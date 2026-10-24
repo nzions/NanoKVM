@@ -6,6 +6,7 @@ over the air: `nanokvm_<version>.tar.gz` plus its `latest.json` manifest.
 | Script | Purpose |
 |---|---|
 | `build-in-container.sh` | Builds every riscv64 artifact (`kvm_system`, `libkvm.so`, `NanoKVM-Server`). Runs inside the `nanokvm-builder` image only. |
+| `forge-build.sh` | forge's build entry: the same steps as `make release`, without docker; publishes to `/artifacts/<version>/`. See "Building on forge". |
 | `package.sh` | Stages the package tree, creates the tarball, and writes `latest.json`. |
 | `compare-release.sh` | Diffs a freshly built package against the currently published one. Informational. |
 | `verify-release-assets.sh` | Checks the three GitHub Release assets before publishing or promotion. |
@@ -76,6 +77,39 @@ provenance file is not attached to the GitHub release. Uploading the tarball and
 `latest.json` to the CDN is what actually offers the update to devices in the
 field, so that step stays manual. `sha256.txt` is only for users verifying a
 manual download and does not change the on-device `latest.json` contract.
+
+## Building on forge
+
+forge (the estate build box) builds the same release without docker: the
+`build` profile in `.build.json` runs `scripts/forge-build.sh` in forge's `c`
+image (nzions/fleet `containers/forge-c`, 1.26 or newer), which carries the
+pinned toolchains at `/opt` (Sophgo host-tools, MaixCDK and its venv, Go 1.26.0,
+Node 22 with pnpm 11). The pins match `docker/Dockerfile`.
+
+```text
+forge_build repo=nanokvm ref=<sha>
+```
+
+The script runs `build-in-container.sh`, the `make web` steps and `package.sh`
+in private copies of the tree and MaixCDK under `$HOME`, then publishes
+`nanokvm_<version>.tar.gz`, `latest.json` and `nanokvm_<version>.tar.gz.sha256`
+to `/artifacts/<version>/` (`/data/nfs/artifacts/nanokvm/<version>/` on beefy).
+A published version is never overwritten with different bytes. The version is
+`$NANOKVM_VERSION`, else an exact numeric git tag on the commit, else the newest
+`## X.Y.Z` heading in `CHANGELOG.md`; bump the CHANGELOG to build a new one.
+MaixCDK downloads its own toolchain and component packages while building, so
+the run needs network access.
+
+The output is **unsigned**. The script prints the sha256 and the name to sign;
+a rook then calls
+
+```text
+keymaster_sign_digest kind=app name=nanokvm-<version>-riscv64 sha256=<sha256>
+```
+
+and writes the returned envelope next to the tarball as
+`nanokvm_<version>.tar.gz.sig`. Publish tarball, `.sig` and `latest.json`
+together; the device refuses an update without a valid `.sig`.
 
 ## Where each file in the package comes from
 
