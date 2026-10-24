@@ -590,6 +590,10 @@ const ru = {
           title: 'Автономные обновления',
           desc: 'Обновление через локальный установочный пакет',
           upload: 'Загрузить',
+          signatureButton: 'Select signature (.sig)',
+          signatureSelected: 'Signature selected: ',
+          signatureRequired: 'Select the .sig signature file that belongs to the package. Updates without a valid signature are refused.',
+          invalidSignatureName: 'The signature file must be named after the package, e.g. nanokvm_1.2.3.tar.gz.sig.',
           checksumPlaceholder: 'Контрольная сумма SHA-256 (необязательно)',
           invalidChecksum:
             'Контрольная сумма SHA-256 должна содержать 64 шестнадцатеричных символа.',

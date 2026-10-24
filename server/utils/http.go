@@ -13,6 +13,8 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+
+	"NanoKVM-Server/service/updatesign"
 )
 
 var downloadClient = NewUpdateHTTPClient(15 * time.Minute)
@@ -42,6 +44,7 @@ func NewAuthenticatedRequest(method string, rawURL string, body io.Reader) (*htt
 func NewUpdateHTTPClient(timeout time.Duration) *http.Client {
 	return &http.Client{
 		Timeout:       timeout,
+		Transport:     updatesign.Transport(),
 		CheckRedirect: preserveBasicAuthRedirect,
 	}
 }
@@ -49,6 +52,13 @@ func NewUpdateHTTPClient(timeout time.Duration) *http.Client {
 func preserveBasicAuthRedirect(req *http.Request, via []*http.Request) error {
 	if len(via) == 0 {
 		return nil
+	}
+	// Update traffic is https only, including after a redirect.
+	if req.URL.Scheme != "https" {
+		return errors.New("update redirect to a non-https URL refused")
+	}
+	if len(via) >= 10 {
+		return errors.New("stopped after 10 redirects")
 	}
 
 	previous := via[len(via)-1]
@@ -71,6 +81,9 @@ func sameUpdateHost(left *url.URL, right *url.URL) bool {
 }
 
 func Download(req *http.Request, target string, maxBytes int64, beforeWrite func(contentLength int64) error) (DownloadInfo, error) {
+	if req.URL.Scheme != "https" {
+		return DownloadInfo{}, errors.New("update download must use https")
+	}
 	log.Debugf("downloading %s to %s", req.URL.Redacted(), target)
 	resp, err := downloadClient.Do(req)
 	if err != nil {

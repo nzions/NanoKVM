@@ -246,7 +246,7 @@ func (s *Service) InstallRuntime(c *gin.Context) {
 	writeSuccess(c, RuntimeInstallResult{
 		Installed: currentStatus.Installed && !currentStatus.Installing,
 		Binary:    picoclawBinaryPath,
-		Download:  picoclawDownloadURL,
+		Download:  picoclawDisplayURL(),
 		Output:    output,
 		Status:    s.runtimeStatus(),
 	})
@@ -337,7 +337,7 @@ func (s *Service) UninstallRuntime(c *gin.Context) {
 	writeSuccess(c, RuntimeInstallResult{
 		Installed: false,
 		Binary:    picoclawBinaryPath,
-		Download:  picoclawDownloadURL,
+		Download:  picoclawDisplayURL(),
 		Output:    uninstallOutput,
 		Status:    s.runtimeStatus(),
 	})

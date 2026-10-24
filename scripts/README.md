@@ -20,8 +20,14 @@ The format is not arbitrary — it is fixed by the on-device updater in
   only directories and regular files under `nanokvm_<version>/`; links,
   special files, duplicate paths, and path traversal are rejected.
 - **`name` is the file name.** `version.go` builds the download URL as
-  `<base>/<name>`, where `<base>` is `https://cdn.sipeed.com/nanokvm` (or
-  `.../preview` when `/etc/kvm/preview_updates` exists).
+  `<base>/<name>`, where `<base>` is `https://hc.nikspace.net/nanokvm` (or
+  `.../preview` when `/etc/kvm/preview_updates` exists). The base must be
+  https.
+- **Every package needs a signature.** Publish `<name>.sig` next to the
+  tarball: a razor-os updatesig envelope (kind `app`, name
+  `nanokvm-<version>-riscv64`, over the tarball's sha256) chaining to the
+  device's pinned firmware CA. `package.sh` prints the sha256 and the signing
+  name. The device refuses an update without a valid `.sig`.
 - **`sha512` is base64, not hex.** `update.go` compares against
   `base64(raw sha512 digest)`. A hex digest will fail verification on device.
 - **`/kvmapp/version`** is what the device reports as its installed version, so

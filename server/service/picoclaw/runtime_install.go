@@ -4,18 +4,21 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
-	"crypto/sha512"
-	"encoding/hex"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
+
+	"NanoKVM-Server/service/application"
+	"NanoKVM-Server/service/updatesign"
+	"NanoKVM-Server/utils"
 )
 
 func (s *Service) installRuntime() (string, *PicoclawError) {
@@ -85,18 +88,17 @@ func (s *Service) runInstallRuntime(ctx context.Context, cancel context.CancelFu
 	}()
 
 	s.setInstallProgress("downloading", 5, "")
-	log.Debugf("picoclaw install: downloading checksum from %s", picoclawChecksumURL)
-	expectedDigest, err := downloadPicoclawChecksum(ctx)
+	archiveURL, err := picoclawArchiveURL()
 	if err != nil {
-		log.Errorf("picoclaw install: checksum download failed: %v", err)
-		s.finishInstallFailure(installFailureStatus(err), err.Error())
+		log.Errorf("picoclaw install: no usable download URL: %v", err)
+		s.finishInstallFailure("install_failed", err.Error())
 		return
 	}
-	log.Debug("picoclaw install: checksum file downloaded")
+	client := newPicoclawClient()
 
 	archivePath := filepath.Join(picoclawCacheDir, "picoclaw.tar.gz")
-	log.Debugf("picoclaw install: downloading archive from %s to %s", picoclawDownloadURL, archivePath)
-	if err := downloadPicoclawArchive(ctx, archivePath, func(downloaded int64, total int64) {
+	log.Debugf("picoclaw install: downloading archive to %s", archivePath)
+	if err := downloadPicoclawArchive(ctx, client, archiveURL, archivePath, func(downloaded int64, total int64) {
 		progress := 10
 		if total > 0 {
 			progress = 10 + int(float64(downloaded)*70/float64(total))
@@ -114,12 +116,13 @@ func (s *Service) runInstallRuntime(ctx context.Context, cancel context.CancelFu
 
 	s.setInstallProgress("verifying", 82, "")
 
-	if err := verifyFileSHA512(archivePath, expectedDigest); err != nil {
-		log.Errorf("picoclaw install: checksum verification failed: %v", err)
+	// The signature is the gate: nothing is extracted or installed before it passes.
+	if err := verifyPicoclawSignature(client, archiveURL, archivePath); err != nil {
+		log.Errorf("picoclaw install: signature verification failed: %v", err)
 		s.finishInstallFailure(installFailureStatus(err), err.Error())
 		return
 	}
-	log.Debugf("picoclaw install: archive checksum verified for %s", archivePath)
+	log.Debugf("picoclaw install: archive signature verified for %s", archivePath)
 
 	s.setInstallProgress("extracting", 85, "")
 	log.Debugf("picoclaw install: extracting binary from %s", archivePath)
@@ -152,15 +155,13 @@ func (s *Service) runInstallRuntime(ctx context.Context, cancel context.CancelFu
 	})
 }
 
-func downloadPicoclawArchive(ctx context.Context, destination string, onProgress func(downloaded int64, total int64)) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, picoclawDownloadURL, nil)
+func downloadPicoclawArchive(ctx context.Context, client *http.Client, archiveURL string, destination string, onProgress func(downloaded int64, total int64)) error {
+	req, err := utils.NewAuthenticatedRequest(http.MethodGet, archiveURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create download request: %w", err)
 	}
+	req = req.WithContext(ctx)
 
-	client := &http.Client{
-		Timeout: picoclawDownloadTimeout,
-	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to download picoclaw: %w", err)
@@ -171,47 +172,36 @@ func downloadPicoclawArchive(ctx context.Context, destination string, onProgress
 		return fmt.Errorf("failed to download picoclaw: unexpected status %s", resp.Status)
 	}
 
+	if resp.ContentLength > picoclawMaxArchiveBytes {
+		return fmt.Errorf("picoclaw archive exceeds %d bytes", picoclawMaxArchiveBytes)
+	}
+
 	file, err := os.Create(destination)
 	if err != nil {
 		return fmt.Errorf("failed to create archive file: %w", err)
 	}
 	defer file.Close()
 
-	if err := copyWithProgress(ctx, file, resp.Body, resp.ContentLength, onProgress); err != nil {
+	limited := io.LimitReader(resp.Body, picoclawMaxArchiveBytes+1)
+	counter := &countingWriter{w: file}
+	if err := copyWithProgress(ctx, counter, limited, resp.ContentLength, onProgress); err != nil {
 		return fmt.Errorf("failed to save archive: %w", err)
+	}
+	if counter.n > picoclawMaxArchiveBytes {
+		return fmt.Errorf("picoclaw archive exceeds %d bytes", picoclawMaxArchiveBytes)
 	}
 	return nil
 }
 
-func downloadPicoclawChecksum(ctx context.Context) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, picoclawChecksumURL, nil)
-	if err != nil {
-		return "", fmt.Errorf("failed to create checksum request: %w", err)
-	}
+type countingWriter struct {
+	w io.Writer
+	n int64
+}
 
-	client := &http.Client{
-		Timeout: picoclawDownloadTimeout,
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("failed to download picoclaw checksum: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to download picoclaw checksum: unexpected status %s", resp.Status)
-	}
-
-	data, err := io.ReadAll(io.LimitReader(resp.Body, 16*1024))
-	if err != nil {
-		return "", fmt.Errorf("failed to read checksum file: %w", err)
-	}
-
-	digest, err := parseSHA512Digest(string(data), filepath.Base(picoclawDownloadURL))
-	if err != nil {
-		return "", err
-	}
-	return digest, nil
+func (c *countingWriter) Write(p []byte) (int, error) {
+	n, err := c.w.Write(p)
+	c.n += int64(n)
+	return n, err
 }
 
 func copyWithProgress(ctx context.Context, dst io.Writer, src io.Reader, total int64, onProgress func(downloaded int64, total int64)) error {
@@ -293,78 +283,73 @@ func installFailureStatus(err error) string {
 	return "install_failed"
 }
 
-func parseSHA512Digest(raw string, expectedName string) (string, error) {
-	lines := strings.Split(raw, "\n")
-	var fallback string
-
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			continue
-		}
-
-		fields := strings.Fields(trimmed)
-		if len(fields) == 0 {
-			continue
-		}
-
-		digest := fields[0]
-		if !isValidSHA512Digest(digest) {
-			continue
-		}
-
-		if len(fields) == 1 {
-			if fallback == "" {
-				fallback = strings.ToLower(digest)
-			}
-			continue
-		}
-
-		name := strings.TrimPrefix(fields[len(fields)-1], "*")
-		if expectedName == "" || name == expectedName {
-			return strings.ToLower(digest), nil
-		}
-	}
-
-	if fallback != "" {
-		return fallback, nil
-	}
-
-	return "", fmt.Errorf("failed to parse sha512 digest from checksum file")
-}
-
-func isValidSHA512Digest(value string) bool {
-	if len(value) != sha512.Size*2 {
-		return false
-	}
-
-	_, err := hex.DecodeString(value)
-	return err == nil
-}
-
-func verifyFileSHA512(filePath string, expectedDigest string) error {
-	expectedDigest = strings.ToLower(strings.TrimSpace(expectedDigest))
-	if !isValidSHA512Digest(expectedDigest) {
-		return fmt.Errorf("invalid expected sha512 digest")
-	}
-
-	file, err := os.Open(filePath)
+// picoclawArchiveURL is <update base>/picoclaw/v<version>/<archive>; the base
+// is the configured update server and must be https.
+func picoclawArchiveURL() (string, error) {
+	base, err := application.ResolveUpdateBaseURL()
 	if err != nil {
-		return fmt.Errorf("failed to open file for sha512 verification: %w", err)
+		return "", err
+	}
+	archiveURL, err := url.JoinPath(base, "picoclaw", "v"+picoclawVersion, picoclawArchiveName)
+	if err != nil {
+		return "", fmt.Errorf("join picoclaw URL: %w", err)
+	}
+	if err := updatesign.RequireHTTPS(archiveURL); err != nil {
+		return "", err
+	}
+	return archiveURL, nil
+}
+
+// picoclawDisplayURL is the archive URL with any credentials redacted, for the UI.
+func picoclawDisplayURL() string {
+	archiveURL, err := picoclawArchiveURL()
+	if err != nil {
+		return ""
+	}
+	parsed, err := url.Parse(archiveURL)
+	if err != nil {
+		return ""
+	}
+	return parsed.Redacted()
+}
+
+func fileSHA256(path string) ([sha256.Size]byte, error) {
+	var sum [sha256.Size]byte
+	file, err := os.Open(path)
+	if err != nil {
+		return sum, fmt.Errorf("failed to open archive for hashing: %w", err)
 	}
 	defer file.Close()
 
-	hasher := sha512.New()
+	hasher := sha256.New()
 	if _, err := io.Copy(hasher, file); err != nil {
-		return fmt.Errorf("failed to hash file for sha512 verification: %w", err)
+		return sum, fmt.Errorf("failed to hash archive: %w", err)
 	}
+	copy(sum[:], hasher.Sum(nil))
+	return sum, nil
+}
 
-	actualDigest := hex.EncodeToString(hasher.Sum(nil))
-	if actualDigest != expectedDigest {
-		return fmt.Errorf("sha512 mismatch: got %s", actualDigest)
+// verifyPicoclawSignature requires <archive URL>.sig to carry a valid
+// signature over picoclaw-<version>-riscv64 and the archive's sha256.
+func verifyPicoclawSignature(client *http.Client, archiveURL string, archivePath string) error {
+	sum, err := fileSHA256(archivePath)
+	if err != nil {
+		return err
 	}
-
+	envelope, err := updatesign.FetchEnvelope(client, archiveURL)
+	if err != nil {
+		return fmt.Errorf("picoclaw signature: %w", err)
+	}
+	signer, err := updatesign.Verify(updatesign.PicoclawName(picoclawVersion), envelope, sum)
+	if err != nil {
+		return fmt.Errorf("picoclaw signature: %w", err)
+	}
+	log.Infof("picoclaw %s signed by %s", picoclawVersion, signer)
 	return nil
+}
+
+func newPicoclawClient() *http.Client {
+	return utils.NewUpdateHTTPClient(picoclawDownloadTimeout)
 }
 
 func extractPicoclawBinary(archivePath string, destinationDir string) (string, error) {

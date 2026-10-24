@@ -225,7 +225,28 @@ cat > "$MANIFEST" <<EOF
 }
 EOF
 
+# --- signing -----------------------------------------------------------------
+# The device refuses any package without a razor-os updatesig envelope that
+# chains to its pinned firmware CA (server/service/updatesign). The envelope
+# is served next to the tarball as "<tarball>.sig" and signs kind "app", the
+# name below, and the tarball's sha256.
+#
+# The .sig is produced by keymaster's digest door until forge builds and signs
+# releases: a rook calls
+#   keymaster_sign_digest kind=app name=<SIGN_NAME> sha256=<hex below>
+# and writes the returned envelope to "<tarball>.sig". Publish tarball,
+# <tarball>.sig and latest.json together.
+SHA256_HEX="$(openssl dgst -sha256 -r "$TARBALL" | cut -d' ' -f1 | tr 'A-F' 'a-f')"
+SIGN_NAME="nanokvm-$VERSION-riscv64"
+printf '%s\n' "$SHA256_HEX" > "$TARBALL.sha256"
+
 echo
 echo "[DONE] $TARBALL"
 echo "[DONE] $MANIFEST"
+echo "[DONE] $TARBALL.sha256"
 cat "$MANIFEST"
+echo
+echo "sha256:    $SHA256_HEX"
+echo "sign name: $SIGN_NAME"
+echo "next:      keymaster_sign_digest kind=app name=$SIGN_NAME sha256=$SHA256_HEX"
+echo "           -> write the envelope to $TARBALL.sig"

@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import * as api from '@/api/application.ts';
 
-const OFFICIAL_UPDATE_SERVER = 'https://cdn.sipeed.com/nanokvm';
+const OFFICIAL_UPDATE_SERVER = 'https://hc.nikspace.net/nanokvm';
 
 interface CustomServerProps {
   checkForUpdates: () => void;
@@ -56,7 +56,7 @@ export const CustomServer = ({
 
     try {
       const parsed = new URL(trimmed);
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      if (parsed.protocol !== 'https:') {
         return t('settings.update.customServer.invalidUrl');
       }
       if (

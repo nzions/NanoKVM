@@ -593,6 +593,10 @@ const it = {
           title: 'Aggiornamenti offline',
           desc: 'Aggiornamento tramite pacchetto di installazione locale',
           upload: 'Carica',
+          signatureButton: 'Select signature (.sig)',
+          signatureSelected: 'Signature selected: ',
+          signatureRequired: 'Select the .sig signature file that belongs to the package. Updates without a valid signature are refused.',
+          invalidSignatureName: 'The signature file must be named after the package, e.g. nanokvm_1.2.3.tar.gz.sig.',
           checksumPlaceholder: 'Checksum SHA-256 (facoltativo)',
           invalidChecksum: 'Il checksum SHA-256 deve contenere 64 caratteri esadecimali.',
           checksumMismatch:

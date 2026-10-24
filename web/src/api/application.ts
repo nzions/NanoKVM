@@ -21,12 +21,11 @@ export function update() {
 }
 
 // offline update application
-export function offlineUpdate(data: FormData, sha256Checksum = '') {
+export function offlineUpdate(data: FormData) {
   const baseUrl = getBaseUrl('http');
   const url = `${baseUrl}/api/application/update/offline`;
   return fetch(url, {
     method: 'POST',
-    headers: sha256Checksum ? { 'X-SHA256-Checksum': sha256Checksum } : undefined,
     body: data
   });
 }

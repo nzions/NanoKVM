@@ -92,7 +92,8 @@ void new_app_init(void)
 {
 	// Update the necessary scripts
 	system("rm -f /boot/logo.jpeg");
-	system("cp -f /kvmapp/system/update-nanokvm.py /etc/kvm/");
+	// The unsigned update script is retired; updates go through the signed server path.
+	system("rm -f /etc/kvm/update-nanokvm.py");
 	system("rm -f /etc/init.d/S02udisk");
 	system("cp -f /kvmapp/system/init.d/S00kmod /etc/init.d/");
 	system("cp -f /kvmapp/system/init.d/S01fs /etc/init.d/");

@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"NanoKVM-Server/proto"
+	"NanoKVM-Server/service/updatesign"
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
@@ -87,21 +88,47 @@ func (s *Service) SetUpdateServer(c *gin.Context) {
 	})
 }
 
+// ResolveUpdateBaseURL returns the https update base other services (picoclaw)
+// download from.
+func ResolveUpdateBaseURL() (string, error) {
+	return resolveUpdateBaseURL()
+}
+
 func resolveUpdateBaseURL() (string, error) {
 	cfg, err := loadUpdateServerConfig()
 	if err != nil {
 		return "", err
 	}
-	if cfg.Enabled {
-		return cfg.URL, nil
+	base := StableURL
+	switch {
+	case cfg.Enabled:
+		base = cfg.URL
+	case isPreviewEnabled():
+		base = PreviewURL
 	}
-	if isPreviewEnabled() {
-		return PreviewURL, nil
+	// A saved config may predate the https-only rule: refuse at use time.
+	if err := updatesign.RequireHTTPS(base); err != nil {
+		return "", err
 	}
-	return StableURL, nil
+	return base, nil
 }
 
+// normalizeUpdateServerURL validates a URL being saved: https only.
 func normalizeUpdateServerURL(raw string) (string, error) {
+	normalized, err := parseUpdateServerURL(raw)
+	if err != nil || normalized == "" {
+		return normalized, err
+	}
+	if err := updatesign.RequireHTTPS(normalized); err != nil {
+		return "", err
+	}
+	return normalized, nil
+}
+
+// parseUpdateServerURL normalizes without judging the scheme beyond
+// http/https, so an old saved http config still loads (and shows in the UI)
+// while resolveUpdateBaseURL refuses to use it.
+func parseUpdateServerURL(raw string) (string, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return "", nil
@@ -146,7 +173,7 @@ func loadUpdateServerConfigFromPath(path string) (UpdateServerConfig, error) {
 		return UpdateServerConfig{}, fmt.Errorf("decode update server config: %w", err)
 	}
 
-	normalizedURL, err := normalizeUpdateServerURL(cfg.URL)
+	normalizedURL, err := parseUpdateServerURL(cfg.URL)
 	if err != nil {
 		return UpdateServerConfig{}, err
 	}

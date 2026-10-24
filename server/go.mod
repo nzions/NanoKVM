@@ -1,6 +1,6 @@
 module NanoKVM-Server
 
-go 1.25.0
+go 1.26
 
 require (
 	github.com/creack/pty v1.1.24
@@ -13,6 +13,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/mervick/aes-everywhere/go/aes256 v0.0.0-20240803013625-6759956693c0
 	github.com/modelcontextprotocol/go-sdk v1.6.1
+	github.com/nzions/razor-os/linux/app/updatesig v0.0.0-20261024162418-d49753e2f034
 	github.com/pion/dtls/v3 v3.1.2
 	github.com/pion/interceptor v0.1.39
 	github.com/pion/rtp v1.8.18

@@ -1,8 +1,10 @@
 package application
 
+import "NanoKVM-Server/service/updatesign"
+
 const (
-	StableURL  = "https://cdn.sipeed.com/nanokvm"
-	PreviewURL = "https://cdn.sipeed.com/nanokvm/preview"
+	StableURL  = updatesign.DefaultBaseURL
+	PreviewURL = updatesign.DefaultBaseURL + "/preview"
 
 	AppDir    = "/kvmapp"
 	BackupDir = "/root/old"

@@ -592,6 +592,10 @@ const ja = {
           title: 'オフラインアップデート',
           desc: 'ローカルインストールパッケージでアップデートする',
           upload: 'アップロード',
+          signatureButton: 'Select signature (.sig)',
+          signatureSelected: 'Signature selected: ',
+          signatureRequired: 'Select the .sig signature file that belongs to the package. Updates without a valid signature are refused.',
+          invalidSignatureName: 'The signature file must be named after the package, e.g. nanokvm_1.2.3.tar.gz.sig.',
           checksumPlaceholder: 'SHA-256チェックサム（任意）',
           invalidChecksum: 'SHA-256チェックサムは64文字の16進数である必要があります。',
           checksumMismatch:

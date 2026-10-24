@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Button, Input } from 'antd';
+import { Button } from 'antd';
 import { ExternalLinkIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -16,10 +16,26 @@ export const Offline = ({ status, setStatus, setIsLocked, setErrMsg }: UpdatePro
   const { t } = useTranslation();
 
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const [sha256Checksum, setSha256Checksum] = useState('');
+  const sigInputRef = useRef<HTMLInputElement | null>(null);
+  const [signature, setSignature] = useState<File | null>(null);
 
   function handleClick() {
+    if (!signature) {
+      setStatus('failed');
+      setErrMsg(t('settings.update.offline.signatureRequired'));
+      return;
+    }
     inputRef.current?.click();
+  }
+
+  function handleSignatureChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) {
+      return;
+    }
+    setSignature(file);
+    setErrMsg('');
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -41,10 +57,15 @@ export const Offline = ({ status, setStatus, setIsLocked, setErrMsg }: UpdatePro
   function upload(file: File | null) {
     if (!file) return;
 
-    const checksum = sha256Checksum.trim();
-    if (checksum && !/^[a-fA-F0-9]{64}$/.test(checksum)) {
+    if (!signature) {
       setStatus('failed');
-      setErrMsg(t('settings.update.offline.invalidChecksum'));
+      setErrMsg(t('settings.update.offline.signatureRequired'));
+      return;
+    }
+
+    if (signature.name !== `${file.name}.sig`) {
+      setStatus('failed');
+      setErrMsg(t('settings.update.offline.invalidSignatureName'));
       return;
     }
 
@@ -64,9 +85,10 @@ export const Offline = ({ status, setStatus, setIsLocked, setErrMsg }: UpdatePro
 
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('signature', signature);
 
     api
-      .offlineUpdate(formData, checksum)
+      .offlineUpdate(formData)
       .then(async (rsp: Response) => {
         // The proxy may return 502 after the update stops the old server.
         if (rsp.status === 502) return;
@@ -74,10 +96,7 @@ export const Offline = ({ status, setStatus, setIsLocked, setErrMsg }: UpdatePro
 
         const rspj = await rsp.json();
         if (rspj.code !== 0) {
-          const message = rspj.msg?.includes('sha256 checksum mismatch')
-            ? t('settings.update.offline.checksumMismatch')
-            : rspj.msg || t('settings.update.offline.updateFailed');
-          throw new Error(message);
+          throw new Error(rspj.msg || t('settings.update.offline.updateFailed'));
         }
       })
       .then(() => {
@@ -128,18 +147,36 @@ export const Offline = ({ status, setStatus, setIsLocked, setErrMsg }: UpdatePro
             onChange={handleFileChange}
             className="hidden"
           />
-          <Button disabled={status === 'loading' || status === 'updating'} onClick={handleClick}>
-            {t('settings.update.offline.upload')}
-          </Button>
+          <input
+            id="signature-upload"
+            ref={sigInputRef}
+            type="file"
+            accept=".sig"
+            onChange={handleSignatureChange}
+            className="hidden"
+          />
+          <div className="flex items-center space-x-2">
+            <Button
+              disabled={status === 'loading' || status === 'updating'}
+              onClick={() => sigInputRef.current?.click()}
+            >
+              {t('settings.update.offline.signatureButton')}
+            </Button>
+            <Button
+              type="primary"
+              disabled={status === 'loading' || status === 'updating' || !signature}
+              onClick={handleClick}
+            >
+              {t('settings.update.offline.upload')}
+            </Button>
+          </div>
         </div>
 
-        <Input
-          value={sha256Checksum}
-          maxLength={64}
-          disabled={status === 'updating'}
-          placeholder={t('settings.update.offline.checksumPlaceholder')}
-          onChange={(event) => setSha256Checksum(event.target.value)}
-        />
+        <span className="text-xs text-neutral-500">
+          {signature
+            ? `${t('settings.update.offline.signatureSelected')}${signature.name}`
+            : t('settings.update.offline.signatureRequired')}
+        </span>
       </div>
     </>
   );

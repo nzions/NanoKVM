@@ -597,6 +597,10 @@ const de = {
           title: 'Offline Aktualisierung',
           desc: 'Über lokales Installationspaket aktualisieren',
           upload: 'Hochladen',
+          signatureButton: 'Select signature (.sig)',
+          signatureSelected: 'Signature selected: ',
+          signatureRequired: 'Select the .sig signature file that belongs to the package. Updates without a valid signature are refused.',
+          invalidSignatureName: 'The signature file must be named after the package, e.g. nanokvm_1.2.3.tar.gz.sig.',
           checksumPlaceholder: 'SHA-256-Prüfsumme (optional)',
           invalidChecksum: 'Die SHA-256-Prüfsumme muss 64 hexadezimale Zeichen enthalten.',
           checksumMismatch:

@@ -1,6 +1,7 @@
 package application
 
 import (
+	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/base64"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"NanoKVM-Server/proto"
+	"NanoKVM-Server/service/updatesign"
 	"NanoKVM-Server/utils"
 )
 
@@ -90,6 +92,11 @@ func update() error {
 		log.Errorf("check sha512 failed: %s", err)
 		return err
 	}
+	// The signature is the gate: nothing is inspected or extracted before it passes.
+	if err := verifyDownloadedSignature(latest, target); err != nil {
+		log.Errorf("update signature check failed: %s", err)
+		return err
+	}
 	expectedRoot := strings.TrimSuffix(latest.Name, ".tar.gz")
 	info, err := inspectUpdateArchive(target, expectedRoot)
 	if err != nil {
@@ -114,6 +121,40 @@ func update() error {
 	}
 
 	return nil
+}
+
+// verifyDownloadedSignature fetches "<package URL>.sig" and verifies it against
+// the sha256 of the downloaded file and the name nanokvm-<version>-riscv64.
+func verifyDownloadedSignature(latest *Latest, target string) error {
+	sum, err := fileSHA256(target)
+	if err != nil {
+		return err
+	}
+	envelope, err := updatesign.FetchEnvelope(latestClient, latest.Url)
+	if err != nil {
+		return err
+	}
+	signer, err := updatesign.Verify(updatesign.AppName(latest.Version), envelope, sum)
+	if err != nil {
+		return err
+	}
+	log.Infof("update %s signed by %s", latest.Version, signer)
+	return nil
+}
+
+func fileSHA256(path string) ([sha256.Size]byte, error) {
+	var sum [sha256.Size]byte
+	file, err := os.Open(path)
+	if err != nil {
+		return sum, err
+	}
+	defer func() { _ = file.Close() }()
+	hasher := sha256.New()
+	if _, err := io.Copy(hasher, file); err != nil {
+		return sum, fmt.Errorf("hash update package: %w", err)
+	}
+	copy(sum[:], hasher.Sum(nil))
+	return sum, nil
 }
 
 func download(latest *Latest, target string) (info utils.DownloadInfo, err error) {

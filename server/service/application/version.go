@@ -148,6 +148,10 @@ func validateLatest(latest *Latest) error {
 	if !packageNamePattern.MatchString(latest.Name) {
 		return errors.New("invalid update package name")
 	}
+	// The signature names the version, so the package must be that version's.
+	if latest.Name != "nanokvm_"+latest.Version+".tar.gz" {
+		return errors.New("update package name does not match its version")
+	}
 	digest, err := base64.StdEncoding.DecodeString(latest.Sha512)
 	if err != nil || len(digest) != 64 {
 		return errors.New("invalid update package sha512")

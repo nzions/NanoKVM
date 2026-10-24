@@ -1,9 +1,6 @@
 package application
 
 import (
-	"crypto/sha256"
-	"crypto/subtle"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -14,6 +11,7 @@ import (
 	"strings"
 
 	"NanoKVM-Server/proto"
+	"NanoKVM-Server/service/updatesign"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 )
@@ -41,11 +39,6 @@ func (s *Service) OfflineUpdate(c *gin.Context) {
 }
 
 func offlineUpdate(c *gin.Context) error {
-	expectedSHA256, err := parseSHA256Checksum(c.GetHeader("X-SHA256-Checksum"))
-	if err != nil {
-		return err
-	}
-
 	if err := prepareCacheForUpdate(); err != nil {
 		return err
 	}
@@ -85,20 +78,29 @@ func offlineUpdate(c *gin.Context) error {
 		return fmt.Errorf("invalid multipart data: %w", err)
 	}
 
-	target, err := processUpload(reader, contentLength, workspace.dir)
+	target, envelope, err := processUpload(reader, contentLength, workspace.dir)
 	if err != nil {
 		log.Errorf("failed to upload install package: %v", err)
 		return err
 	}
 
-	if err := verifySHA256Checksum(target, expectedSHA256); err != nil {
-		log.Errorf("failed to verify install package: %v", err)
-		return err
-	}
-
+	// The version is the one the package file name declares (validateFilename
+	// pins it to nanokvm_X.Y.Z.tar.gz). Nothing is inspected, extracted or
+	// installed until the signature over that name and the file's sha256 passes.
 	archiveName := filepath.Base(target)
 	expectedRoot := strings.TrimSuffix(archiveName, ".tar.gz")
 	expectedVersion := strings.TrimPrefix(expectedRoot, "nanokvm_")
+	sum, err := fileSHA256(target)
+	if err != nil {
+		return err
+	}
+	signer, err := updatesign.Verify(updatesign.AppName(expectedVersion), envelope, sum)
+	if err != nil {
+		log.Errorf("offline update signature check failed: %v", err)
+		return err
+	}
+	log.Infof("offline update %s signed by %s", expectedVersion, signer)
+
 	info, err := inspectUpdateArchive(target, expectedRoot)
 	if err != nil {
 		return fmt.Errorf("inspect update package: %w", err)
@@ -116,43 +118,6 @@ func offlineUpdate(c *gin.Context) error {
 	if err := installPreparedPackage(sourceDir); err != nil {
 		log.Errorf("failed to install package: %v", err)
 		return err
-	}
-
-	return nil
-}
-
-func parseSHA256Checksum(value string) ([]byte, error) {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return nil, nil
-	}
-
-	checksum, err := hex.DecodeString(value)
-	if err != nil || len(checksum) != sha256.Size {
-		return nil, fmt.Errorf("invalid sha256 checksum")
-	}
-
-	return checksum, nil
-}
-
-func verifySHA256Checksum(filePath string, expected []byte) error {
-	if len(expected) == 0 {
-		return nil
-	}
-
-	file, err := os.Open(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to open uploaded file: %w", err)
-	}
-	defer file.Close()
-
-	hasher := sha256.New()
-	if _, err := io.Copy(hasher, file); err != nil {
-		return fmt.Errorf("failed to calculate sha256 checksum: %w", err)
-	}
-
-	if subtle.ConstantTimeCompare(hasher.Sum(nil), expected) != 1 {
-		return fmt.Errorf("sha256 checksum mismatch")
 	}
 
 	return nil
@@ -185,8 +150,11 @@ func createSentinelFile() error {
 	return nil
 }
 
-func processUpload(reader *multipart.Reader, contentLength int64, workspaceDir string) (string, error) {
+// processUpload reads the package ("file") and its signature envelope
+// ("signature", the .sig file) from the multipart body, in either order.
+func processUpload(reader *multipart.Reader, contentLength int64, workspaceDir string) (string, []byte, error) {
 	var outPath string
+	var envelope []byte
 
 	for {
 		part, err := reader.NextPart()
@@ -194,27 +162,37 @@ func processUpload(reader *multipart.Reader, contentLength int64, workspaceDir s
 			break
 		}
 		if err != nil {
-			return "", fmt.Errorf("failed to read multipart: %w", err)
+			return "", nil, fmt.Errorf("failed to read multipart: %w", err)
 		}
 
-		if part.FormName() != "file" {
-			continue
-		}
-		if outPath != "" {
-			return "", fmt.Errorf("multiple files uploaded")
-		}
-
-		outPath, err = saveUploadedFile(part, contentLength, workspaceDir)
-		if err != nil {
-			return "", err
+		switch part.FormName() {
+		case "file":
+			if outPath != "" {
+				return "", nil, fmt.Errorf("multiple files uploaded")
+			}
+			outPath, err = saveUploadedFile(part, contentLength, workspaceDir)
+			if err != nil {
+				return "", nil, err
+			}
+		case "signature":
+			if envelope != nil {
+				return "", nil, fmt.Errorf("multiple signatures uploaded")
+			}
+			envelope, err = updatesign.ReadEnvelope(part)
+			if err != nil {
+				return "", nil, err
+			}
 		}
 	}
 
 	if outPath == "" {
-		return "", fmt.Errorf("no file uploaded")
+		return "", nil, fmt.Errorf("no file uploaded")
+	}
+	if envelope == nil {
+		return "", nil, fmt.Errorf("no signature uploaded: select the .sig file that belongs to the package")
 	}
 
-	return outPath, nil
+	return outPath, envelope, nil
 }
 
 func saveUploadedFile(part *multipart.Part, contentLength int64, workspaceDir string) (string, error) {
