@@ -1,3 +1,10 @@
+## 2.5.3 (2026-10-25)
+
+### Features
+
+* Settings → Network shows each network interface (Ethernet, Wi-Fi) with the same settings: DHCP or static IPv4 address, netmask and gateway, plus the SSID for Wi-Fi. An interface the device does not have is shown as not present. A change must be confirmed from the device's address within 120 seconds, or the previous settings are restored, including after a reboot.
+* Wi-Fi station mode honours a static address in /boot/wlan.nodhcp (same format as /boot/eth.nodhcp), re-applied without dropping the Wi-Fi join
+
 ## 2.5.2 (2026-10-25)
 
 ### Security
