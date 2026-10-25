@@ -486,24 +486,48 @@ void kvm_wifi_config_ui_disp(uint8_t first_disp, uint8_t subpage_changed)
 	// switch(show_which_page())
 }
 
-// Show the first-boot / reset password (SEED_PASS_FILE) until a key is pressed
-// or the owner changes it.
+// Read the first line of path into pass (one 6x8 line is 21 characters).
+// Returns 1 when the file exists.
+static uint8_t read_pass_file(const char *path, char pass[22])
+{
+	FILE *fp = fopen(path, "r");
+	pass[0] = '\0';
+	if(fp == NULL) return 0;
+	if(fgets(pass, 22, fp) == NULL) pass[0] = '\0';
+	fclose(fp);
+	pass[strcspn(pass, "\r\n")] = '\0';
+	return 1;
+}
+
+// Show the first-boot / reset password (SEED_PASS_FILE) and/or the rotated root
+// password (ROOT_PASS_FILE) until a key is pressed or the owner changes the
+// password (the files are removed).
 void kvm_password_ui_disp(uint8_t first_disp, uint8_t subpage_changed)
 {
-	char pass[22] = {0};	// one 6x8 line is 21 characters
-	FILE *fp;
+	char seed[22] = {0};
+	char root[22] = {0};
+	uint8_t has_seed, has_root;
 	if(!(first_disp || subpage_changed)) return;
-	fp = fopen(SEED_PASS_FILE, "r");
-	if(fp != NULL){
-		if(fgets(pass, sizeof(pass), fp) == NULL) pass[0] = '\0';
-		fclose(fp);
-	}
-	pass[strcspn(pass, "\r\n")] = '\0';
+	has_seed = read_pass_file(SEED_PASS_FILE, seed);
+	has_root = read_pass_file(ROOT_PASS_FILE, root);
 	OLED_Clear();
-	OLED_ShowString(0, 0, "Web login: admin", 8);
-	OLED_ShowString(0, 1, "Password:", 8);
-	OLED_ShowString(0, 2, pass, 8);
-	OLED_ShowString(0, 3, "Key: close", 8);
+	if(has_seed && has_root && strcmp(seed, root) != 0){
+		// two different passwords: no room for the close hint, any key closes
+		OLED_ShowString(0, 0, "Web admin:", 8);
+		OLED_ShowString(0, 1, seed, 8);
+		OLED_ShowString(0, 2, "SSH root:", 8);
+		OLED_ShowString(0, 3, root, 8);
+	} else if(has_seed){
+		OLED_ShowString(0, 0, has_root ? "Web admin / SSH root:" : "Web login: admin", 8);
+		OLED_ShowString(0, 1, "Password:", 8);
+		OLED_ShowString(0, 2, seed, 8);
+		OLED_ShowString(0, 3, "Key: close", 8);
+	} else {
+		OLED_ShowString(0, 0, "SSH login: root", 8);
+		OLED_ShowString(0, 1, "Password:", 8);
+		OLED_ShowString(0, 2, root, 8);
+		OLED_ShowString(0, 3, "Key: close", 8);
+	}
 }
 
 void oled_auto_sleep_time_update(void)

@@ -11,17 +11,94 @@ PIDFILE="/var/run/sshd.pid"
 
 umask 077
 
-# Key-only login. Each option is probed first: sshd refuses to start on a
-# keyword its version does not know (KbdInteractiveAuthentication is newer
-# than ChallengeResponseAuthentication).
-sshd_opts() {
-    for opt in PasswordAuthentication=no KbdInteractiveAuthentication=no \
-        ChallengeResponseAuthentication=no PermitRootLogin=prohibit-password \
-        PermitEmptyPasswords=no; do
-        if /usr/sbin/sshd -t -o "$opt" >/dev/null 2>&1; then
-            printf '%s\n' "-o" "$opt"
+ROOT_PASS_FILE="/etc/kvm/root.pass"
+SHADOW_FILE="${SHADOW_FILE:-/etc/shadow}"
+
+# Print crypt(root-password-guess, <setting from the shadow hash>) for one tool.
+# $1 hash type id (1, 5, 6 or des), $2 busybox -m name, $3 full hash, $4 salt.
+root_hash_candidates() {
+    id="$1"; alg="$2"; full="$3"; salt="$4"
+    if command -v cryptpw >/dev/null 2>&1; then
+        cryptpw -m "$alg" -S "$full" root 2>/dev/null
+        cryptpw -m "$alg" -S "$salt" root 2>/dev/null
+    fi
+    if command -v mkpasswd >/dev/null 2>&1; then
+        mkpasswd -m "$alg" -S "$full" root 2>/dev/null
+        mkpasswd -m "$alg" -S "$salt" root 2>/dev/null
+    fi
+    if command -v openssl >/dev/null 2>&1; then
+        case "$id" in
+            1|5|6) openssl passwd "-$id" -salt "$salt" root 2>/dev/null ;;
+            des) openssl passwd -crypt -salt "$salt" root 2>/dev/null ;;
+        esac
+    fi
+}
+
+# 0 when root's password is still "root" (or empty), 1 when it is something
+# else or locked, 2 when it could not be determined.
+root_password_is_default() {
+    hash=""
+    found=0
+    while IFS=: read -r shadow_user shadow_hash shadow_rest; do
+        if [ "$shadow_user" = "root" ]; then
+            hash="$shadow_hash"
+            found=1
+            break
         fi
+    done < "$SHADOW_FILE"
+    # no root line is "cannot tell", not an empty password
+    [ "$found" -eq 1 ] || return 2
+    case "$hash" in
+        '') return 0 ;;
+        '!'*|'*'*) return 1 ;;
+        '$1$'*) id=1; alg=md5 ;;
+        '$5$'*) id=5; alg=sha256 ;;
+        '$6$'*) id=6; alg=sha512 ;;
+        '$'*) return 2 ;;
+        *) id=des; alg=des ;;
+    esac
+    if [ "$id" = "des" ]; then
+        salt=$(printf '%s' "$hash" | cut -c1-2)
+    else
+        salt="${hash#\$?\$}"
+        salt="${salt%%\$*}"
+    fi
+    out=$(root_hash_candidates "$id" "$alg" "$hash" "$salt")
+    [ -n "$out" ] || return 2
+    # a tool that ignored the salt cannot match by accident; any hit is exact
+    printf '%s\n' "$out" | while IFS= read -r candidate; do
+        [ "$candidate" = "$hash" ] && exit 7
     done
+    [ $? -eq 7 ] && return 0
+    return 1
+}
+
+# The image ships root:root. With password login on, that is a known password:
+# replace it with a random one, kept 0600 in /etc/kvm/root.pass and shown on the
+# device screen by kvm_system until the owner sets a password (the file is then
+# removed). Delete the file to dismiss the page.
+rotate_default_root_password() {
+    [ -r "$SHADOW_FILE" ] || return 0
+    root_password_is_default
+    case $? in
+        0) ;;
+        2) echo "WARNING: cannot verify root's password (no cryptpw/mkpasswd/openssl?)" >&2; return 0 ;;
+        *) return 0 ;;
+    esac
+    pw=$(tr -dc '23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz' < /dev/urandom | head -c 12)
+    if [ "${#pw}" -ne 12 ]; then
+        echo "ERROR: root password is the default but no random password could be made" >&2
+        return 0
+    fi
+    mkdir -p /etc/kvm
+    if printf 'root:%s\n' "$pw" | chpasswd; then
+        printf '%s\n' "$pw" > "$ROOT_PASS_FILE.new" && chmod 600 "$ROOT_PASS_FILE.new" &&
+            mv "$ROOT_PASS_FILE.new" "$ROOT_PASS_FILE"
+        sync
+        echo "root password was the default: rotated (see $ROOT_PASS_FILE)"
+    else
+        echo "ERROR: root password is the default and chpasswd failed" >&2
+    fi
 }
 
 startssh() {
@@ -29,13 +106,14 @@ startssh() {
     [ ! -f /etc/ssh/ssh_host_rsa_key ] && /usr/bin/ssh-keygen -A
 
         printf "Starting sshd: "
-        # shellcheck disable=SC2046
-        /usr/sbin/sshd $(sshd_opts | tr '\n' ' ')
+        # password and public-key login are both accepted; empty passwords never
+        /usr/sbin/sshd -o PermitEmptyPasswords=no
         touch /var/lock/sshd
         echo "OK"
 }
 
 start() {
+    rotate_default_root_password
     if [ -e /etc/kvm/ssh_stop ]; then
         if [ -e /boot/start_ssh_once ]; then
             rm -f /boot/start_ssh_once

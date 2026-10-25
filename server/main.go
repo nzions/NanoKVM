@@ -39,8 +39,17 @@ func initialize() {
 
 	// seed the device owner now so its first-boot password is on the device screen
 	if config.GetInstance().Authentication != "disable" {
-		if err := authn.DefaultStore.Init(); err != nil {
+		seeded, err := authn.DefaultStore.Init()
+		if err != nil {
 			log.Printf("failed to initialize accounts: %v", err)
+		}
+		if seeded != "" {
+			// one password for the OLED: the web owner and root share it
+			if err := utils.SetRootPassword(seeded); err != nil {
+				log.Printf("ERROR: failed to set the root password to the seeded one: %v", err)
+			} else if err := utils.ClearRootPassFile(); err != nil {
+				log.Printf("ERROR: failed to remove %s: %v", utils.RootPassFile, err)
+			}
 		}
 	}
 

@@ -19,7 +19,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -60,14 +59,8 @@ const (
 // imageDirectory is a variable so tests can point it at a temporary directory
 var imageDirectory = "/data"
 
-// ipAllowed decides which addresses a remote download may connect to. It is a
-// variable so tests can reach a local httptest server.
-var ipAllowed = isPublicIP
-
 var (
 	errDownloadInProgress = errors.New("download in progress")
-	errSHA256Required     = errors.New("sha256sum is required")
-	errBlockedAddress     = errors.New("download address is not allowed")
 	errImageTooLarge      = errors.New("download exceeds the size limit")
 	errImageExists        = errors.New("image already exists")
 	errSHA256Mismatch     = errors.New("sha256 mismatch")
@@ -451,11 +444,6 @@ func (s *Service) DownloadImage(c *gin.Context) {
 		rsp.ErrRsp(c, -1, err.Error())
 		return
 	}
-	// nothing else vouches for a remote image, so the checksum is mandatory
-	if expectedSHA256 == nil {
-		rsp.ErrRsp(c, -1, errSHA256Required.Error())
-		return
-	}
 
 	u, err := url.Parse(req.File)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.Path == "" {
@@ -531,9 +519,6 @@ func (s *Service) downloadRemoteImage(
 	filename string,
 	onProgress func(string),
 ) error {
-	if expectedSHA256 == nil {
-		return errSHA256Required
-	}
 	if err := validateImageFilename(filename); err != nil {
 		return err
 	}
@@ -592,7 +577,8 @@ func (s *Service) downloadRemoteImage(
 		return fmt.Errorf("close downloaded image failed: %w", closeErr)
 	}
 
-	if !bytes.Equal(hasher.Sum(nil), expectedSHA256) {
+	// the checksum is optional: verified before the rename when one was given
+	if expectedSHA256 != nil && !bytes.Equal(hasher.Sum(nil), expectedSHA256) {
 		return errSHA256Mismatch
 	}
 	if ctx.Err() != nil {
@@ -623,33 +609,14 @@ func ensureNotExist(path string) error {
 	return nil
 }
 
-// newDownloadClient returns an HTTP client with timeouts that only connects to
-// public addresses. The address is checked in the dialer after name resolution,
-// so a redirect or a DNS answer that changes between lookups cannot reach the
-// local network.
+// newDownloadClient returns an HTTP client with timeouts and a redirect limit.
+// Any address may be fetched, the local network included (owner ruling).
 func newDownloadClient() *http.Client {
-	dialer := &net.Dialer{
-		Timeout: downloadDialTimeout,
-		Control: func(network string, address string, _ syscall.RawConn) error {
-			host, _, err := net.SplitHostPort(address)
-			if err != nil {
-				return err
-			}
-
-			ip := net.ParseIP(host)
-			if ip == nil || !ipAllowed(ip) {
-				return fmt.Errorf("%w: %s", errBlockedAddress, host)
-			}
-
-			return nil
-		},
-	}
+	dialer := &net.Dialer{Timeout: downloadDialTimeout}
 
 	return &http.Client{
 		Timeout: downloadOverallTimeout,
 		Transport: &http.Transport{
-			// no environment proxy: it would dial the address checks never see
-			Proxy:                 nil,
 			DialContext:           dialer.DialContext,
 			TLSHandshakeTimeout:   downloadTLSHandshakeTimeout,
 			ResponseHeaderTimeout: downloadResponseHeaderTimeout,
@@ -661,27 +628,6 @@ func newDownloadClient() *http.Client {
 			return nil
 		},
 	}
-}
-
-// carrierGradeNAT is 100.64.0.0/10, shared address space that is not public
-var carrierGradeNAT = net.IPNet{IP: net.IPv4(100, 64, 0, 0), Mask: net.CIDRMask(10, 32)}
-
-// isPublicIP reports whether ip is a routable address outside the local network
-func isPublicIP(ip net.IP) bool {
-	if v4 := ip.To4(); v4 != nil {
-		ip = v4
-		if carrierGradeNAT.Contains(ip) {
-			return false
-		}
-	}
-
-	return !(ip.IsLoopback() ||
-		ip.IsPrivate() ||
-		ip.IsUnspecified() ||
-		ip.IsLinkLocalUnicast() ||
-		ip.IsLinkLocalMulticast() ||
-		ip.IsInterfaceLocalMulticast() ||
-		ip.IsMulticast())
 }
 
 type loggingWriter struct {

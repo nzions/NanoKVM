@@ -55,6 +55,29 @@ func TestFreshSeedIsRandomPrivateAndMustChange(t *testing.T) {
 	}
 }
 
+func TestInitReportsTheSeededPasswordOnlyOnce(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "pwd")
+	store := NewStore(path)
+
+	seeded, err := store.Init()
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(store.seedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if seeded == "" || seeded != strings.TrimSpace(string(data)) {
+		t.Fatalf("Init reported %q, seed file holds %q", seeded, data)
+	}
+
+	// the account exists now: nothing new is seeded, so root is left alone
+	seeded, err = store.Init()
+	if err != nil || seeded != "" {
+		t.Fatalf("second Init: seeded=%q err=%v, want empty", seeded, err)
+	}
+}
+
 func TestLegacyDefaultPasswordMustChange(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "pwd")
 	hash, err := bcrypt.GenerateFromPassword([]byte(legacyDefaultPassword), bcrypt.MinCost)

@@ -58,8 +58,8 @@ static uint8_t write_secret_file(const char *path, const char *text)
 // Show the first-boot / reset password on the OLED while its file exists.
 void kvm_show_seed_password(void)
 {
-	if(access(SEED_PASS_FILE, F_OK) != 0){
-		// the owner changed the password: the file is gone, leave the page
+	if(access(SEED_PASS_FILE, F_OK) != 0 && access(ROOT_PASS_FILE, F_OK) != 0){
+		// the owner changed the password: the files are gone, leave the page
 		seed_pass_shown = 0;
 		if(kvm_sys_state.page == 2){
 			kvm_sys_state.page = 0;
@@ -256,6 +256,8 @@ uint8_t kvm_reset_password(void)
 		perror("write seed password");
 		return 1;
 	}
+	// root now has the seed password too: a rotated one is obsolete
+	unlink(ROOT_PASS_FILE);
 	unlink("/etc/kvm/pwd");
 	sync();
 

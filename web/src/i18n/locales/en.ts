@@ -301,7 +301,7 @@ const en = {
       uploadbox: 'Drop file here or click to select',
       inputfile: 'Please enter the image File',
       NoISO: 'No ISO',
-      sha256: 'SHA-256 (required for URL downloads)',
+      sha256: 'SHA-256 (optional)',
       sha256Placeholder: 'Enter a 64-character SHA-256 checksum',
       invalidSHA256: 'SHA-256 must be a 64-character hexadecimal string',
       failed: 'Download failed',

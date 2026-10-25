@@ -88,7 +88,9 @@ type legacyAccount struct {
 type Store struct {
 	path     string
 	seedPath string
-	mutex    sync.RWMutex
+	// seeded is the password the last Init generated for a new owner account
+	seeded string
+	mutex  sync.RWMutex
 }
 
 var DefaultStore = NewStore(AccountFile)
@@ -117,13 +119,18 @@ func ValidatePassword(password string) error {
 	return nil
 }
 
-// Init creates the account file (and the seed password file) when missing.
-func (s *Store) Init() error {
+// Init creates the account file (and the seed password file) when missing. It
+// returns the password it seeded the owner account with, or "" when the account
+// already existed, so the caller can set the same password on the system.
+func (s *Store) Init() (string, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
+	s.seeded = ""
 	_, err := s.loadLocked(true)
-	return err
+	seeded := s.seeded
+	s.seeded = ""
+	return seeded, err
 }
 
 func (s *Store) List() ([]UserInfo, error) {
@@ -521,6 +528,9 @@ func (s *Store) defaultDatabase(persist bool) (*database, error) {
 func (s *Store) seedPassword(persist bool) (string, error) {
 	if data, err := os.ReadFile(s.seedPath); err == nil {
 		if password := strings.TrimSpace(string(data)); ValidatePassword(password) == nil {
+			if persist {
+				s.seeded = password
+			}
 			return password, nil
 		}
 	}
@@ -532,6 +542,7 @@ func (s *Store) seedPassword(persist bool) (string, error) {
 		if err = writeFile0600(s.seedPath, []byte(password+"\n")); err != nil {
 			return "", err
 		}
+		s.seeded = password
 	}
 	return password, nil
 }

@@ -10,6 +10,7 @@ import (
 	"NanoKVM-Server/config"
 	"NanoKVM-Server/middleware"
 	"NanoKVM-Server/proto"
+	"NanoKVM-Server/utils"
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
@@ -84,6 +85,12 @@ func changeUserPassword(username, password string) error {
 		_, err = authn.DefaultStore.SetPasswordAndRun(username, password, func() error {
 			return systemPasswordUpdater(password)
 		})
+		if err == nil {
+			// the owner chose a password: a generated root one is obsolete
+			if rmErr := utils.ClearRootPassFile(); rmErr != nil {
+				log.Errorf("failed to remove %s: %s", utils.RootPassFile, rmErr)
+			}
+		}
 		return err
 	}
 	_, err = authn.DefaultStore.SetPassword(username, password)
