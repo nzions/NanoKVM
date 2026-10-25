@@ -1,3 +1,9 @@
+## 2.5.5 (2026-10-25)
+
+### Security
+
+* Online update refuses a release that is not newer than the installed version, so an older, genuinely signed package cannot be served as an update. An explicit reinstall or downgrade is `POST /api/application/update?allow_downgrade=1`; an offline upload is still allowed at any version and logs a warning when it is not newer
+
 ## 2.5.4 (2026-10-25)
 
 ### Bug Fixes

@@ -33,7 +33,10 @@ func (s *Service) Update(c *gin.Context) {
 		return
 	}
 
-	if err := update(); err != nil {
+	// Explicit downgrade/reinstall, e.g. POST /api/application/update?allow_downgrade=1.
+	allowDowngrade := c.Query("allow_downgrade") == "1" || c.Query("allow_downgrade") == "true"
+
+	if err := update(allowDowngrade); err != nil {
 		releaseUpdateLock()
 		rsp.ErrRsp(c, -1, fmt.Sprintf("update failed: %s", err))
 		return
@@ -54,9 +57,12 @@ func restartServices() {
 	}
 }
 
-func update() error {
+func update(allowDowngrade bool) error {
 	latest, err := getLatest()
 	if err != nil {
+		return err
+	}
+	if err := checkNotRollback(currentVersion(), latest.Version, allowDowngrade); err != nil {
 		return err
 	}
 	if err := prepareCacheForUpdate(); err != nil {

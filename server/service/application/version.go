@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -45,14 +46,9 @@ func (s *Service) GetVersion(c *gin.Context) {
 	var rsp proto.Response
 
 	// current version
-	currentVersion := "1.0.0"
+	current := currentVersion()
 
-	versionFile := fmt.Sprintf("%s/version", AppDir)
-	if version, err := os.ReadFile(versionFile); err == nil {
-		currentVersion = strings.ReplaceAll(string(version), "\n", "")
-	}
-
-	log.Debugf("current version: %s", currentVersion)
+	log.Debugf("current version: %s", current)
 
 	// latest version
 	latestVersion := ""
@@ -65,9 +61,123 @@ func (s *Service) GetVersion(c *gin.Context) {
 	latestVersion = latest.Version
 
 	rsp.OkRspWithData(c, &proto.GetVersionRsp{
-		Current: currentVersion,
+		Current: current,
 		Latest:  latestVersion,
 	})
+}
+
+// currentVersion reads the installed version, defaulting to 1.0.0 for a fresh or legacy box.
+func currentVersion() string {
+	version := "1.0.0"
+
+	versionFile := fmt.Sprintf("%s/version", AppDir)
+	if data, err := os.ReadFile(versionFile); err == nil {
+		version = strings.ReplaceAll(string(data), "\n", "")
+	}
+
+	return version
+}
+
+// checkNotRollback refuses an update whose version is not newer than the installed one.
+// allow=true is an explicit downgrade/reinstall and skips the check entirely, even when
+// the installed version is unparseable; the latest version is already validated by validateLatest.
+func checkNotRollback(current, latest string, allow bool) error {
+	if allow {
+		return nil
+	}
+	cmp, err := compareVersions(latest, current)
+	if err != nil {
+		return fmt.Errorf("refusing update: %w", err)
+	}
+	if cmp <= 0 {
+		return fmt.Errorf("refusing update: latest %s is not newer than installed %s", latest, current)
+	}
+	return nil
+}
+
+// compareVersions orders two versions accepted by versionPattern per semver 2.0:
+// -1 if a < b, 0 if equal, 1 if a > b. Build metadata is ignored.
+func compareVersions(a, b string) (int, error) {
+	coreA, preA, err := parseVersion(a)
+	if err != nil {
+		return 0, err
+	}
+	coreB, preB, err := parseVersion(b)
+	if err != nil {
+		return 0, err
+	}
+
+	for i := range coreA {
+		if coreA[i] != coreB[i] {
+			return cmpUint(coreA[i], coreB[i]), nil
+		}
+	}
+
+	// A prerelease sorts below the release it precedes.
+	switch {
+	case len(preA) == 0 && len(preB) == 0:
+		return 0, nil
+	case len(preA) == 0:
+		return 1, nil
+	case len(preB) == 0:
+		return -1, nil
+	}
+	for i := 0; i < len(preA) && i < len(preB); i++ {
+		if c := comparePrerelease(preA[i], preB[i]); c != 0 {
+			return c, nil
+		}
+	}
+	return cmpUint(uint64(len(preA)), uint64(len(preB))), nil
+}
+
+func parseVersion(v string) (core [3]uint64, pre []string, err error) {
+	if !versionPattern.MatchString(v) {
+		return core, nil, fmt.Errorf("invalid version %q", v)
+	}
+	v, _, _ = strings.Cut(v, "+")
+	v, prerelease, hasPre := strings.Cut(v, "-")
+	for i, part := range strings.Split(v, ".") {
+		n, perr := strconv.ParseUint(part, 10, 64)
+		if perr != nil {
+			return core, nil, fmt.Errorf("invalid version %q: %w", v, perr)
+		}
+		core[i] = n
+	}
+	if hasPre {
+		pre = strings.Split(prerelease, ".")
+		for _, id := range pre {
+			if id == "" {
+				return core, nil, fmt.Errorf("invalid version %q: empty prerelease identifier", v)
+			}
+		}
+	}
+	return core, pre, nil
+}
+
+// comparePrerelease: numeric identifiers compare numerically and sort below alphanumeric ones.
+func comparePrerelease(a, b string) int {
+	na, errA := strconv.ParseUint(a, 10, 64)
+	nb, errB := strconv.ParseUint(b, 10, 64)
+	switch {
+	case errA == nil && errB == nil:
+		return cmpUint(na, nb)
+	case errA == nil:
+		return -1
+	case errB == nil:
+		return 1
+	default:
+		return strings.Compare(a, b)
+	}
+}
+
+func cmpUint(a, b uint64) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	}
+	return 0
 }
 
 func getLatest() (*Latest, error) {

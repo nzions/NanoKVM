@@ -100,6 +100,10 @@ func offlineUpdate(c *gin.Context) error {
 		return err
 	}
 	log.Infof("offline update %s signed by %s", expectedVersion, signer)
+	// The upload is an explicit choice, so a downgrade is allowed, but say so.
+	if cmp, err := compareVersions(expectedVersion, currentVersion()); err != nil || cmp <= 0 {
+		log.Warnf("offline update %s is not newer than installed %s (compare error: %v)", expectedVersion, currentVersion(), err)
+	}
 
 	info, err := inspectUpdateArchive(target, expectedRoot)
 	if err != nil {
