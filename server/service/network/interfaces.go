@@ -314,18 +314,20 @@ func validateIfaceStatic(address, gateway string) (ifaceConfig, error) {
 	if !addr.Is4() {
 		return cfg, errors.New("only IPv4 is supported")
 	}
-	if prefix.Bits() < 1 || prefix.Bits() > 30 {
-		return cfg, errors.New("prefix length must be between 1 and 30")
+	if prefix.Bits() < 1 || prefix.Bits() > 31 {
+		return cfg, errors.New("prefix length must be between 1 and 31")
 	}
 	if err := checkIfaceHost(addr, "address"); err != nil {
 		return cfg, err
 	}
 
+	// A /31 is a point-to-point link (RFC 3021): both addresses are hosts.
 	network := prefix.Masked()
-	if addr == network.Addr() {
+	p2p := prefix.Bits() == 31
+	if !p2p && addr == network.Addr() {
 		return cfg, errors.New("address is the network address")
 	}
-	if addr == ifaceBroadcast(network) {
+	if !p2p && addr == ifaceBroadcast(network) {
 		return cfg, errors.New("address is the broadcast address")
 	}
 
@@ -346,7 +348,7 @@ func validateIfaceStatic(address, gateway string) (ifaceConfig, error) {
 		if gw == addr {
 			return cfg, errors.New("gateway equals the address")
 		}
-		if gw == network.Addr() || gw == ifaceBroadcast(network) {
+		if !p2p && (gw == network.Addr() || gw == ifaceBroadcast(network)) {
 			return cfg, errors.New("gateway is the network or broadcast address")
 		}
 		cfg.Gateway = gw

@@ -521,7 +521,7 @@ const en = {
           optional: 'Optional',
           save: 'Save',
           invalidAddress:
-            'Enter an address in CIDR form, for example 192.168.1.20/24 (prefix 1 to 30)',
+            'Enter an address in CIDR form, for example 192.168.1.20/24 (prefix 1 to 31; /31 is point-to-point)',
           hostNotAllowed: 'The address cannot be the network or broadcast address of its subnet',
           invalidGateway: 'Enter a valid IPv4 gateway, or leave it empty',
           gatewayOutsideSubnet: 'The gateway must be inside the address subnet',
