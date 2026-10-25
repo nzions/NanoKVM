@@ -37,8 +37,17 @@ stock_components_aside() {
 
     mkdir -p $NanoKVM_PATH/support/sg2002/additional/original
     mv -f $MAIXCDK_PATH/components/vision $NanoKVM_PATH/support/sg2002/additional/original
-    mv -f $MAIXCDK_PATH/components/peripheral/port/maixcam/maix_i2c.cpp $NanoKVM_PATH/support/sg2002/additional/original
-    mv -f $MAIXCDK_PATH/components/3rd_party/sophgo-middleware/sophgo-middleware/v2/sample/common/sample_common_sensor.c $NanoKVM_PATH/support/sg2002/additional/original
+    for f in components/peripheral/port/maixcam/maix_i2c.cpp \
+             components/3rd_party/sophgo-middleware/sophgo-middleware/v2/sample/common/sample_common_sensor.c
+    do
+      if [ -e "$MAIXCDK_PATH/$f" ]
+      then
+        mv -f "$MAIXCDK_PATH/$f" $NanoKVM_PATH/support/sg2002/additional/original
+      else
+        echo -e "\e[36m[build] \e[33mstock $f not present in MaixCDK; nothing to move aside\e[0m"
+        find "$MAIXCDK_PATH/components" -name "$(basename "$f")" -o -name sophgo_middleware.hpp
+      fi
+    done
 
     echo -e "\e[36m[build] \e[32mMove the library completed!\e[0m"
   fi
