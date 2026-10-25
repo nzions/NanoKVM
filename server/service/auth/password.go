@@ -1,11 +1,6 @@
 package auth
 
 import (
-	"io"
-	"os"
-	"os/exec"
-	"time"
-
 	"NanoKVM-Server/authn"
 	"NanoKVM-Server/config"
 	"NanoKVM-Server/middleware"
@@ -97,33 +92,14 @@ func changeUserPassword(username, password string) error {
 	return err
 }
 
+// changeRootPassword keeps root's Linux password in step with the web one,
+// as the same SHA-512 crypt the first-boot seed uses (busybox passwd wrote
+// MD5-crypt).
 func changeRootPassword(password string) error {
-	if err := passwd(password); err != nil {
+	if err := utils.SetRootPassword(password); err != nil {
 		log.Errorf("failed to change root password: %s", err)
 		return err
 	}
 	log.Debug("change root password successful")
 	return nil
-}
-
-func passwd(password string) error {
-	cmd := exec.Command("passwd", "root")
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return err
-	}
-	defer func() { _ = stdin.Close() }()
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err = cmd.Start(); err != nil {
-		return err
-	}
-	if _, err = io.WriteString(stdin, password+"\n"); err != nil {
-		return err
-	}
-	time.Sleep(100 * time.Millisecond)
-	if _, err = io.WriteString(stdin, password+"\n"); err != nil {
-		return err
-	}
-	return cmd.Wait()
 }
