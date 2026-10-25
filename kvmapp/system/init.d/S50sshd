@@ -73,6 +73,51 @@ root_password_is_default() {
     return 1
 }
 
+# Set root's password to $1. The stock image has no chpasswd (not even as a
+# busybox applet), so without it the SHA-512 hash is made with openssl or
+# busybox mkpasswd and root's shadow entry (fields 2 and 3) is rewritten.
+# The password goes over stdin, never argv. Returns non-zero on any failure.
+set_root_password() {
+    srp_pw="$1"
+    [ -n "$srp_pw" ] || return 1
+    if command -v chpasswd >/dev/null 2>&1; then
+        printf 'root:%s\n' "$srp_pw" | chpasswd
+        return $?
+    fi
+
+    srp_hash=""
+    if command -v openssl >/dev/null 2>&1; then
+        srp_hash=$(printf '%s\n' "$srp_pw" | openssl passwd -6 -stdin 2>/dev/null)
+    fi
+    case "$srp_hash" in
+        '$6$'*) ;;
+        *)
+            # busybox mkpasswd reads the password from stdin when no password
+            # argument is given
+            srp_hash=""
+            if command -v mkpasswd >/dev/null 2>&1; then
+                srp_hash=$(printf '%s\n' "$srp_pw" | mkpasswd -m sha512 2>/dev/null)
+            fi
+            ;;
+    esac
+    case "$srp_hash" in
+        '$6$'*) ;;
+        *) return 1 ;;
+    esac
+
+    srp_days=$(( $(date +%s) / 86400 ))
+    rm -f "$SHADOW_FILE.new"
+    # only the first root line changes; no root line means failure, never append
+    SRP_HASH="$srp_hash" SRP_DAYS="$srp_days" awk -F: -v OFS=: '
+        !done && $1 == "root" && NF >= 3 { $2 = ENVIRON["SRP_HASH"]; $3 = ENVIRON["SRP_DAYS"]; done = 1 }
+        { print }
+        END { if (!done) exit 3 }
+    ' "$SHADOW_FILE" > "$SHADOW_FILE.new" || { rm -f "$SHADOW_FILE.new"; return 1; }
+    [ -s "$SHADOW_FILE.new" ] || { rm -f "$SHADOW_FILE.new"; return 1; }
+    chmod 600 "$SHADOW_FILE.new" || { rm -f "$SHADOW_FILE.new"; return 1; }
+    mv "$SHADOW_FILE.new" "$SHADOW_FILE" || { rm -f "$SHADOW_FILE.new"; return 1; }
+}
+
 # The image ships root:root. With password login on, that is a known password:
 # replace it with a random one, kept 0600 in /etc/kvm/root.pass and shown on the
 # device screen by kvm_system until the owner sets a password (the file is then
@@ -91,13 +136,13 @@ rotate_default_root_password() {
         return 0
     fi
     mkdir -p /etc/kvm
-    if printf 'root:%s\n' "$pw" | chpasswd; then
+    if set_root_password "$pw"; then
         printf '%s\n' "$pw" > "$ROOT_PASS_FILE.new" && chmod 600 "$ROOT_PASS_FILE.new" &&
             mv "$ROOT_PASS_FILE.new" "$ROOT_PASS_FILE"
         sync
         echo "root password was the default: rotated (see $ROOT_PASS_FILE)"
     else
-        echo "ERROR: root password is the default and chpasswd failed" >&2
+        echo "ERROR: root password is the default and could not set it" >&2
     fi
 }
 
