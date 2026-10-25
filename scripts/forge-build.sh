@@ -162,6 +162,19 @@ SHA256="$(tr -d ' \n' < "$TARBALL.sha256")"
 printf '%s' "$SHA256" | grep -qE '^[0-9a-f]{64}$' || die "bad sha256 in $TARBALL.sha256: '$SHA256'"
 [ "$SHA256" = "$(sha256sum "$TARBALL" | cut -d' ' -f1)" ] || die "sha256 file does not match the tarball"
 
+# --- emulator build of the server (qemu, no cgo, no hardware) -------------------
+# Same pinned Go as above. The release server (server/build.sh) is a plain
+# `go build`; -trimpath is added so the binary carries no build-host paths.
+EMU_SERVER="$WORK_NANOKVM/build/emu/NanoKVM-Server"
+log "building the emulator server (-tags nokvm)"
+mkdir -p "$(dirname "$EMU_SERVER")"
+(
+    cd "$WORK_NANOKVM/server"
+    CGO_ENABLED=0 GOOS=linux GOARCH=riscv64 go build -trimpath -tags nokvm -o "$EMU_SERVER" .
+)
+[ -s "$EMU_SERVER" ] || die "the emulator server build produced no $EMU_SERVER"
+[ -s "$WORK_NANOKVM/scripts/emu-image.sh" ] || die "scripts/emu-image.sh is missing from the tree"
+
 # --- publish to the artifacts share --------------------------------------------
 [ -d "$ARTIFACTS" ] && [ -w "$ARTIFACTS" ] || die "$ARTIFACTS is not a writable directory (run this under the build profile)"
 DEST="$ARTIFACTS/$VERSION"
@@ -179,6 +192,12 @@ else
     rm -rf "$STAGE"
     mkdir "$STAGE"
     cp "$TARBALL" "$OUT/latest.json" "$TARBALL.sha256" "$STAGE/"
+    # emu/ is for the qemu emulator only: NOT in the OTA tarball, NOT signed,
+    # and must never be copied to the update base.
+    mkdir "$STAGE/emu"
+    install -m 0755 "$EMU_SERVER" "$STAGE/emu/NanoKVM-Server"
+    (cd "$STAGE/emu" && sha256sum NanoKVM-Server > NanoKVM-Server.sha256)
+    install -m 0755 "$WORK_NANOKVM/scripts/emu-image.sh" "$STAGE/emu/emu-image.sh"
     mv "$STAGE" "$DEST"
     log "published $DEST"
 fi
@@ -188,6 +207,7 @@ cat "$OUT/latest.json"
 echo
 echo "version:   $VERSION"
 echo "artifacts: $DEST/{nanokvm_$VERSION.tar.gz,latest.json,nanokvm_$VERSION.tar.gz.sha256}"
+echo "emulator:  $DEST/emu/{NanoKVM-Server,NanoKVM-Server.sha256,emu-image.sh} (not signed, not for the update base)"
 echo "sha256:    $SHA256"
 echo "sign name: nanokvm-$VERSION-riscv64"
 echo "next:      keymaster_sign_digest kind=app name=nanokvm-$VERSION-riscv64 sha256=$SHA256"

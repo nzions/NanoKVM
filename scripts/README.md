@@ -97,6 +97,10 @@ to `/artifacts/<version>/` (`/data/nfs/artifacts/nanokvm/<version>/` on beefy).
 A published version is never overwritten with different bytes. The version is
 `$NANOKVM_VERSION`, else an exact numeric git tag on the commit, else the newest
 `## X.Y.Z` heading in `CHANGELOG.md`; bump the CHANGELOG to build a new one.
+The same atomic publish also carries `emu/NanoKVM-Server` (a `-tags nokvm`
+`CGO_ENABLED=0` build), `emu/NanoKVM-Server.sha256` and `emu/emu-image.sh` for
+the qemu emulator. They are not in the OTA tarball, not signed, and never go to
+the update base.
 MaixCDK downloads its own toolchain and component packages while building, so
 the run needs network access.
 
@@ -188,6 +192,29 @@ qemu-system-riscv64 -M virt -cpu thead-c906 -smp 1 -m 512 -bios default \
 ```
 
 The web UI is then on `https://localhost:18443` and `http://localhost:18080`.
+
+#### After an OTA: `--refresh`
+
+An online update replaces `/kvmapp` wholesale, which brings back the hardware
+(cgo) server and an `S95nanokvm` that starts `kvm_system`; both segfault under
+qemu. Two `S95nanokvm` copies run: `/etc/init.d/S95nanokvm` at boot (rcS), and
+`/kvmapp/system/init.d/S95nanokvm` for the `restart` the update issues.
+`--refresh` fixes both, in place:
+
+```sh
+scripts/emu-image.sh --refresh <out.img> <NanoKVM-Server>
+```
+
+1. Let the emulator take the OTA.
+2. Stop the qemu VM (the image is edited in place; never run this on a live VM).
+3. Run `--refresh` with the `emu/NanoKVM-Server` from the version's artifact
+   dir (or your own `-tags nokvm` build). It reinstalls the server (0755),
+   strips the `kvm_system` start line from both `S95nanokvm` copies (printing
+   the diffs; a copy that has none counts as already refreshed), and uses the
+   same dd cut-out, `debugfs -w`, `e2fsck` and `dd conv=notrunc` splice as the
+   build. It refuses an image without `/etc/S95nanokvm.orig`, so only an image
+   this script already built is accepted.
+4. Boot the VM again with the qemu command above.
 
 ### The kernel (prototype)
 

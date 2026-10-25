@@ -21,8 +21,20 @@
 # debugfs -w, checked with e2fsck and spliced back with dd conv=notrunc.
 # The stock image is only read. See scripts/README.md for the qemu command.
 #
+# An online update (OTA) replaces /kvmapp wholesale: it brings back the
+# hardware (cgo) server and an S95nanokvm that starts kvm_system, and both
+# segfault under qemu. --refresh re-applies the two edits that matter after an
+# OTA (steps 2 and 3) IN PLACE on an image this script already processed:
+# it reinstalls the nokvm server and strips the kvm_system start line from both
+# S95nanokvm copies that run (/etc/init.d/S95nanokvm, which rcS runs at boot,
+# and /kvmapp/system/init.d/S95nanokvm, which the OTA runs for `restart`).
+# Run it with the qemu VM STOPPED; it refuses an image without
+# /etc/S95nanokvm.orig. Same safety style: dd cut-out, debugfs -w, e2fsck,
+# dd conv=notrunc splice back.
+#
 # Usage:
 #   scripts/emu-image.sh [--sha256 <hex>] <stock.img> <NanoKVM-Server> <out.img>
+#   scripts/emu-image.sh --refresh <img> <NanoKVM-Server>
 #   scripts/emu-image.sh --patch-kernel <vmlinuz-in> <vmlinuz-out>
 #
 # NanoKVM-Server: CGO_ENABLED=0 GOOS=linux GOARCH=riscv64 go build -tags nokvm
@@ -61,6 +73,7 @@ info() {
 usage() {
     cat >&2 <<EOF
 Usage: $0 [--sha256 <hex>] <stock.img> <NanoKVM-Server> <out.img>
+       $0 --refresh <img> <NanoKVM-Server>   (in place, after an OTA; VM stopped)
        $0 --patch-kernel <vmlinuz-in> <vmlinuz-out>
 EOF
     exit 1
@@ -103,20 +116,30 @@ patch_kernel() {
 # ------------------------------------------------------------------ arguments
 
 WANT_SHA=""
+MODE=build
 if [ "${1:-}" = "--patch-kernel" ]; then
     [ $# -eq 3 ] || usage
     patch_kernel "$2" "$3"
     exit 0
 fi
-if [ "${1:-}" = "--sha256" ]; then
-    [ $# -ge 2 ] || usage
-    WANT_SHA="$2"
-    shift 2
+if [ "${1:-}" = "--refresh" ]; then
+    [ $# -eq 3 ] || usage
+    MODE=refresh
+    # In refresh mode STOCK is the already processed image, edited in place.
+    STOCK="$2"
+    SERVER="$3"
+    OUT=""
+else
+    if [ "${1:-}" = "--sha256" ]; then
+        [ $# -ge 2 ] || usage
+        WANT_SHA="$2"
+        shift 2
+    fi
+    [ $# -eq 3 ] || usage
+    STOCK="$1"
+    SERVER="$2"
+    OUT="$3"
 fi
-[ $# -eq 3 ] || usage
-STOCK="$1"
-SERVER="$2"
-OUT="$3"
 
 if [ -n "$WANT_SHA" ]; then
     echo "$WANT_SHA" | grep -qE '^[0-9a-fA-F]{64}$' || die "--sha256 must be 64 hex digits"
@@ -129,11 +152,19 @@ for t in debugfs e2fsck sfdisk dd od sha256sum cmp awk grep mktemp cp diff; do
     esac
 done
 
-[ -f "$STOCK" ] || die "stock image not found: $STOCK"
+if [ "$MODE" = refresh ]; then
+    [ -f "$STOCK" ] || die "image not found: $STOCK"
+else
+    [ -f "$STOCK" ] || die "stock image not found: $STOCK"
+fi
 [ -f "$SERVER" ] || die "server binary not found: $SERVER"
-[ ! -e "$OUT" ] || die "refusing to overwrite existing file: $OUT"
-OUT_DIR="$(cd "$(dirname "$OUT")" 2>/dev/null && pwd)" || die "output directory does not exist: $(dirname "$OUT")"
-OUT="$OUT_DIR/$(basename "$OUT")"
+if [ "$MODE" = refresh ]; then
+    OUT_DIR="$(cd "$(dirname "$STOCK")" 2>/dev/null && pwd)" || die "image directory does not exist: $(dirname "$STOCK")"
+else
+    [ ! -e "$OUT" ] || die "refusing to overwrite existing file: $OUT"
+    OUT_DIR="$(cd "$(dirname "$OUT")" 2>/dev/null && pwd)" || die "output directory does not exist: $(dirname "$OUT")"
+    OUT="$OUT_DIR/$(basename "$OUT")"
+fi
 
 # The server must be a riscv64 ELF: magic 7f 45 4c 46, class 2 (64-bit),
 # little-endian, e_machine 0xF3 (243). Anything else would boot to nothing.
@@ -256,6 +287,69 @@ fsck() {
 }
 fsck "before edits"
 
+# Drop the kvm_system start line from the S95nanokvm at <fs path> (shared by
+# the build step 3 and --refresh). Only lines whose command is kvm_system (bare
+# or by path, optional trailing args/&) go; "killall kvm_system" style lines
+# stay. With <allow_none>=1 a file that has no such line counts as success
+# (already refreshed); with 0 it is fatal.
+KVM_SYSTEM_RE='^[[:space:]]*(/[^[:space:]]*/)?kvm_system([[:space:]]|$)'
+strip_kvm_system() { # <fs path> <allow_none 0|1>
+    local path="$1" allow_none="$2"
+    exists "$path" || die "$path not found in the image"
+    dump_to "$path" "$T/s95.in"
+    grep -vE "$KVM_SYSTEM_RE" "$T/s95.in" >"$T/s95.out" || true
+    if cmp -s "$T/s95.in" "$T/s95.out"; then
+        [ "$allow_none" = 1 ] || die "no line starting kvm_system found in $path; edit did not apply"
+        info "$path has no kvm_system start line: already refreshed, nothing to do"
+        return 0
+    fi
+    if grep -qE "$KVM_SYSTEM_RE" "$T/s95.out"; then
+        die "kvm_system start line still present in $path after edit"
+    fi
+    sh -n "$T/s95.out" || die "edited $path does not parse (an emptied if/case body?)"
+    put_file "$T/s95.out" "$path" 755
+    info "$path diff (original -> edited):"
+    diff -u "$T/s95.in" "$T/s95.out" || true
+}
+
+# Splice the edited rootfs ($FS) into <target image> over partition 2 and verify:
+# same size, bytes before p2 untouched, p2 reads back equal to $FS.
+splice_back() { # <target image>
+    local target="$1" size_before
+    size_before=$(wc -c <"$target")
+    dd if="$target" of="$T/head.before" bs="$SECTOR" count="$P2_START" status=none ||
+        die "dd failed reading the bytes before partition 2"
+    dd if="$FS" of="$target" bs="$SECTOR" seek="$P2_START" conv=notrunc status=none ||
+        die "dd failed splicing the rootfs back"
+    [ "$(wc -c <"$target")" -eq "$size_before" ] || die "output image size changed during the splice"
+    # Everything before p2 (MBR, bootloader partition) must be untouched.
+    dd if="$target" of="$T/head.after" bs="$SECTOR" count="$P2_START" status=none ||
+        die "dd failed reading the bytes before partition 2"
+    cmp -s "$T/head.before" "$T/head.after" || die "bytes before partition 2 changed"
+    extract_p2 "$target" "$T/p2.check"
+    cmp -s "$FS" "$T/p2.check" || die "partition 2 read back from $target differs from the edited rootfs"
+}
+
+# ------------------------------------------------------------- --refresh mode
+
+if [ "$MODE" = refresh ]; then
+    exists /etc/S95nanokvm.orig ||
+        die "/etc/S95nanokvm.orig not found: $STOCK does not look processed by emu-image.sh; build it from the stock image instead"
+    exists /kvmapp/server || die "/kvmapp/server does not exist in the image: not a NanoKVM rootfs"
+    put_file "$SERVER" /kvmapp/server/NanoKVM-Server 755
+    info "server installed ($(wc -c <"$SERVER") bytes)"
+    # Both copies run: /etc/init.d/S95nanokvm at boot (rcS), and
+    # /kvmapp/system/init.d/S95nanokvm for the `restart` an OTA issues.
+    strip_kvm_system /etc/init.d/S95nanokvm 1
+    strip_kvm_system /kvmapp/system/init.d/S95nanokvm 1
+    fsck "after edits"
+    exists /kvmapp/server/NanoKVM-Server || die "server vanished during the final e2fsck"
+    splice_back "$STOCK"
+    info "refreshed $STOCK in place"
+    info "sha256 $(sha_of "$STOCK")  $STOCK"
+    exit 0
+fi
+
 # -------------------------------------------------- 1. xthead loaders -> musl
 
 PLAIN=/lib/ld-musl-riscv64.so.1
@@ -302,18 +396,8 @@ S95ORIG=/etc/S95nanokvm.orig
 exists "$S95" || die "$S95 not found in the image"
 exists "$S95ORIG" && die "$S95ORIG already exists: this image looks already processed; start from the stock image"
 dump_to "$S95" "$T/S95.orig"
-# Drop only lines whose command is kvm_system (bare or by path, optional
-# trailing args/&); "killall kvm_system" style lines are kept.
-grep -vE '^[[:space:]]*(/[^[:space:]]*/)?kvm_system([[:space:]]|$)' "$T/S95.orig" >"$T/S95.new" || true
-cmp -s "$T/S95.orig" "$T/S95.new" && die "no line starting kvm_system found in $S95; edit did not apply"
-if grep -qE '^[[:space:]]*(/[^[:space:]]*/)?kvm_system([[:space:]]|$)' "$T/S95.new"; then
-    die "kvm_system start line still present in $S95 after edit"
-fi
-sh -n "$T/S95.new" || die "edited $S95 does not parse (an emptied if/case body?)"
 put_file "$T/S95.orig" "$S95ORIG" 644
-put_file "$T/S95.new" "$S95" 755
-info "$S95 diff (original -> edited):"
-diff -u "$T/S95.orig" "$T/S95.new" || true
+strip_kvm_system "$S95" 0
 
 # ---------------------------------------------------------- 4. busybox inittab
 
@@ -375,13 +459,9 @@ fsck "after edits"
 exists /usr/bin/init || die "/usr/bin/init vanished during the final e2fsck"
 
 cp -- "$STOCK" "$IMG"
-dd if="$FS" of="$IMG" bs="$SECTOR" seek="$P2_START" conv=notrunc status=none ||
-    die "dd failed splicing the rootfs back"
+splice_back "$IMG"
 [ "$(wc -c <"$IMG")" -eq "$img_bytes" ] || die "output image size changed during the splice"
-# Everything before p2 (MBR, bootloader partition) must be untouched.
-cmp -s -n $((P2_START * SECTOR)) "$STOCK" "$IMG" || die "bytes before partition 2 changed"
-extract_p2 "$IMG" "$T/p2.check"
-cmp -s "$FS" "$T/p2.check" || die "partition 2 read back from the output differs from the edited rootfs"
+cmp -s -n $((P2_START * SECTOR)) "$STOCK" "$IMG" || die "bytes before partition 2 differ from the stock image"
 
 mv -- "$IMG" "$OUT"
 info "wrote $OUT"

@@ -1,3 +1,9 @@
+## 2.5.6 (2026-10-25)
+
+### Build
+
+* forge also publishes an emulator build of the server (`-tags nokvm`) and `emu-image.sh` under `<version>/emu/`. `emu-image.sh --refresh` re-applies the emulator edits to an image that has taken an OTA, so the qemu emulator keeps serving after an update. Nothing shipped to devices changes.
+
 ## 2.5.5 (2026-10-25)
 
 ### Security
