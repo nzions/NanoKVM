@@ -7,7 +7,7 @@
     "check  a cheap gate: gofmt over server/ (vendor/ excluded) and go vet of the update-signature",
     "       verifier, the one package whose breakage bricks updates on devices.",
     "test   go test of every server/ package that carries a _test.go (vendor/ excluded), on the host arch:",
-    "       none of them needs the device's cgo libraries (go vet compiles them all off-device).",
+    "       -tags nokvm swaps common/kvm_vision.go (cgo, links the riscv64-only dl_lib/libkvm.so) for its stub.",
     "build  the riscv64 release, the same steps `make release` runs in docker, without docker. Runs in the",
     "       `c` image (forge-c >= 1.26 carries the NanoKVM toolchains at /opt, opt-in: Sophgo host-tools,",
     "       MaixCDK + venv, Go 1.26.0, Node + pnpm). scripts/forge-build.sh does the work and writes",
@@ -46,7 +46,7 @@
       "requires": [
         "go"
       ],
-      "run": "cd server && go test -count=1 $(find . -name '*_test.go' -not -path './vendor/*' -exec dirname {} \\; | sort -u)"
+      "run": "cd server && go test -count=1 -tags nokvm $(find . -name '*_test.go' -not -path './vendor/*' -exec dirname {} \\; | sort -u)"
     }
   }
 }

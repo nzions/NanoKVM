@@ -9,10 +9,6 @@ import (
 	"strings"
 )
 
-// jwtSecretFile holds the signing secret generated when server.yaml carries
-// none, so a restart does not log everyone out.
-const jwtSecretFile = "/etc/kvm/.jwt_secret"
-
 // Generate random string for secret key. There is no fallback: a secret that
 // cannot be drawn from crypto/rand must stop the server, not weaken it.
 func generateRandomSecretKey() (string, error) {
@@ -24,8 +20,9 @@ func generateRandomSecretKey() (string, error) {
 	return base64.URLEncoding.EncodeToString(b), nil
 }
 
-// loadOrCreateJWTSecret returns the secret stored at path, creating it 0600
-// when missing.
+// loadOrCreateJWTSecret returns the secret stored at path (etcDir/.jwt_secret
+// when server.yaml carries none, so a restart does not log everyone out),
+// creating it 0600 when missing.
 func loadOrCreateJWTSecret(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err == nil {

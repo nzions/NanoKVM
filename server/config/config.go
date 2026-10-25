@@ -5,16 +5,28 @@ import (
 	"errors"
 	"log"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 )
 
+// etcDir is the directory holding every NanoKVM state file. initialize()
+// overrides it once from etcDirEnv, so tests can run off-device.
+var etcDir = "/etc/kvm"
+
+const etcDirEnv = "NANOKVM_ETC_DIR"
+
 var (
 	instance Config
 	once     sync.Once
 )
+
+// etcPath returns the path of name inside etcDir.
+func etcPath(name string) string {
+	return filepath.Join(etcDir, name)
+}
 
 func GetInstance() *Config {
 	once.Do(initialize)
@@ -23,6 +35,10 @@ func GetInstance() *Config {
 }
 
 func initialize() {
+	if dir := os.Getenv(etcDirEnv); dir != "" {
+		etcDir = dir
+	}
+
 	if err := readByFile(); err != nil {
 		if errors.As(err, &viper.ConfigFileNotFoundError{}) {
 			create()
@@ -57,13 +73,13 @@ func initialize() {
 func readByFile() error {
 	viper.SetConfigName("server")
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath("/etc/kvm/")
+	viper.AddConfigPath(etcDir)
 
 	return viper.ReadInConfig()
 }
 
 func readByDefault() error {
-	data, err := yaml.Marshal(defaultConfig)
+	data, err := yaml.Marshal(defaultConfig())
 	if err != nil {
 		log.Printf("failed to marshal default config: %s", err)
 		return err
@@ -80,9 +96,9 @@ func create() {
 		err  error
 	)
 
-	_ = os.MkdirAll("/etc/kvm", 0o644)
+	_ = os.MkdirAll(etcDir, 0o644)
 
-	file, err = os.OpenFile("/etc/kvm/server.yaml", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	file, err = os.OpenFile(ConfigurationFile(), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		log.Printf("open config failed: %s", err)
 		return
@@ -95,7 +111,7 @@ func create() {
 		_ = file.Close()
 	}()
 
-	if data, err = yaml.Marshal(defaultConfig); err != nil {
+	if data, err = yaml.Marshal(defaultConfig()); err != nil {
 		log.Printf("failed to marshal default config: %s", err)
 		return
 	}
@@ -110,7 +126,7 @@ func create() {
 		return
 	}
 
-	log.Println("create file /etc/kvm/server.yaml with default configuration")
+	log.Printf("create file %s with default configuration", ConfigurationFile())
 }
 
 // Validate the configuration. This is to ensure compatibility with earlier versions.
@@ -119,7 +135,7 @@ func validate() error {
 		return nil
 	}
 
-	_ = os.Remove("/etc/kvm/server.yaml")
+	_ = os.Remove(ConfigurationFile())
 	log.Println("delete empty configuration file")
 
 	create()

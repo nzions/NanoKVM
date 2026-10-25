@@ -6,42 +6,44 @@ import "fmt"
 // this default; a negative value disables the lockout.
 const defaultLoginLockoutDuration = 300
 
-var defaultConfig = &Config{
-	Proto: "https",
-	Host:  "",
-	Port: Port{
-		Http:  80,
-		Https: 443,
-	},
-	Cert: Cert{
-		Crt: "/etc/kvm/server.crt",
-		Key: "/etc/kvm/server.key",
-	},
-	Logger: Logger{
-		Level: "info",
-		File:  "stdout",
-	},
-	JWT: JWT{
-		SecretKey:            "",
-		RefreshTokenDuration: 2678400,
-		RevokeTokensOnLogout: true,
-	},
-	Stun: "stun.l.google.com:19302",
-	Turn: Turn{
-		TurnAddr: "",
-		TurnUser: "",
-		TurnCred: "",
-	},
-	Authentication: "enable",
-	Security: Security{
-		LoginLockoutDuration: defaultLoginLockoutDuration,
-		LoginMaxFailures:     5,
-	},
+func defaultConfig() *Config {
+	return &Config{
+		Proto: "https",
+		Host:  "",
+		Port: Port{
+			Http:  80,
+			Https: 443,
+		},
+		Cert: Cert{
+			Crt: etcPath("server.crt"),
+			Key: etcPath("server.key"),
+		},
+		Logger: Logger{
+			Level: "info",
+			File:  "stdout",
+		},
+		JWT: JWT{
+			SecretKey:            "",
+			RefreshTokenDuration: 2678400,
+			RevokeTokensOnLogout: true,
+		},
+		Stun: "stun.l.google.com:19302",
+		Turn: Turn{
+			TurnAddr: "",
+			TurnUser: "",
+			TurnCred: "",
+		},
+		Authentication: "enable",
+		Security: Security{
+			LoginLockoutDuration: defaultLoginLockoutDuration,
+			LoginMaxFailures:     5,
+		},
+	}
 }
 
 func checkDefaultValue() error {
 	if instance.JWT.SecretKey == "" {
-		secret, err := loadOrCreateJWTSecret(jwtSecretFile)
+		secret, err := loadOrCreateJWTSecret(etcPath(".jwt_secret"))
 		if err != nil {
 			return fmt.Errorf("jwt secret: %w", err)
 		}

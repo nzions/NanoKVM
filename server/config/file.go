@@ -7,10 +7,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const ConfigurationFile = "/etc/kvm/server.yaml"
+func ConfigurationFile() string {
+	return etcPath("server.yaml")
+}
 
 func Read() (*Config, error) {
-	data, err := os.ReadFile(ConfigurationFile)
+	data, err := os.ReadFile(ConfigurationFile())
 	if err != nil {
 		log.Errorf("failed to read config: %v", err)
 		return nil, err
@@ -23,7 +25,7 @@ func Read() (*Config, error) {
 		return nil, err
 	}
 
-	log.Debugf("read %s successfully", ConfigurationFile)
+	log.Debugf("read %s successfully", ConfigurationFile())
 	return &conf, nil
 }
 
@@ -34,16 +36,16 @@ func Write(conf *Config) error {
 		return err
 	}
 
-	err = os.WriteFile(ConfigurationFile, data, 0o600)
+	err = os.WriteFile(ConfigurationFile(), data, 0o600)
 	if err == nil {
 		// the file may already exist with a looser mode
-		err = os.Chmod(ConfigurationFile, 0o600)
+		err = os.Chmod(ConfigurationFile(), 0o600)
 	}
 	if err != nil {
 		log.Errorf("failed to write config: %v", err)
 		return err
 	}
 
-	log.Debugf("write to %s successfully", ConfigurationFile)
+	log.Debugf("write to %s successfully", ConfigurationFile())
 	return nil
 }

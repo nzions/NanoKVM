@@ -13,9 +13,11 @@ const (
 	HWVersionAlpha HWVersion = iota
 	HWVersionBeta
 	HWVersionPcie
-
-	HWVersionFile = "/etc/kvm/hw"
 )
+
+func HWVersionFile() string {
+	return etcPath("hw")
+}
 
 var HWAlpha = Hardware{
 	Version:      HWVersionAlpha,
@@ -55,7 +57,7 @@ func (h HWVersion) String() string {
 }
 
 func GetHwVersion() HWVersion {
-	content, err := os.ReadFile(HWVersionFile)
+	content, err := os.ReadFile(HWVersionFile())
 	if err != nil {
 		return HWVersionAlpha
 	}

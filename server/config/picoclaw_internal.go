@@ -9,8 +9,11 @@ import (
 
 const (
 	PicoclawInternalTokenHeader = "X-NanoKVM-Internal-Token"
-	picoclawInternalTokenFile   = "/etc/kvm/.picoclaw_internal_token"
 )
+
+func picoclawInternalTokenFile() string {
+	return etcPath(".picoclaw_internal_token")
+}
 
 var picoclawInternalToken struct {
 	mu    sync.Mutex
@@ -38,10 +41,10 @@ func GetPicoclawInternalToken() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := os.MkdirAll(filepath.Dir(picoclawInternalTokenFile), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(picoclawInternalTokenFile()), 0o755); err != nil {
 		return "", err
 	}
-	if err := os.WriteFile(picoclawInternalTokenFile, []byte(token+"\n"), 0o600); err != nil {
+	if err := os.WriteFile(picoclawInternalTokenFile(), []byte(token+"\n"), 0o600); err != nil {
 		return "", err
 	}
 
@@ -55,7 +58,7 @@ func EnsurePicoclawInternalToken() error {
 }
 
 func readPicoclawInternalToken() (string, error) {
-	data, err := os.ReadFile(picoclawInternalTokenFile)
+	data, err := os.ReadFile(picoclawInternalTokenFile())
 	if err != nil {
 		return "", err
 	}
