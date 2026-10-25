@@ -1,3 +1,9 @@
+## 2.5.7 (2026-10-25)
+
+### Features
+
+* Settings → Network: a static address is entered as one CIDR field (e.g. 192.168.1.20/24) instead of separate address and netmask fields, and the static form opens prefilled with the interface's current address and gateway
+
 ## 2.5.6 (2026-10-25)
 
 ### Build

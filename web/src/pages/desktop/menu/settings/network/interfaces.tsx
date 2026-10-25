@@ -5,59 +5,11 @@ import { useTranslation } from 'react-i18next';
 import * as api from '@/api/network.ts';
 import type { IPMode, NetworkInterface } from '@/api/network.ts';
 
+import { ipv4ToInt, isNetworkOrBroadcast, parseCidr, sameSubnet } from '@/lib/cidr.ts';
+
 import { Wifi } from './wifi.tsx';
 
-const minPrefix = 1;
 const maxPrefix = 30;
-
-function isValidIPv4(value: string) {
-  const parts = value.split('.');
-  if (parts.length !== 4) return false;
-
-  return parts.every((part) => {
-    if (!/^\d+$/.test(part)) return false;
-    if (part.length > 1 && part.startsWith('0')) return false;
-
-    const number = Number(part);
-    return number >= 0 && number <= 255;
-  });
-}
-
-function prefixToMask(prefix: number) {
-  const octets: number[] = [];
-  for (let i = 0; i < 4; i++) {
-    const bits = Math.max(0, Math.min(8, prefix - i * 8));
-    octets.push((0xff << (8 - bits)) & 0xff);
-  }
-  return octets.join('.');
-}
-
-// maskToPrefix reads 255.255.255.0, /24 or 24; null when it is none of them
-function maskToPrefix(value: string): number | null {
-  const text = value.trim();
-
-  if (/^\/?\d{1,2}$/.test(text)) {
-    return Number(text.replace('/', ''));
-  }
-  if (!isValidIPv4(text)) return null;
-
-  let prefix = 0;
-  let seenZero = false;
-  for (const part of text.split('.')) {
-    for (let bit = 7; bit >= 0; bit--) {
-      const set = (Number(part) >> bit) & 1;
-      if (set && seenZero) return null;
-      if (set) prefix++;
-      else seenZero = true;
-    }
-  }
-  return prefix;
-}
-
-function splitAddress(address: string) {
-  const [ip, prefix] = address.split('/');
-  return { ip: ip || '', mask: prefix ? prefixToMask(Number(prefix)) : '' };
-}
 
 function hostOf(address: string) {
   return address.split('/')[0];
@@ -72,8 +24,7 @@ const InterfacePanel = ({ info, onChanged }: PanelProps) => {
   const { t } = useTranslation();
 
   const [mode, setMode] = useState<IPMode>(info.mode);
-  const [ip, setIp] = useState('');
-  const [mask, setMask] = useState('');
+  const [address, setAddress] = useState('');
   const [gateway, setGateway] = useState('');
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -87,15 +38,14 @@ const InterfacePanel = ({ info, onChanged }: PanelProps) => {
   const currentAddress = info.current.addresses[0] || '';
 
   useEffect(() => {
-    const source = info.mode === 'static' && info.address ? info.address : currentAddress;
-    const parts = splitAddress(source);
+    // a saved static config wins; otherwise open on what the interface has now
+    const saved = info.mode === 'static' && !!info.address;
 
     setMode(info.mode);
-    setIp(parts.ip);
-    setMask(parts.mask);
-    setGateway(info.mode === 'static' ? info.gateway : '');
+    setAddress(saved ? info.address : currentAddress);
+    setGateway((saved && info.gateway) || info.current.gateway || '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [info.mode, info.address, info.gateway, currentAddress]);
+  }, [info.mode, info.address, info.gateway, currentAddress, info.current.gateway]);
 
   useEffect(() => {
     if (info.pending) {
@@ -125,15 +75,19 @@ const InterfacePanel = ({ info, onChanged }: PanelProps) => {
   function validate(): string {
     if (mode === 'dhcp') return '';
 
-    if (!isValidIPv4(ip.trim())) return t('settings.network.interfaces.invalidIp');
-
-    const prefix = maskToPrefix(mask);
-    if (prefix === null || prefix < minPrefix || prefix > maxPrefix) {
-      return t('settings.network.interfaces.invalidMask');
+    // the server accepts /1 to /30 (server/service/network/interfaces.go)
+    const cidr = parseCidr(address);
+    if (!cidr || cidr.prefix > maxPrefix) return t('settings.network.interfaces.invalidAddress');
+    if (isNetworkOrBroadcast(cidr.ip, cidr.prefix)) {
+      return t('settings.network.interfaces.hostNotAllowed');
     }
 
-    if (gateway.trim() && !isValidIPv4(gateway.trim())) {
-      return t('settings.network.interfaces.invalidGateway');
+    const gw = gateway.trim();
+    if (gw) {
+      if (ipv4ToInt(gw) === null) return t('settings.network.interfaces.invalidGateway');
+      if (!sameSubnet(gw, cidr.ip, cidr.prefix)) {
+        return t('settings.network.interfaces.gatewayOutsideSubnet');
+      }
     }
 
     return '';
@@ -147,10 +101,10 @@ const InterfacePanel = ({ info, onChanged }: PanelProps) => {
     }
     setError('');
 
-    const prefix = maskToPrefix(mask);
+    const cidr = parseCidr(address);
     const req: api.SetInterfaceReq = {
       mode,
-      address: mode === 'static' ? `${ip.trim()}/${prefix}` : '',
+      address: mode === 'static' && cidr ? `${cidr.ip}/${cidr.prefix}` : '',
       gateway: mode === 'static' ? gateway.trim() : ''
     };
 
@@ -199,7 +153,7 @@ const InterfacePanel = ({ info, onChanged }: PanelProps) => {
   const hasChanges =
     mode !== info.mode ||
     (mode === 'static' &&
-      (`${ip.trim()}/${maskToPrefix(mask)}` !== info.address ||
+      (address.trim() !== info.address ||
         gateway.trim() !== info.gateway));
 
   return (
@@ -239,26 +193,18 @@ const InterfacePanel = ({ info, onChanged }: PanelProps) => {
           <div className="flex flex-col space-y-2">
             <Input
               addonBefore={t('settings.network.interfaces.address')}
-              placeholder="192.168.1.50"
-              value={ip}
+              placeholder="192.168.1.20/24"
+              value={address}
               disabled={isSaving || !!pending}
-              status={ip && !isValidIPv4(ip.trim()) ? 'error' : undefined}
-              onChange={(e) => setIp(e.target.value)}
-            />
-            <Input
-              addonBefore={t('settings.network.interfaces.netmask')}
-              placeholder="255.255.255.0"
-              value={mask}
-              disabled={isSaving || !!pending}
-              status={mask && maskToPrefix(mask) === null ? 'error' : undefined}
-              onChange={(e) => setMask(e.target.value)}
+              status={address && !parseCidr(address) ? 'error' : undefined}
+              onChange={(e) => setAddress(e.target.value)}
             />
             <Input
               addonBefore={t('settings.network.interfaces.gateway')}
               placeholder={t('settings.network.interfaces.optional')}
               value={gateway}
               disabled={isSaving || !!pending}
-              status={gateway && !isValidIPv4(gateway.trim()) ? 'error' : undefined}
+              status={gateway && ipv4ToInt(gateway.trim()) === null ? 'error' : undefined}
               onChange={(e) => setGateway(e.target.value)}
             />
           </div>
