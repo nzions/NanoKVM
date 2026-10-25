@@ -1,3 +1,15 @@
+## 2.5.12 (2026-10-25)
+
+### Features
+
+* Web: Settings → Appearance chooses Dark (the default, as before), Light or System; System follows the browser's colour scheme and changes with it live. The choice is kept in the browser (`nano-kvm-theme`)
+* Settings → Network has a Firewall selector: Open (every port reachable) or Drop (only the KVM's own service ports). It writes `firewall:` in /etc/kvm/server.yaml and applies it with `nanokvm-firewall`; switching to Drop asks first, and if applying fails the previous mode is kept and an error is shown. API: `GET`/`POST /api/vm/firewall` (admin), `{"mode":"open"|"drop"}`
+
+### Bug Fixes
+
+* Web: every language carries the strings added since 2.5.0 (Ethernet panel, users and roles, HID-only, the UI-tour fixes, appearance, firewall) instead of falling back to English
+* Web: the Czech and Swedish language codes are the ISO 639-1 `cs` and `sv` (were `cz` and `se`); a stored choice of the old code is migrated once. Danish and Italian are listed by their own names (Dansk, Italiano)
+
 ## 2.5.11 (2026-10-25)
 
 ### Bug Fixes
