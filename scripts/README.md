@@ -184,7 +184,7 @@ Boot it:
 
 ```sh
 qemu-system-riscv64 -M virt -cpu thead-c906 -smp 1 -m 512 -bios default \
-  -kernel <Image-c906> \
+  -kernel <kernel-nanokvm-emu Image> \
   -append 'root=/dev/vda2 rw console=ttyS0 init=/usr/bin/init' \
   -drive file=<out.img>,format=raw,if=virtio \
   -netdev user,id=n0,hostfwd=tcp::18443-:443,hostfwd=tcp::18080-:80 \
@@ -216,11 +216,20 @@ scripts/emu-image.sh --refresh <out.img> <NanoKVM-Server>
    this script already built is accepted.
 4. Boot the VM again with the qemu command above.
 
-### The kernel (prototype)
+### The kernel
 
-The kernel is currently Ubuntu noble `linux-riscv` 6.8.0-60 `vmlinuz` with a
-4-byte patch at file offset `0x1B7BC` (`f3 27 00 5c` to `81 47 01 00`). It
-disables the T-Head errata probe `csrr a5,sxstatus`, which QEMU 8.2 traps on.
-`emu-image.sh --patch-kernel <in> <out>` applies exactly that patch, after
-checking the four original bytes, and prints the output sha256. This is a
-prototype; the clean fix is a kernel built with `CONFIG_ERRATA_THEAD=n`.
+The kernel is built by forge, not patched: fleet's native files build
+`kernel-nanokvm-emu` (`containers/kernel-nanokvm-emu`) compiles a pinned
+kernel.org stable tarball (6.12.x) for `ARCH=riscv` with clang/lld, offline. It
+is `defconfig` with `CONFIG_ERRATA_THEAD=n` (the T-Head errata probe
+`csrr sxstatus`, which QEMU traps on, is never built; `ARCH_THEAD`,
+`ARCH_SUNXI` and the other SoCs that select it are off), modules off, virtio
+(pci and mmio) blk/net/console, ext4, 8250 serial and devtmpfs built in, and
+netfilter (conntrack, the xtables matches the firewall uses, legacy iptables
+and nf_tables with `NFT_COMPAT`) built in, so `nanokvm-firewall` finds its
+tables. The build fails if a required setting did not take. It lands at
+`<share>/fleet/artifacts/kernel-nanokvm-emu/<version>/{Image,config}`; boot it
+with `-kernel Image` and
+`-append 'root=/dev/vda2 rw console=ttyS0 init=/usr/bin/init'`. There is no
+initrd and no modules. The old 4-byte patch of Ubuntu's `linux-riscv` `vmlinuz`
+(`emu-image.sh --patch-kernel`) is gone.

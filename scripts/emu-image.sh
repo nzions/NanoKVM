@@ -41,25 +41,21 @@
 # Usage:
 #   scripts/emu-image.sh [--sha256 <hex>] <stock.img> <NanoKVM-Server> <out.img>
 #   scripts/emu-image.sh --refresh <img> <NanoKVM-Server>
-#   scripts/emu-image.sh --patch-kernel <vmlinuz-in> <vmlinuz-out>
 #
 # NanoKVM-Server: CGO_ENABLED=0 GOOS=linux GOARCH=riscv64 go build -tags nokvm
 # (from server/). <out.img> must not exist.
+#
+# The kernel is NOT made here: it is forge's fleet native build
+# kernel-nanokvm-emu (riscv64, CONFIG_ERRATA_THEAD=n, netfilter built in),
+# landing at <share>/fleet/artifacts/kernel-nanokvm-emu/<version>/Image. See
+# scripts/README.md.
 
 set -euo pipefail
-
-# Prototype kernel patch: the Ubuntu noble linux-riscv 6.8.0-60 vmlinuz probes
-# the T-Head errata with `csrr a5,sxstatus`, which QEMU 8.2 traps on.
-# f3 27 00 5c (csrr a5,sxstatus) -> 81 47 01 00 (c.li a5,0 ; c.nop).
-KPATCH_OFFSET=$((0x1B7BC))
-KPATCH_OLD="f3 27 00 5c"
-KPATCH_NEW="81 47 01 00"
-KPATCH_NEW_PRINTF='\201\107\001\000'
 
 QEMU_CMD() {
     cat <<EOF
 qemu-system-riscv64 -M virt -cpu thead-c906 -smp 1 -m 512 -bios default \\
-  -kernel <Image-c906> \\
+  -kernel <kernel-nanokvm-emu Image> \\
   -append 'root=/dev/vda2 rw console=ttyS0 init=/usr/bin/init' \\
   -drive file=$1,format=raw,if=virtio \\
   -netdev user,id=n0,hostfwd=tcp::18443-:443,hostfwd=tcp::18080-:80 \\
@@ -80,7 +76,6 @@ usage() {
     cat >&2 <<EOF
 Usage: $0 [--sha256 <hex>] <stock.img> <NanoKVM-Server> <out.img>
        $0 --refresh <img> <NanoKVM-Server>   (in place, after an OTA; VM stopped)
-       $0 --patch-kernel <vmlinuz-in> <vmlinuz-out>
 EOF
     exit 1
 }
@@ -95,39 +90,10 @@ sha_of() {
     echo "${out%% *}"
 }
 
-# ---------------------------------------------------------------- kernel patch
-
-patch_kernel() {
-    local in="$1" out="$2" got
-    need_tool od "coreutils"
-    need_tool dd "coreutils"
-    [ -f "$in" ] || die "kernel input not found: $in"
-    [ ! -e "$out" ] || die "refusing to overwrite existing file: $out"
-    got=$(od -An -tx1 -j "$KPATCH_OFFSET" -N4 "$in") || die "cannot read $in"
-    got=$(echo $got) # squeeze whitespace
-    [ "$got" = "$KPATCH_OLD" ] ||
-        die "bytes at offset 0x1B7BC of $in are '$got', expected '$KPATCH_OLD': not the kernel this patch is for"
-    cp -- "$in" "$out"
-    printf "$KPATCH_NEW_PRINTF" |
-        dd of="$out" bs=1 seek="$KPATCH_OFFSET" conv=notrunc 2>/dev/null ||
-        die "dd failed writing the patch"
-    got=$(od -An -tx1 -j "$KPATCH_OFFSET" -N4 "$out")
-    got=$(echo $got)
-    [ "$got" = "$KPATCH_NEW" ] || die "patch did not land: '$got' at offset 0x1B7BC of $out"
-    cmp -s -n "$KPATCH_OFFSET" "$in" "$out" || die "bytes before the patch differ"
-    info "patched $out (0x1B7BC: $KPATCH_OLD -> $KPATCH_NEW)"
-    info "sha256 $(sha_of "$out")  $out"
-}
-
 # ------------------------------------------------------------------ arguments
 
 WANT_SHA=""
 MODE=build
-if [ "${1:-}" = "--patch-kernel" ]; then
-    [ $# -eq 3 ] || usage
-    patch_kernel "$2" "$3"
-    exit 0
-fi
 if [ "${1:-}" = "--refresh" ]; then
     [ $# -eq 3 ] || usage
     MODE=refresh
@@ -496,5 +462,5 @@ cmp -s -n $((P2_START * SECTOR)) "$STOCK" "$IMG" || die "bytes before partition 
 mv -- "$IMG" "$OUT"
 info "wrote $OUT"
 info "sha256 $(sha_of "$OUT")  $OUT"
-info "boot it with (kernel: see scripts/README.md, --patch-kernel):"
+info "boot it with (kernel: forge's kernel-nanokvm-emu, see scripts/README.md):"
 QEMU_CMD "$OUT"
