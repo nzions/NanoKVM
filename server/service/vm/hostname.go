@@ -1,9 +1,10 @@
 package vm
 
 import (
-	"fmt"
+	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"NanoKVM-Server/proto"
@@ -13,16 +14,82 @@ import (
 )
 
 const (
+	maxHostnameLength = 253
+	maxLabelLength    = 63
+)
+
+// the files are variables so tests can point them at a temporary directory
+var (
 	BootHostnameFile = "/boot/hostname"
 	EtcHostname      = "/etc/hostname"
 	EtcHosts         = "/etc/hosts"
 )
+
+// validateHostname checks an RFC 1123 hostname: dot separated labels of 1-63
+// characters from [a-z0-9-], none starting or ending with a hyphen, 253
+// characters at most.
+func validateHostname(hostname string) error {
+	if hostname == "" || len(hostname) > maxHostnameLength {
+		return errors.New("invalid hostname length")
+	}
+
+	for _, label := range strings.Split(hostname, ".") {
+		if label == "" || len(label) > maxLabelLength {
+			return errors.New("invalid hostname label length")
+		}
+		if label[0] == '-' || label[len(label)-1] == '-' {
+			return errors.New("hostname label starts or ends with a hyphen")
+		}
+		for _, r := range label {
+			if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '-' {
+				return errors.New("hostname contains an invalid character")
+			}
+		}
+	}
+
+	return nil
+}
+
+// writeFileAtomic writes data to a temporary file in the target directory,
+// syncs it and renames it over path, so a reader never sees a partial file.
+func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".tmp-"+filepath.Base(path)+"-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+
+	_, err = tmp.Write(data)
+	if err == nil {
+		err = tmp.Chmod(perm)
+	}
+	if err == nil {
+		err = tmp.Sync()
+	}
+	if closeErr := tmp.Close(); err == nil {
+		err = closeErr
+	}
+	if err == nil {
+		err = os.Rename(tmpPath, path)
+	}
+	if err != nil {
+		_ = os.Remove(tmpPath)
+	}
+
+	return err
+}
 
 func (s *Service) SetHostname(c *gin.Context) {
 	var req proto.SetHostnameReq
 	var rsp proto.Response
 
 	if err := proto.ParseFormRequest(c, &req); err != nil {
+		rsp.ErrRsp(c, -1, "invalid arguments")
+		return
+	}
+
+	if err := validateHostname(req.Hostname); err != nil {
+		log.Warnf("reject hostname %q: %s", req.Hostname, err)
 		rsp.ErrRsp(c, -1, "invalid arguments")
 		return
 	}
@@ -35,7 +102,8 @@ func (s *Service) SetHostname(c *gin.Context) {
 
 	oldHostname := strings.Replace(string(dataRead), "\n", "", -1)
 
-	if (oldHostname != req.Hostname) {
+	// an empty old name would match between every character of the file
+	if oldHostname != "" && oldHostname != req.Hostname {
 		dataRead, err = os.ReadFile(EtcHosts)
 		if err != nil {
 			rsp.ErrRsp(c, -1, "read Hosts failed")
@@ -44,20 +112,20 @@ func (s *Service) SetHostname(c *gin.Context) {
 
 		data := []byte(strings.Replace(string(dataRead), oldHostname, req.Hostname, -1))
 
-		if err := os.WriteFile(EtcHosts, data, 0o644); err != nil {
+		if err := writeFileAtomic(EtcHosts, data, 0o644); err != nil {
 			rsp.ErrRsp(c, -2, "failed to write data")
 			return
 		}
 	}
 
-	data := []byte(fmt.Sprintf("%s", req.Hostname))
+	data := []byte(req.Hostname)
 
-	if err := os.WriteFile(BootHostnameFile, data, 0o644); err != nil {
+	if err := writeFileAtomic(BootHostnameFile, data, 0o644); err != nil {
 		rsp.ErrRsp(c, -2, "failed to write data")
 		return
 	}
 
-	if err := os.WriteFile(EtcHostname, data, 0o644); err != nil {
+	if err := writeFileAtomic(EtcHostname, data, 0o644); err != nil {
 		rsp.ErrRsp(c, -3, "failed to write data")
 		return
 	}

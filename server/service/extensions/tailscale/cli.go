@@ -5,7 +5,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
-	"fmt"
+
 	"os"
 	"os/exec"
 	"regexp"
@@ -43,28 +43,24 @@ func (c *Cli) Start() error {
 		}
 	}
 
-	commands := []string{
-		fmt.Sprintf("cp -f %s %s", ScriptBackupPath, ScriptPath),
-		fmt.Sprintf("%s start", ScriptPath),
-	}
-
-	command := strings.Join(commands, " && ")
-	return exec.Command("sh", "-c", command).Run()
+	return installAndRun("start")
 }
 
 func (c *Cli) Restart() error {
-	commands := []string{
-		fmt.Sprintf("cp -f %s %s", ScriptBackupPath, ScriptPath),
-		fmt.Sprintf("%s restart", ScriptPath),
+	return installAndRun("restart")
+}
+
+// installAndRun refreshes the init script from the backup, then runs it
+func installAndRun(action string) error {
+	if err := exec.Command("cp", "-f", ScriptBackupPath, ScriptPath).Run(); err != nil {
+		return err
 	}
 
-	command := strings.Join(commands, " && ")
-	return exec.Command("sh", "-c", command).Run()
+	return exec.Command("/bin/sh", ScriptPath, action).Run()
 }
 
 func (c *Cli) Stop() error {
-	command := fmt.Sprintf("%s stop", ScriptPath)
-	err := exec.Command("sh", "-c", command).Run()
+	err := exec.Command("/bin/sh", ScriptPath, "stop").Run()
 	if err != nil {
 		return err
 	}
@@ -73,18 +69,15 @@ func (c *Cli) Stop() error {
 }
 
 func (c *Cli) Up() error {
-	command := "tailscale up --accept-dns=false"
-	return exec.Command("sh", "-c", command).Run()
+	return exec.Command("tailscale", "up", "--accept-dns=false").Run()
 }
 
 func (c *Cli) Down() error {
-	command := "tailscale down"
-	return exec.Command("sh", "-c", command).Run()
+	return exec.Command("tailscale", "down").Run()
 }
 
 func (c *Cli) Status() (*TsStatus, error) {
-	command := "tailscale status --json"
-	cmd := exec.Command("sh", "-c", command)
+	cmd := exec.Command("tailscale", "status", "--json")
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -111,8 +104,7 @@ func (c *Cli) Status() (*TsStatus, error) {
 }
 
 func (c *Cli) Login() (string, error) {
-	command := "tailscale login --accept-dns=false --timeout=10m"
-	cmd := exec.Command("sh", "-c", command)
+	cmd := exec.Command("tailscale", "login", "--accept-dns=false", "--timeout=10m")
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
@@ -142,6 +134,5 @@ func (c *Cli) Login() (string, error) {
 }
 
 func (c *Cli) Logout() error {
-	command := "tailscale logout"
-	return exec.Command("sh", "-c", command).Run()
+	return exec.Command("tailscale", "logout").Run()
 }

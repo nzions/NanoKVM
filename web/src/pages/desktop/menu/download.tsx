@@ -112,9 +112,11 @@ export const DownloadImage = () => {
     setSha256sum(e.target.value);
   }
 
-  function getValidatedSHA256() {
+  // A URL download needs a checksum, the server refuses one without; for an
+  // upload it stays optional.
+  function getValidatedSHA256(required = false) {
     const checksum = sha256sum.trim();
-    if (checksum && !/^[a-fA-F0-9]{64}$/.test(checksum)) {
+    if ((required || checksum) && !/^[a-fA-F0-9]{64}$/.test(checksum)) {
       setStatus('failed');
       setLog(t('download.invalidSHA256'));
       return null;
@@ -200,7 +202,7 @@ export const DownloadImage = () => {
   function download(url?: string) {
     if (!url) return;
 
-    const checksum = getValidatedSHA256();
+    const checksum = getValidatedSHA256(true);
     if (checksum === null) return;
 
     // Invalidate the status request started when the popover was opened.

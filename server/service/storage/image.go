@@ -19,14 +19,18 @@ import (
 	"NanoKVM-Server/service/hid"
 )
 
+// imageDirectory is a variable so tests can point it at a temporary directory
+var imageDirectory = "/data"
+
 const (
-	imageDirectory = "/data"
-	imageNone      = "/dev/mmcblk0p3"
-	cdromFlag      = "/sys/kernel/config/usb_gadget/g0/functions/mass_storage.disk0/lun.0/cdrom"
-	mountDevice    = "/sys/kernel/config/usb_gadget/g0/functions/mass_storage.disk0/lun.0/file"
-	inquiryString  = "/sys/kernel/config/usb_gadget/g0/functions/mass_storage.disk0/lun.0/inquiry_string"
-	roFlag         = "/sys/kernel/config/usb_gadget/g0/functions/mass_storage.disk0/lun.0/ro"
-	usbProduct     = "/sys/kernel/config/usb_gadget/g0/strings/0x409/product"
+	imageNone     = "/dev/mmcblk0p3"
+	cdromFlag     = "/sys/kernel/config/usb_gadget/g0/functions/mass_storage.disk0/lun.0/cdrom"
+	mountDevice   = "/sys/kernel/config/usb_gadget/g0/functions/mass_storage.disk0/lun.0/file"
+	inquiryString = "/sys/kernel/config/usb_gadget/g0/functions/mass_storage.disk0/lun.0/inquiry_string"
+	roFlag        = "/sys/kernel/config/usb_gadget/g0/functions/mass_storage.disk0/lun.0/ro"
+	usbProduct    = "/sys/kernel/config/usb_gadget/g0/strings/0x409/product"
+	usbGadgetUDC  = "/sys/kernel/config/usb_gadget/g0/UDC"
+	udcClassDir   = "/sys/class/udc"
 
 	usbProductName = "NanoKVM"
 	// the SCSI inquiry product field holds 16 bytes, the USB product string 126
@@ -70,6 +74,18 @@ func (s *Service) MountImage(c *gin.Context) {
 	if err := proto.ParseFormRequest(c, &req); err != nil {
 		rsp.ErrRsp(c, -1, "invalid arguments")
 		return
+	}
+
+	// the client names the image, so it is resolved inside the image directory
+	// before anything else happens
+	if req.File != "" {
+		resolved, err := resolveImagePath(req.File)
+		if err != nil {
+			log.Warnf("reject mount of %q: %s", req.File, err)
+			rsp.ErrRsp(c, -2, "invalid arguments")
+			return
+		}
+		req.File = resolved
 	}
 
 	// The host owns the raw partition while the virtual disk serves it, so /data
@@ -174,20 +190,27 @@ func (s *Service) MountImage(c *gin.Context) {
 		h.Unlock()
 	}()
 
-	// reset usb
-	commands := []string{
-		"echo > /sys/kernel/config/usb_gadget/g0/UDC",
-		"ls /sys/class/udc/ | cat > /sys/kernel/config/usb_gadget/g0/UDC",
+	// reset usb: detach the gadget, then attach it to the controller again
+	if err := os.WriteFile(usbGadgetUDC, []byte("\n"), 0o666); err != nil {
+		log.Errorf("detach usb gadget failed: %s", err)
+		rsp.ErrRsp(c, -2, "execute command failed")
+		return
+	}
+	time.Sleep(100 * time.Millisecond)
+
+	controllers, err := os.ReadDir(udcClassDir)
+	if err != nil || len(controllers) == 0 {
+		log.Errorf("find usb controller failed: %v", err)
+		rsp.ErrRsp(c, -2, "execute command failed")
+		return
 	}
 
-	for _, command := range commands {
-		err := exec.Command("sh", "-c", command).Run()
-		if err != nil {
-			rsp.ErrRsp(c, -2, "execute command failed")
-			return
-		}
-		time.Sleep(100 * time.Millisecond)
+	if err := os.WriteFile(usbGadgetUDC, []byte(controllers[0].Name()+"\n"), 0o666); err != nil {
+		log.Errorf("attach usb gadget failed: %s", err)
+		rsp.ErrRsp(c, -2, "execute command failed")
+		return
 	}
+	time.Sleep(100 * time.Millisecond)
 
 	rsp.OkRsp(c)
 	log.Debugf("mount image %s success", req.File)
@@ -235,6 +258,46 @@ func MountedImage() (string, error) {
 	}
 
 	return image, nil
+}
+
+// resolveImagePath turns a client supplied path into the real path of an image
+// file inside imageDirectory. The path must be absolute, name an existing
+// regular .img/.iso file and, after symlinks are followed, stay inside the
+// directory.
+func resolveImagePath(file string) (string, error) {
+	if file == "" || !filepath.IsAbs(file) {
+		return "", errors.New("image path must be absolute")
+	}
+
+	resolved, err := filepath.EvalSymlinks(filepath.Clean(file))
+	if err != nil {
+		return "", err
+	}
+
+	root, err := filepath.EvalSymlinks(imageDirectory)
+	if err != nil {
+		return "", err
+	}
+
+	// the separator keeps /database from matching /data
+	if !strings.HasPrefix(resolved, strings.TrimSuffix(root, "/")+"/") {
+		return "", errors.New("image is outside " + imageDirectory)
+	}
+
+	ext := strings.ToLower(filepath.Ext(resolved))
+	if ext != ".img" && ext != ".iso" {
+		return "", errors.New("image must be a .img or .iso file")
+	}
+
+	info, err := os.Stat(resolved)
+	if err != nil {
+		return "", err
+	}
+	if !info.Mode().IsRegular() {
+		return "", errors.New("image is not a regular file")
+	}
+
+	return resolved, nil
 }
 
 // imageName returns the file name of an image without the extension
@@ -333,16 +396,14 @@ func (s *Service) DeleteImage(c *gin.Context) {
 		return
 	}
 
-	filename := strings.ToLower(req.File)
-	validPrefix := strings.HasPrefix(filename, imageDirectory)
-	validSuffix := strings.HasSuffix(filename, ".iso") || strings.HasSuffix(filename, ".img")
-
-	if !validPrefix || !validSuffix {
+	file, err := resolveImagePath(req.File)
+	if err != nil {
+		log.Warnf("reject delete of %q: %s", req.File, err)
 		rsp.ErrRsp(c, -2, "invalid arguments")
 		return
 	}
 
-	if err := os.Remove(req.File); err != nil {
+	if err := os.Remove(file); err != nil {
 		rsp.ErrRsp(c, -3, "remove file failed")
 		log.Errorf("failed to remove file %s: %s", req.File, err)
 		return

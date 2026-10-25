@@ -4,12 +4,40 @@
 
 APFLAG_FILE=/tmp/wifiap
 
+# plain_text VALUE succeeds when VALUE holds no newline or other control
+# character, which would start a new line in the generated config files
+plain_text() {
+    [ "$(printf '%s' "$1" | LC_ALL=C tr -d '[:cntrl:]' | wc -c)" -eq "$(printf '%s' "$1" | wc -c)" ]
+}
+
+# check_wifi_credentials SSID PASS succeeds for an SSID of 1-32 bytes and a
+# passphrase of at most 64 bytes, both free of control characters
+check_wifi_credentials() {
+    if ! plain_text "$1" || ! plain_text "$2"; then
+        echo "wifi: credentials contain control characters, refusing to use them" >&2
+        return 1
+    fi
+    if [ "${#1}" -lt 1 ] || [ "${#1}" -gt 32 ] || [ "${#2}" -gt 64 ]; then
+        echo "wifi: credentials have an invalid length, refusing to use them" >&2
+        return 1
+    fi
+}
+
+# stop_pidfile FILE signals the process named in FILE, if it holds a number
+stop_pidfile() {
+    pid=$(cat "$1")
+    case "$pid" in
+        ''|*[!0-9]*) ;;
+        *) kill "$pid" || true ;;
+    esac
+}
+
 gen_hostapd_conf() {
     ssid="${1}"
     pass="${2}"
     echo "ctrl_interface=/var/run/hostapd"
     echo "ctrl_interface_group=0"
-    echo "ssid=${ssid}"
+    printf 'ssid=%s\n' "${ssid}"
     echo "hw_mode=g"
     echo "channel=1"
     echo "beacon_int=100"
@@ -20,7 +48,7 @@ gen_hostapd_conf() {
     echo "macaddr_acl=0"
     echo "auth_algs=3"
     echo "wpa=2"
-    echo "wpa_passphrase=${pass}"
+    printf 'wpa_passphrase=%s\n' "${pass}"
     echo "ieee80211n=1"
 }
 
@@ -72,6 +100,7 @@ start() {
     fi
     # credentials: keep them root-only, including files from older releases
     [ -e /etc/kvm/wifi.pass ] && chmod 600 /etc/kvm/wifi.pass
+    check_wifi_credentials "$ssid" "$pass" || return 1
     (
         umask 077
         echo "ctrl_interface=/var/run/wpa_supplicant" >/etc/wpa_supplicant.conf
@@ -86,8 +115,8 @@ start() {
 
 ap_start() {
     echo "wifi mode: ap"
-    id2=$(printf "%d" 0x$(sha512sum /sys/class/cvi-base/base_uid | head -c 2))
-    id3=$(printf "%d" 0x$(sha512sum /sys/class/cvi-base/base_uid | head -c 4 | tail -c 2))
+    id2=$(printf "%d" "0x$(sha512sum /sys/class/cvi-base/base_uid | head -c 2)")
+    id3=$(printf "%d" "0x$(sha512sum /sys/class/cvi-base/base_uid | head -c 4 | tail -c 2)")
     if [ "$id2" = "$id3" ]; then
         id2=$((id2 + 1))
     fi
@@ -105,12 +134,13 @@ ap_start() {
     if [ -e /kvmapp/kvm/ap.pass ]; then
         pass=$(cat /kvmapp/kvm/ap.pass)
     fi
+    check_wifi_credentials "$ssid" "$pass" || return 1
     (
         umask 077
         gen_hostapd_conf "$ssid" "$pass" >/etc/hostapd.conf
     )
     chmod 600 /etc/hostapd.conf
-    ipv4_prefix=10.$id3.$id2
+    ipv4_prefix="10.$id3.$id2"
     if [ ! -e /etc/udhcpd.wlan0.conf ]; then
         gen_udhcpd_conf wlan0 "${ipv4_prefix}" >/etc/udhcpd.wlan0.conf
     fi
@@ -126,7 +156,7 @@ ap_start() {
     ifconfig wlan0 up
     ip route del default || true
     ip add flush dev wlan0
-    ip addr add $ipv4_prefix.1/24 dev wlan0
+    ip addr add "$ipv4_prefix.1/24" dev wlan0
     # dnsmasq --pid-file=/tmp/dnsmasq.run -C /etc/dnsmasq.conf
     hostapd -B -i wlan0 /etc/hostapd.conf
     udhcpd -S /etc/udhcpd.wlan0.conf
@@ -142,15 +172,15 @@ stop() {
     ps -ef | grep "udhcpd -S /etc/udhcpd.wlan0.conf" | grep -v grep | awk '{print $1}' | xargs kill -2 || true
     killall wpa_supplicant || true
     if [ -e /run/udhcpc.wlan0.pid ]; then
-        kill $(cat /run/udhcpc.wlan0.pid) || true
+        stop_pidfile /run/udhcpc.wlan0.pid
         rm -f /run/udhcpc.wlan0.pid
     fi
     if [ -e /var/run/udhcpd.wlan0.pid ]; then
-        kill $(cat /var/run/udhcpd.wlan0.pid) || true
+        stop_pidfile /var/run/udhcpd.wlan0.pid
         rm -f /var/run/udhcpd.wlan0.pid
     fi
     if [ -e /tmp/dnsmasq.run ]; then
-        kill $(cat /tmp/dnsmasq.run) || true
+        stop_pidfile /tmp/dnsmasq.run
         rm -f /tmp/dnsmasq.run
     fi
     # if [ -e /etc/wpa_supplicant.conf]

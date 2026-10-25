@@ -2,7 +2,7 @@ package network
 
 import (
 	"crypto/subtle"
-	"fmt"
+
 	"os"
 	"os/exec"
 	"strings"
@@ -147,8 +147,7 @@ func (s *Service) ConnectWifi(c *gin.Context) {
 func (s *Service) DisconnectWifi(c *gin.Context) {
 	var rsp proto.Response
 
-	command := fmt.Sprintf("%s stop", WiFiScript)
-	cmd := exec.Command("sh", "-c", command)
+	cmd := exec.Command("/bin/sh", WiFiScript, "stop")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Errorf("failed to disconnect wifi: %s", output)

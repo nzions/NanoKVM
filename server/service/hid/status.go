@@ -149,8 +149,7 @@ func ResetUSBPHY() error {
 	h.CloseNoLock()
 	defer h.Unlock()
 
-	command := fmt.Sprintf("%s restart_phy", USBDevScript)
-	if err := exec.Command("sh", "-c", command).Run(); err != nil {
+	if err := exec.Command("/bin/sh", USBDevScript, "restart_phy").Run(); err != nil {
 		return fmt.Errorf("restart usb phy: %w", err)
 	}
 

@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -18,6 +19,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -35,7 +37,14 @@ const (
 	downloadStatusFailed         downloadStatus = "failed"
 	downloadStatusChecksumFailed downloadStatus = "checksum_failed"
 
-	imageDirectory = "/data"
+	// A remote image is stored whole, so the cap has to allow DVD and disk images.
+	maxDownloadSize = 16 << 30
+
+	downloadDialTimeout           = 15 * time.Second
+	downloadTLSHandshakeTimeout   = 15 * time.Second
+	downloadResponseHeaderTimeout = 30 * time.Second
+	downloadOverallTimeout        = 4 * time.Hour
+	downloadMaxRedirects          = 5
 
 	// ISO 9660 and UDF volume descriptors live in sector 16 of the image.
 	volumeDescriptorOffset = 0x8001
@@ -48,8 +57,19 @@ const (
 	imageFreeReserve = 128 << 20
 )
 
+// imageDirectory is a variable so tests can point it at a temporary directory
+var imageDirectory = "/data"
+
+// ipAllowed decides which addresses a remote download may connect to. It is a
+// variable so tests can reach a local httptest server.
+var ipAllowed = isPublicIP
+
 var (
 	errDownloadInProgress = errors.New("download in progress")
+	errSHA256Required     = errors.New("sha256sum is required")
+	errBlockedAddress     = errors.New("download address is not allowed")
+	errImageTooLarge      = errors.New("download exceeds the size limit")
+	errImageExists        = errors.New("image already exists")
 	errSHA256Mismatch     = errors.New("sha256 mismatch")
 	errUnsupportedImage   = errors.New("unsupported image format: expected an ISO 9660/UDF image or a raw disk image")
 	validISOFilename      = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
@@ -387,6 +407,18 @@ func (s *Service) DownloadImageFile(c *gin.Context) {
 	rsp.ErrRsp(c, -1, "file is required")
 }
 
+// validateImageFilename accepts a plain .iso or .img file name
+func validateImageFilename(filename string) error {
+	lower := strings.ToLower(filename)
+	if !strings.HasSuffix(lower, ".iso") && !strings.HasSuffix(lower, ".img") {
+		return errors.New("only .iso and .img files allowed")
+	}
+	if filename == "" || filename[0] == '.' || !validISOFilename.MatchString(filename) {
+		return errors.New("invalid filename")
+	}
+	return nil
+}
+
 func validateISOFilename(filename string) error {
 	if filename == "" {
 		return errors.New("no filename")
@@ -419,6 +451,11 @@ func (s *Service) DownloadImage(c *gin.Context) {
 		rsp.ErrRsp(c, -1, err.Error())
 		return
 	}
+	// nothing else vouches for a remote image, so the checksum is mandatory
+	if expectedSHA256 == nil {
+		rsp.ErrRsp(c, -1, errSHA256Required.Error())
+		return
+	}
 
 	u, err := url.Parse(req.File)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.Path == "" {
@@ -428,6 +465,10 @@ func (s *Service) DownloadImage(c *gin.Context) {
 	filename := filepath.Base(u.Path)
 	if filename == "." || filename == "/" || filename == "" {
 		rsp.ErrRsp(c, -1, "invalid url")
+		return
+	}
+	if err := validateImageFilename(filename); err != nil {
+		rsp.ErrRsp(c, -1, err.Error())
 		return
 	}
 
@@ -490,12 +531,24 @@ func (s *Service) downloadRemoteImage(
 	filename string,
 	onProgress func(string),
 ) error {
+	if expectedSHA256 == nil {
+		return errSHA256Required
+	}
+	if err := validateImageFilename(filename); err != nil {
+		return err
+	}
+
+	destPath := filepath.Join(imageDirectory, filename)
+	if err := ensureNotExist(destPath); err != nil {
+		return err
+	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return fmt.Errorf("create download request failed: %w", err)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := newDownloadClient().Do(req)
 	if err != nil {
 		return fmt.Errorf("download request failed: %w", err)
 	}
@@ -504,7 +557,12 @@ func (s *Service) downloadRemoteImage(
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download request returned status %d", resp.StatusCode)
 	}
+	if resp.ContentLength > maxDownloadSize {
+		return errImageTooLarge
+	}
 
+	// the temporary file lives next to the destination, so the rename at the end
+	// stays on one filesystem
 	tempFile, err := os.CreateTemp(imageDirectory, ".nanokvm-download-*")
 	if err != nil {
 		return fmt.Errorf("create temporary image failed: %w", err)
@@ -514,8 +572,12 @@ func (s *Service) downloadRemoteImage(
 
 	hasher := sha256.New()
 	lw := newLoggingWriter(io.MultiWriter(tempFile, hasher), resp.ContentLength, onProgress)
-	_, copyErr := io.Copy(lw, resp.Body)
+	// one byte past the cap tells a body that is too long from one that fits
+	written, copyErr := io.Copy(lw, io.LimitReader(resp.Body, maxDownloadSize+1))
 	lw.stopTicker()
+	if copyErr == nil {
+		copyErr = tempFile.Sync()
+	}
 	closeErr := tempFile.Close()
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -523,23 +585,103 @@ func (s *Service) downloadRemoteImage(
 	if copyErr != nil {
 		return fmt.Errorf("save downloaded image failed: %w", copyErr)
 	}
+	if written > maxDownloadSize {
+		return errImageTooLarge
+	}
 	if closeErr != nil {
 		return fmt.Errorf("close downloaded image failed: %w", closeErr)
 	}
 
-	if expectedSHA256 != nil && !bytes.Equal(hasher.Sum(nil), expectedSHA256) {
+	if !bytes.Equal(hasher.Sum(nil), expectedSHA256) {
 		return errSHA256Mismatch
 	}
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 
-	destPath := filepath.Join(imageDirectory, filename)
+	// checked again: another image may have appeared while this one was fetched
+	if err := ensureNotExist(destPath); err != nil {
+		return err
+	}
 	if err := os.Rename(tempPath, destPath); err != nil {
 		return fmt.Errorf("install downloaded image failed: %w", err)
 	}
 
 	return nil
+}
+
+// ensureNotExist refuses to replace a file or link that is already there
+func ensureNotExist(path string) error {
+	_, err := os.Lstat(path)
+	if err == nil {
+		return errImageExists
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("check %s failed: %w", path, err)
+	}
+
+	return nil
+}
+
+// newDownloadClient returns an HTTP client with timeouts that only connects to
+// public addresses. The address is checked in the dialer after name resolution,
+// so a redirect or a DNS answer that changes between lookups cannot reach the
+// local network.
+func newDownloadClient() *http.Client {
+	dialer := &net.Dialer{
+		Timeout: downloadDialTimeout,
+		Control: func(network string, address string, _ syscall.RawConn) error {
+			host, _, err := net.SplitHostPort(address)
+			if err != nil {
+				return err
+			}
+
+			ip := net.ParseIP(host)
+			if ip == nil || !ipAllowed(ip) {
+				return fmt.Errorf("%w: %s", errBlockedAddress, host)
+			}
+
+			return nil
+		},
+	}
+
+	return &http.Client{
+		Timeout: downloadOverallTimeout,
+		Transport: &http.Transport{
+			// no environment proxy: it would dial the address checks never see
+			Proxy:                 nil,
+			DialContext:           dialer.DialContext,
+			TLSHandshakeTimeout:   downloadTLSHandshakeTimeout,
+			ResponseHeaderTimeout: downloadResponseHeaderTimeout,
+		},
+		CheckRedirect: func(_ *http.Request, via []*http.Request) error {
+			if len(via) >= downloadMaxRedirects {
+				return errors.New("too many redirects")
+			}
+			return nil
+		},
+	}
+}
+
+// carrierGradeNAT is 100.64.0.0/10, shared address space that is not public
+var carrierGradeNAT = net.IPNet{IP: net.IPv4(100, 64, 0, 0), Mask: net.CIDRMask(10, 32)}
+
+// isPublicIP reports whether ip is a routable address outside the local network
+func isPublicIP(ip net.IP) bool {
+	if v4 := ip.To4(); v4 != nil {
+		ip = v4
+		if carrierGradeNAT.Contains(ip) {
+			return false
+		}
+	}
+
+	return !(ip.IsLoopback() ||
+		ip.IsPrivate() ||
+		ip.IsUnspecified() ||
+		ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() ||
+		ip.IsInterfaceLocalMulticast() ||
+		ip.IsMulticast())
 }
 
 type loggingWriter struct {

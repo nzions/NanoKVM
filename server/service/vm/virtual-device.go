@@ -18,31 +18,57 @@ const (
 	virtualDisk    = "/boot/usb.disk0"
 )
 
+// deviceStep is one action of a gadget change, done with os calls or an argv
+// exec, never through a shell
+type deviceStep func() error
+
+func touchFile(path string) deviceStep {
+	return func() error {
+		f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0o666)
+		if err != nil {
+			return err
+		}
+		return f.Close()
+	}
+}
+
+func removeFile(path string) deviceStep {
+	return func() error { return os.Remove(path) }
+}
+
+func removeTree(path string) deviceStep {
+	return func() error { return os.RemoveAll(path) }
+}
+
+func gadgetService(action string) deviceStep {
+	return func() error { return exec.Command("/bin/sh", hid.USBDevScript, action).Run() }
+}
+
 var (
-	mountNetworkCommands = []string{
-		"touch /boot/usb.rndis0",
-		"/etc/init.d/S03usbdev stop",
-		"/etc/init.d/S03usbdev start",
+	mountNetworkCommands = []deviceStep{
+		touchFile(virtualNetwork),
+		gadgetService("stop"),
+		gadgetService("start"),
 	}
 
-	unmountNetworkCommands = []string{
-		"/etc/init.d/S03usbdev stop",
-		"rm -rf /sys/kernel/config/usb_gadget/g0/configs/c.1/rndis.usb0",
-		"rm /boot/usb.rndis0",
-		"/etc/init.d/S03usbdev start",
+	unmountNetworkCommands = []deviceStep{
+		gadgetService("stop"),
+		removeTree("/sys/kernel/config/usb_gadget/g0/configs/c.1/rndis.usb0"),
+		removeFile(virtualNetwork),
+		gadgetService("start"),
 	}
 
-	mountDiskCommands = []string{
-		"touch /boot/usb.disk0",
-		"/etc/init.d/S03usbdev stop",
-		"/etc/init.d/S03usbdev start",
+	mountDiskCommands = []deviceStep{
+		touchFile(virtualDisk),
+		gadgetService("stop"),
+		gadgetService("start"),
 	}
 
-	unmountDiskCommands = []string{
-		"/etc/init.d/S03usbdev stop",
-		"rm -rf /sys/kernel/config/usb_gadget/g0/configs/c.1/mass_storage.disk0",
-		"rm /boot/usb.disk0",
-		"/etc/init.d/S03usbdev start",
+	unmountDiskCommands = []deviceStep{
+		gadgetService("stop"),
+		removeTree("/sys/kernel/config/usb_gadget/g0/configs/c.1/mass_storage.disk0"),
+		removeFile(virtualDisk),
+		gadgetService("start"),
 	}
 )
 
@@ -68,7 +94,7 @@ func (s *Service) UpdateVirtualDevice(c *gin.Context) {
 	}
 
 	var device string
-	var commands []string
+	var commands []deviceStep
 
 	switch req.Device {
 	case "network":
@@ -110,8 +136,7 @@ func (s *Service) UpdateVirtualDevice(c *gin.Context) {
 	}()
 
 	for _, command := range commands {
-		err := exec.Command("sh", "-c", command).Run()
-		if err != nil {
+		if err := command(); err != nil {
 			rsp.ErrRsp(c, -3, "operation failed")
 			return
 		}

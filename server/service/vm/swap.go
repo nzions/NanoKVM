@@ -81,17 +81,17 @@ func enableSwap(size int64) error {
 		}
 	}
 
-	commands := []string{
-		fmt.Sprintf("fallocate -l %dM %s", size, SwapFile),
-		fmt.Sprintf("chmod 600 %s", SwapFile),
-		fmt.Sprintf("mkswap %s", SwapFile),
-		fmt.Sprintf("swapon %s", SwapFile),
+	commands := [][]string{
+		{"fallocate", "-l", fmt.Sprintf("%dM", size), SwapFile},
+		{"chmod", "600", SwapFile},
+		{"mkswap", SwapFile},
+		{"swapon", SwapFile},
 	}
 
 	for _, command := range commands {
-		err := exec.Command("sh", "-c", command).Run()
+		err := exec.Command(command[0], command[1:]...).Run()
 		if err != nil {
-			log.Errorf("failed to execute %s: %s", command, err)
+			log.Errorf("failed to execute %s: %s", strings.Join(command, " "), err)
 			return err
 		}
 
@@ -103,8 +103,7 @@ func enableSwap(size int64) error {
 }
 
 func disableSwap() error {
-	command := "swapoff -a"
-	if err := exec.Command("sh", "-c", command).Run(); err != nil {
+	if err := exec.Command("swapoff", "-a").Run(); err != nil {
 		log.Errorf("failed to execute swapoff: %s", err)
 		return err
 	}

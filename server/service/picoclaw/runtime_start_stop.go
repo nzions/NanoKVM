@@ -90,7 +90,7 @@ func (s *Service) startRuntimeContext(ctx context.Context) (string, string, *Pic
 	startCtx, cancel := context.WithTimeout(ctx, picoclawStartTimeout)
 	defer cancel()
 
-	output, execErr := exec.CommandContext(startCtx, "sh", "-c", command).CombinedOutput()
+	output, execErr := exec.CommandContext(startCtx, "/bin/sh", scriptPath, "start").CombinedOutput()
 	trimmedOutput := strings.TrimSpace(string(output))
 	if execErr != nil {
 		if lifecycleErr := runtimeLifecycleOperationError(ctx); lifecycleErr != nil {
@@ -184,7 +184,7 @@ func (s *Service) stopRuntime() (string, string, *PicoclawError) {
 	ctx, cancel := context.WithTimeout(context.Background(), picoclawStopTimeout)
 	defer cancel()
 
-	output, execErr := exec.CommandContext(ctx, "sh", "-c", command).CombinedOutput()
+	output, execErr := exec.CommandContext(ctx, "/bin/sh", scriptPath, "stop").CombinedOutput()
 	trimmedOutput := strings.TrimSpace(string(output))
 	if execErr != nil {
 		status := RuntimeStatus{
@@ -283,11 +283,10 @@ func runPicoclawOnboardContext(ctx context.Context) (string, *PicoclawError) {
 		return "", lifecycleErr
 	}
 
-	command := scriptPath + " onboard"
 	onboardCtx, cancel := context.WithTimeout(ctx, picoclawOnboardTimeout)
 	defer cancel()
 
-	output, execErr := exec.CommandContext(onboardCtx, "sh", "-c", command).CombinedOutput()
+	output, execErr := exec.CommandContext(onboardCtx, "/bin/sh", scriptPath, "onboard").CombinedOutput()
 	trimmedOutput := strings.TrimSpace(string(output))
 	if execErr != nil {
 		if lifecycleErr := runtimeLifecycleOperationError(ctx); lifecycleErr != nil {

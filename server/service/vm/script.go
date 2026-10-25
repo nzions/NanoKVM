@@ -1,10 +1,11 @@
 package vm
 
 import (
-	"fmt"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -14,7 +15,10 @@ import (
 	"NanoKVM-Server/utils"
 )
 
-const ScriptDirectory = "/etc/kvm/scripts"
+// ScriptDirectory is a variable so tests can point it at a temporary directory
+var ScriptDirectory = "/etc/kvm/scripts"
+
+var validScriptName = regexp.MustCompile(`^[A-Za-z0-9_-][A-Za-z0-9._-]*$`)
 
 func (s *Service) GetScripts(c *gin.Context) {
 	var rsp proto.Response
@@ -52,16 +56,17 @@ func (s *Service) UploadScript(c *gin.Context) {
 		return
 	}
 
-	if !isScript(header.Filename) {
-		rsp.ErrRsp(c, -2, "invalid arguments")
-		return
-	}
-
 	if _, err = os.Stat(ScriptDirectory); err != nil {
 		_ = os.MkdirAll(ScriptDirectory, 0o755)
 	}
 
-	target := fmt.Sprintf("%s/%s", ScriptDirectory, header.Filename)
+	target, err := scriptPath(header.Filename)
+	if err != nil {
+		log.Warnf("reject upload of script %q: %s", header.Filename, err)
+		rsp.ErrRsp(c, -2, "invalid arguments")
+		return
+	}
+
 	err = c.SaveUploadedFile(header, target)
 	if err != nil {
 		rsp.ErrRsp(c, -2, "save failed")
@@ -87,16 +92,22 @@ func (s *Service) RunScript(c *gin.Context) {
 		return
 	}
 
-	command := fmt.Sprintf("%s/%s", ScriptDirectory, req.Name)
+	script, err := scriptPath(req.Name)
+	if err != nil {
+		log.Warnf("reject run of script %q: %s", req.Name, err)
+		rsp.ErrRsp(c, -1, "invalid arguments")
+		return
+	}
 
-	name := strings.ToLower(req.Name)
-	if strings.HasSuffix(name, ".py") {
-		command = fmt.Sprintf("python %s", command)
+	// argv only, the name never reaches a shell
+	var cmd *exec.Cmd
+	if strings.HasSuffix(strings.ToLower(script), ".py") {
+		cmd = exec.Command("python", script)
+	} else {
+		cmd = exec.Command("/bin/sh", script)
 	}
 
 	var output []byte
-	var err error
-	cmd := exec.Command("sh", "-c", command)
 
 	if req.Type == "foreground" {
 		output, err = cmd.CombinedOutput()
@@ -133,7 +144,12 @@ func (s *Service) DeleteScript(c *gin.Context) {
 		return
 	}
 
-	file := fmt.Sprintf("%s/%s", ScriptDirectory, req.Name)
+	file, err := scriptPath(req.Name)
+	if err != nil {
+		log.Warnf("reject delete of script %q: %s", req.Name, err)
+		rsp.ErrRsp(c, -1, "invalid arguments")
+		return
+	}
 
 	if err := os.Remove(file); err != nil {
 		log.Errorf("delete script %s failed: %s", file, err)
@@ -143,6 +159,36 @@ func (s *Service) DeleteScript(c *gin.Context) {
 
 	rsp.OkRsp(c)
 	log.Debugf("delete script %s success", file)
+}
+
+// scriptPath maps a client supplied script name to its path inside
+// ScriptDirectory. The name must be a plain file name with a script extension,
+// and an existing file must not be a symlink that leads out of the directory.
+func scriptPath(name string) (string, error) {
+	if !validScriptName.MatchString(name) || !isScript(name) {
+		return "", errors.New("invalid script name")
+	}
+
+	root, err := filepath.EvalSymlinks(ScriptDirectory)
+	if err != nil {
+		return "", err
+	}
+
+	path := filepath.Join(root, name)
+
+	if _, err := os.Lstat(path); err == nil {
+		resolved, err := filepath.EvalSymlinks(path)
+		if err != nil {
+			return "", err
+		}
+		// the separator keeps /scripts-other from matching /scripts
+		if !strings.HasPrefix(resolved, root+"/") {
+			return "", errors.New("script is outside " + ScriptDirectory)
+		}
+		path = resolved
+	}
+
+	return path, nil
 }
 
 func isScript(name string) bool {
