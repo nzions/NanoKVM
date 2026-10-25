@@ -518,7 +518,8 @@ void kvm_password_ui_disp(uint8_t first_disp, uint8_t subpage_changed)
 		OLED_ShowString(0, 2, "SSH root:", 8);
 		OLED_ShowString(0, 3, root, 8);
 	} else if(has_seed){
-		OLED_ShowString(0, 0, has_root ? "Web admin / SSH root:" : "Web login: admin", 8);
+		if(has_root) OLED_ShowString(0, 0, "Web admin / SSH root:", 8);
+		else OLED_ShowString(0, 0, "Web login: admin", 8);
 		OLED_ShowString(0, 1, "Password:", 8);
 		OLED_ShowString(0, 2, seed, 8);
 		OLED_ShowString(0, 3, "Key: close", 8);
