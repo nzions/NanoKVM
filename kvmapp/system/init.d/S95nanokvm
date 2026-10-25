@@ -37,18 +37,99 @@ stop_process() {
     wait_for_exit "$process" 2 || true
 }
 
+# Run from /kvmapp, not from a copy in /tmp. Why that is safe: the OTA
+# (server/service/application/install.go) moves /kvmapp to /root/old and the new
+# tree in with rename(2), and its cross-filesystem fallback writes "<file>.tmp"
+# and renames over the target. Either way the running binary's old inode lives on
+# untouched, never rewritten in place, so no ETXTBSY and no corruption. After the
+# OTA it calls `S95nanokvm restart`, which restarts the supervised programs from
+# the new files. Running in place also keeps os.Executable() under /kvmapp/server,
+# where the web files and the picoclaw profile paths are resolved.
+SUPERVISE=/kvmapp/system/nanokvm-supervise
+FIREWALL=/kvmapp/system/nanokvm-firewall
+SERVER_BIN=/kvmapp/server/NanoKVM-Server
+SYSTEM_BIN=/kvmapp/kvm_system/kvm_system
+SERVER_PID=/run/nanokvm-server.supervisor.pid
+SYSTEM_PID=/run/nanokvm-kvm_system.supervisor.pid
+
+apply_firewall() {
+    if [ ! -f "$FIREWALL" ]; then
+        echo "S95nanokvm: $FIREWALL missing: NO FIREWALL APPLIED, box is open" >&2
+        return 0
+    fi
+    # A failure leaves the previous state in place (the script says why) and must
+    # not stop the KVM from coming up.
+    /bin/sh "$FIREWALL" || echo "S95nanokvm: firewall script FAILED (see above): inbound state unchanged" >&2
+}
+
+# start_watched <name> <pidfile> <program>: run a program under the supervisor
+start_watched() {
+    name="$1"
+    pidfile="$2"
+    prog="$3"
+
+    if [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile" 2>/dev/null)" 2>/dev/null; then
+        return
+    fi
+    if [ -f "$SUPERVISE" ]; then
+        /bin/sh "$SUPERVISE" "$name" "$pidfile" "$prog" &
+    else
+        echo "S95nanokvm: $SUPERVISE missing: starting $name WITHOUT a supervisor" >&2
+        "$prog" &
+    fi
+}
+
+# stop_watched <name> <pidfile>: stop the supervisor first (it forwards SIGINT to
+# the program and does not restart it), then fall back to the by-name escalation
+stop_watched() {
+    name="$1"
+    pidfile="$2"
+    sup=""
+
+    if [ -f "$pidfile" ]; then
+        sup=$(cat "$pidfile" 2>/dev/null)
+        if [ -n "$sup" ] && kill -0 "$sup" 2>/dev/null; then
+            kill -TERM "$sup" 2>/dev/null || true
+            waited=0
+            while kill -0 "$sup" 2>/dev/null && [ "$waited" -lt 25 ]; do
+                sleep 1
+                waited=$((waited + 1))
+            done
+        fi
+    fi
+    stop_process "$name"
+    # the program is gone; a supervisor still alive would only restart it
+    if [ -n "$sup" ] && kill -0 "$sup" 2>/dev/null; then
+        kill -KILL "$sup" 2>/dev/null || true
+    fi
+    rm -f "$pidfile"
+}
+
+# Feed /dev/watchdog with busybox's applet, if the board has both. It is started
+# once and deliberately NOT stopped by `stop`/`restart` (a restart or an OTA takes
+# longer than the timeout would allow without it). It only starts when the device
+# node and the applet exist, so a board without them is unchanged. If the applet
+# dies without a clean close, the board reboots after the timeout: that is the
+# watchdog doing its job.
+start_watchdog() {
+    [ -c /dev/watchdog ] || return 0
+    command -v watchdog >/dev/null 2>&1 || return 0
+    pidof watchdog >/dev/null 2>&1 && return 0
+    watchdog -t 5 -T 30 /dev/watchdog || echo "S95nanokvm: watchdog applet failed to start" >&2
+}
+
 stop_services() {
     # The server owns VI/VPSS. Let it release MMF before stopping kvm_system.
-    stop_process NanoKVM-Server
-    stop_process kvm_system
+    stop_watched NanoKVM-Server "$SERVER_PID"
+    stop_watched kvm_system "$SYSTEM_PID"
+    # copies left in /tmp by releases that ran from there
     rm -rf /tmp/kvm_system /tmp/server
 }
 
 start_services() {
-    cp -r /kvmapp/kvm_system /tmp/
     if [ -f /kvmapp/kvm_new_app ]; then
         touch /tmp/.nanokvm_migrating
-        /tmp/kvm_system/kvm_system &
+        start_watched kvm_system "$SYSTEM_PID" "$SYSTEM_BIN"
 
         # The legacy migration invokes this init script recursively and starts
         # the server itself. Wait for that single migration path to finish.
@@ -63,13 +144,11 @@ start_services() {
         done
         rm -f /tmp/.nanokvm_migrating
     else
-        /tmp/kvm_system/kvm_system &
+        start_watched kvm_system "$SYSTEM_PID" "$SYSTEM_BIN"
     fi
 
     if ! pidof NanoKVM-Server >/dev/null 2>&1; then
-        rm -rf /tmp/server
-        cp -r /kvmapp/server /tmp/
-        /tmp/server/NanoKVM-Server &
+        start_watched NanoKVM-Server "$SERVER_PID" "$SERVER_BIN"
     fi
 }
 
@@ -96,21 +175,9 @@ case "$1" in
         [ -e "$f" ] && chmod 600 "$f"
     done
 
-    # Set iptables rules (skip if already present)
-    iptables -C INPUT -i eth0 -p tcp --dport 80 -m state --state NEW,ESTABLISHED -j ACCEPT 2>/dev/null || \
-    iptables -A INPUT -i eth0 -p tcp --dport 80 -m state --state NEW,ESTABLISHED -j ACCEPT
-
-    iptables -C OUTPUT -o eth0 -p tcp --sport 80 -m state --state ESTABLISHED -j ACCEPT 2>/dev/null || \
-    iptables -A OUTPUT -o eth0 -p tcp --sport 80 -m state --state ESTABLISHED -j ACCEPT
-
-    iptables -C INPUT -i eth0 -p tcp --sport 22 -m state --state NEW,ESTABLISHED -j ACCEPT 2>/dev/null || \
-    iptables -A INPUT -i eth0 -p tcp --sport 22 -m state --state NEW,ESTABLISHED -j ACCEPT
-
-    iptables -C OUTPUT -o eth0 -p tcp --dport 22 -m state --state ESTABLISHED -j ACCEPT 2>/dev/null || \
-    iptables -A OUTPUT -o eth0 -p tcp --dport 22 -m state --state ESTABLISHED -j ACCEPT
-
-    iptables -C OUTPUT -o eth0 -p tcp --sport 8000 -m state --state ESTABLISHED -j DROP 2>/dev/null || \
-    iptables -A OUTPUT -o eth0 -p tcp --sport 8000 -m state --state ESTABLISHED -j DROP
+    # Default-DROP inbound firewall (own chain, idempotent; also removes the old
+    # ad hoc rules). Never blocks startup.
+    apply_firewall
 
     # Logo selection
     if [ -f /boot/logo.ico ]; then
@@ -126,6 +193,11 @@ case "$1" in
 
     # Start services
     start_services
+    start_watchdog
+   ;;
+
+  firewall)
+    apply_firewall
    ;;
 
   stop)
@@ -145,7 +217,7 @@ case "$1" in
    ;;
     
   *)
-    echo "Usage: $0 {start|stop|restart}"
+    echo "Usage: $0 {start|stop|restart|firewall}"
     exit 1
   ;;
 esac

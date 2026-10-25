@@ -1,0 +1,97 @@
+#!/bin/sh
+# nanokvm-supervise: keep one program running, restarting it with backoff.
+#
+#   nanokvm-supervise <name> <pidfile> <program> [args...]
+#
+# Runs <program> in the foreground of this shell, and when it exits starts it
+# again after a delay that doubles from 1s up to 30s; a run that lasted at least
+# 60s resets the delay. Writes its OWN pid to <pidfile> (that is the supervisor,
+# not the program). `kill -TERM <supervisor pid>` is the clean stop: it forwards
+# SIGINT (what S95nanokvm's stop uses for the server, so MMF is released), waits
+# for the program to exit, removes the pidfile and does not restart it.
+#
+# If a program called <name> is already running that we did not start (the
+# legacy kvm_new_app migration starts its own server), we do not start a second
+# one; we wait and re-check.
+
+[ "$#" -ge 3 ] || {
+    echo "usage: $0 <name> <pidfile> <program> [args...]" >&2
+    exit 2
+}
+
+name="$1"
+pidfile="$2"
+shift 2
+
+MIN_DELAY=1
+MAX_DELAY=30
+STABLE_SECS=60
+
+child=""
+stopping=0
+
+log() {
+    echo "nanokvm-supervise[$name]: $*" >&2
+    logger -t "nanokvm-supervise" "$name: $*" 2>/dev/null || true
+}
+
+on_term() {
+    stopping=1
+    if [ -n "$child" ]; then
+        kill -INT "$child" 2>/dev/null || true
+    fi
+}
+
+cleanup() {
+    rm -f "$pidfile"
+}
+
+trap on_term TERM INT HUP
+trap cleanup EXIT
+
+echo "$$" >"$pidfile" || {
+    log "cannot write $pidfile"
+    exit 1
+}
+
+delay=$MIN_DELAY
+while [ "$stopping" -eq 0 ]; do
+    if pidof "$name" >/dev/null 2>&1; then
+        # not ours: do not fight it, look again shortly (sleep is interrupted
+        # by nothing in ash, but 1s is short enough for a stop to be prompt)
+        sleep 1
+        continue
+    fi
+
+    started=$(date +%s)
+    "$@" &
+    child=$!
+    log "started pid $child"
+
+    # `wait` returns early when a trapped signal arrives; keep waiting until the
+    # program is really gone
+    status=0
+    while kill -0 "$child" 2>/dev/null; do
+        wait "$child" 2>/dev/null
+        status=$?
+    done
+    child=""
+
+    [ "$stopping" -eq 0 ] || break
+
+    now=$(date +%s)
+    if [ $((now - started)) -ge "$STABLE_SECS" ]; then
+        delay=$MIN_DELAY
+    fi
+    log "exited (status $status) after $((now - started))s; restarting in ${delay}s"
+    i=0
+    while [ "$i" -lt "$delay" ] && [ "$stopping" -eq 0 ]; do
+        sleep 1
+        i=$((i + 1))
+    done
+    delay=$((delay * 2))
+    [ "$delay" -le "$MAX_DELAY" ] || delay=$MAX_DELAY
+done
+
+log "stopped"
+exit 0

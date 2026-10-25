@@ -1,0 +1,241 @@
+#!/bin/sh
+# nanokvm-firewall: default-DROP inbound firewall for the NanoKVM.
+#
+# Called by S95nanokvm start (and runnable by hand: `nanokvm-firewall`).
+# Idempotent. Only our own chain (NANOKVM_IN) is ever flushed; INPUT itself is
+# never flushed, it just gets one jump to the chain and policy DROP.
+#
+# How a re-run avoids a gap in the rules: the new rule set is built in a
+# scratch chain (NANOKVM_IN_NEW). If any required rule fails to load, the scratch
+# chain is deleted and the existing state is left exactly as it was (we log loudly
+# and never flip a policy we could not back with allow rules). Only when the
+# scratch chain is complete is it jumped to first, the old chain retired, the new
+# one renamed into place, and ONLY THEN is the INPUT policy set to DROP.
+#
+# OUTPUT and FORWARD are not touched (OUTPUT stays ACCEPT).
+#
+# Allowed in (see the end of the script for why each one):
+#   lo; ESTABLISHED,RELATED; tcp 80/443/22 (+ the ports in /etc/kvm/server.yaml);
+#   ICMP echo-request (rate limited); IGMP; DHCP client replies; mDNS; SSDP;
+#   usb0 and wlan0: DHCP server (udp 67) and DNS (udp/tcp 53); tailscale0: all.
+# Not listening / deliberately not opened: 8000 (nothing listens, the old
+# OUTPUT drop on it is gone), picoclaw 18790 (loopback only: covered by lo),
+# tailscale udp 41641 (peers reach us through conntrack, see below).
+
+CHAIN=NANOKVM_IN
+NEWCHAIN=NANOKVM_IN_NEW
+SERVER_YAML=/etc/kvm/server.yaml
+USB_IF=usb0
+AP_IF=wlan0
+TS_IF=tailscale0
+
+log() {
+    echo "nanokvm-firewall: $*" >&2
+    logger -t nanokvm-firewall "$*" 2>/dev/null || true
+}
+
+# ports the server was configured to use, besides the 80/443 defaults
+configured_ports() {
+    [ -r "$SERVER_YAML" ] || return 0
+    awk '
+        /^port:[[:space:]]*$/ { inport = 1; next }
+        /^[^[:space:]#]/      { inport = 0 }
+        inport && $1 == "http:"  { print $2 }
+        inport && $1 == "https:" { print $2 }
+    ' "$SERVER_YAML" 2>/dev/null | while read -r p; do
+        case "$p" in
+            ''|*[!0-9]*) ;;
+            *) echo "$p" ;;
+        esac
+    done
+}
+
+# ipt <cmd> args...: run iptables or ip6tables, whichever this pass is for
+ipt() {
+    "$IPT" "$@"
+}
+
+# add one rule to the scratch chain; a failure aborts the whole pass
+add() {
+    ipt -A "$NEWCHAIN" "$@" || {
+        log "FAILED to add rule: $IPT -A $NEWCHAIN $*"
+        return 1
+    }
+}
+
+# add, but a failure only logs (rules that are nice to have, not required)
+add_optional() {
+    ipt -A "$NEWCHAIN" "$@" 2>/dev/null || log "skipped optional rule: $IPT $*"
+    return 0
+}
+
+drop_scratch() {
+    ipt -F "$NEWCHAIN" 2>/dev/null || true
+    ipt -X "$NEWCHAIN" 2>/dev/null || true
+}
+
+# the pre-F5 ad hoc rules; delete every copy of each
+remove_legacy_v4() {
+    for spec in \
+        "INPUT -i eth0 -p tcp --dport 80 -m state --state NEW,ESTABLISHED -j ACCEPT" \
+        "INPUT -i eth0 -p tcp --sport 22 -m state --state NEW,ESTABLISHED -j ACCEPT" \
+        "OUTPUT -o eth0 -p tcp --sport 80 -m state --state ESTABLISHED -j ACCEPT" \
+        "OUTPUT -o eth0 -p tcp --dport 22 -m state --state ESTABLISHED -j ACCEPT" \
+        "OUTPUT -o eth0 -p tcp --sport 8000 -m state --state ESTABLISHED -j DROP"; do
+        # shellcheck disable=SC2086
+        while iptables -D $spec 2>/dev/null; do :; done
+    done
+}
+
+# build, swap in, then close the policy, for one address family
+apply_family() {
+    IPT="$1"
+    fam="$2"
+
+    command -v "$IPT" >/dev/null 2>&1 || {
+        log "$IPT not installed: $fam firewall NOT applied"
+        return 1
+    }
+    # Can we talk to the kernel's table at all? If not, change nothing.
+    ipt -L INPUT -n >/dev/null 2>&1 || {
+        log "$IPT cannot read the INPUT chain (module missing?): $fam firewall NOT applied, state left as it was"
+        return 1
+    }
+
+    drop_scratch
+    ipt -N "$NEWCHAIN" || {
+        log "$IPT cannot create chain $NEWCHAIN: $fam firewall NOT applied, state left as it was"
+        return 1
+    }
+
+    ok=1
+    build_rules || ok=0
+    if [ "$ok" -ne 1 ]; then
+        drop_scratch
+        log "$fam firewall NOT applied (rule load failed), state left as it was"
+        return 1
+    fi
+
+    # swap in: new chain first (so there is no moment without our rules), then
+    # retire the old one, then rename the new one into place
+    ipt -I INPUT 1 -j "$NEWCHAIN" || {
+        drop_scratch
+        log "$IPT cannot jump INPUT to $NEWCHAIN: $fam firewall NOT applied"
+        return 1
+    }
+    if ipt -n -L "$CHAIN" >/dev/null 2>&1; then
+        while ipt -D INPUT -j "$CHAIN" 2>/dev/null; do :; done
+        ipt -F "$CHAIN" 2>/dev/null || true
+        ipt -X "$CHAIN" 2>/dev/null || log "could not delete the old $CHAIN chain ($fam)"
+    fi
+    if ! ipt -E "$NEWCHAIN" "$CHAIN"; then
+        # the jump to NEWCHAIN already protects us; keep it, just say so
+        log "$IPT could not rename $NEWCHAIN to $CHAIN: staying on $NEWCHAIN ($fam)"
+        CHAIN_IN_USE=$NEWCHAIN
+    else
+        CHAIN_IN_USE=$CHAIN
+    fi
+
+    # policy last, after every allow rule is in
+    ipt -P INPUT DROP || {
+        log "$IPT FAILED to set INPUT policy DROP ($fam): the box is still open"
+        return 1
+    }
+    log "$fam firewall applied: INPUT policy DROP, allow rules in $CHAIN_IN_USE"
+    return 0
+}
+
+build_rules() {
+    # 1. loopback (picoclaw's gateway on 127.0.0.1:18790 is reached here)
+    add -i lo -j ACCEPT || return 1
+
+    # 2. replies to what we started (also what carries WebRTC media: ICE is
+    #    started from this side by the browser/STUN exchange, and the media
+    #    flows back through the conntrack entry of those packets)
+    if ipt -A "$NEWCHAIN" -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null; then
+        :
+    else
+        add -m state --state ESTABLISHED,RELATED -j ACCEPT || return 1
+    fi
+
+    # 3. management: web UI (http + https redirect/serve) and ssh, all interfaces
+    ports="80 443 22 $(configured_ports)"
+    seen=" "
+    for p in $ports; do
+        case "$seen" in *" $p "*) continue ;; esac
+        seen="$seen$p "
+        add -p tcp --dport "$p" -j ACCEPT || return 1
+    done
+
+    # 4. ping, rate limited when the limit module is there, plain otherwise
+    if [ "$fam" = "ipv6" ]; then
+        icmp_echo="-p ipv6-icmp --icmpv6-type 128"
+    else
+        icmp_echo="-p icmp --icmp-type echo-request"
+    fi
+    # shellcheck disable=SC2086
+    ipt -A "$NEWCHAIN" $icmp_echo -m limit --limit 5/second --limit-burst 10 -j ACCEPT 2>/dev/null || {
+        log "limit match unavailable: echo-request accepted without a rate limit ($fam)"
+        # shellcheck disable=SC2086
+        add $icmp_echo -j ACCEPT || return 1
+    }
+
+    if [ "$fam" = "ipv6" ]; then
+        # IPv6 does not work without these: dest-unreachable, packet-too-big
+        # (path MTU), time-exceeded, param-problem, MLD query, router
+        # advertisement, neighbour solicitation/advertisement, redirect
+        for t in 1 2 3 4 130 134 135 136 137; do
+            add -p ipv6-icmp --icmpv6-type "$t" -j ACCEPT || return 1
+        done
+        # DHCPv6 replies to our client
+        add_optional -p udp --sport 547 --dport 546 -j ACCEPT
+    else
+        # the switch's IGMP queries: if they are dropped the membership reports
+        # stop and a snooping switch stops forwarding mDNS/SSDP multicast to us
+        add_optional -p igmp -j ACCEPT
+        # DHCP client replies (eth0/wlan0 run udhcpc)
+        add -p udp --sport 67 --dport 68 -j ACCEPT || return 1
+    fi
+
+    # 5. discovery: mDNS (S50avahi-daemon) and SSDP (S50ssdpd)
+    add -p udp --dport 5353 -j ACCEPT || return 1
+    add -p udp --dport 1900 -j ACCEPT || return 1
+
+    # 6. the USB-gadget network (usb0) is served DHCP + DNS by dnsmasq (S80dnsmasq)
+    #    and the Wi-Fi AP (wlan0, S30wifi: hostapd + udhcpd) serves DHCP. The AP
+    #    is toggled at runtime, so these are per-interface rules rather than
+    #    something decided once at boot; nothing listens there outside AP mode.
+    for ifc in "$USB_IF" "$AP_IF"; do
+        if [ "$fam" = "ipv4" ]; then
+            add -i "$ifc" -p udp --dport 67 -j ACCEPT || return 1
+        fi
+        add -i "$ifc" -p udp --dport 53 -j ACCEPT || return 1
+        add -i "$ifc" -p tcp --dport 53 -j ACCEPT || return 1
+    done
+
+    # 7. tailscale: the tunnel interface is trusted (S98tailscaled starts after
+    #    us, so match by name instead of testing whether it exists now). The
+    #    daemon's UDP 41641 is not opened: peers are reached by outbound
+    #    packets, replies come back through the conntrack entries.
+    add -i "$TS_IF" -j ACCEPT || return 1
+
+    return 0
+}
+
+rc=0
+if command -v iptables >/dev/null 2>&1; then
+    remove_legacy_v4
+    apply_family iptables ipv4 || rc=1
+else
+    log "iptables not installed: NO firewall applied"
+    rc=1
+fi
+
+if command -v ip6tables >/dev/null 2>&1; then
+    apply_family ip6tables ipv6 || {
+        log "WARNING: ip6tables failed: IPv6 INPUT is unfiltered"
+        rc=1
+    }
+fi
+
+exit "$rc"
