@@ -34,6 +34,7 @@ func defaultConfig() *Config {
 			TurnCred: "",
 		},
 		Authentication: "enable",
+		Firewall:       "open",
 		Security: Security{
 			LoginLockoutDuration: defaultLoginLockoutDuration,
 			LoginMaxFailures:     5,
@@ -71,6 +72,10 @@ func checkDefaultValue() error {
 
 	if instance.Security.LoginMaxFailures <= 0 {
 		instance.Security.LoginMaxFailures = 5
+	}
+
+	if instance.Firewall == "" {
+		instance.Firewall = "open"
 	}
 
 	instance.Hardware = getHardware()

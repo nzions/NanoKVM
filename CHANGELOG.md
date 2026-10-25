@@ -1,3 +1,9 @@
+## Unreleased
+
+### Security
+
+* The inbound firewall is open by default: INPUT policy ACCEPT and none of our rules, and a device that already had the default-DROP allowlist is opened on the next `S95nanokvm firewall` or boot. `firewall: drop` in /etc/kvm/server.yaml turns the allowlist back on (then run `/etc/init.d/S95nanokvm firewall`); an unknown value is logged and treated as open
+
 ## 2.5.10 (2026-10-25)
 
 ### Build

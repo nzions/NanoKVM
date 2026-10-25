@@ -1,11 +1,23 @@
 #!/bin/sh
-# nanokvm-firewall: default-DROP inbound firewall for the NanoKVM.
+# nanokvm-firewall: optional default-DROP inbound firewall for the NanoKVM.
+#
+# OPEN BY DEFAULT. The mode is the top-level `firewall:` key in
+# /etc/kvm/server.yaml:
+#   firewall: open   (the default; also when the key is absent, empty, or the
+#                     file is missing) INPUT policy ACCEPT and none of our rules.
+#                     An earlier `drop` is undone: policy ACCEPT first, then the
+#                     NANOKVM_IN jump, chain and leftovers are removed, and so are
+#                     the pre-F5 ad hoc rules. A box with no netfilter exits 0.
+#   firewall: drop   the allowlist below, INPUT policy DROP.
+# An unknown value is logged loudly and treated as open. To switch: edit
+# server.yaml, then run `/etc/init.d/S95nanokvm firewall` (or this script).
 #
 # Called by S95nanokvm start (and runnable by hand: `nanokvm-firewall`).
-# Idempotent. Only our own chain (NANOKVM_IN) is ever flushed; INPUT itself is
-# never flushed, it just gets one jump to the chain and policy DROP.
+# Idempotent in both modes. In drop mode only our own chain (NANOKVM_IN) is ever
+# flushed; INPUT itself is never flushed, it just gets one jump to the chain and
+# policy DROP.
 #
-# How a re-run avoids a gap in the rules: the new rule set is built in a
+# How a drop-mode re-run avoids a gap in the rules: the new rule set is built in a
 # scratch chain (NANOKVM_IN_NEW). If any required rule fails to load, the scratch
 # chain is deleted and the existing state is left exactly as it was (we log loudly
 # and never flip a policy we could not back with allow rules). Only when the
@@ -14,7 +26,7 @@
 #
 # OUTPUT and FORWARD are not touched (OUTPUT stays ACCEPT).
 #
-# Allowed in (see the end of the script for why each one):
+# In drop mode, allowed in (see the end of the script for why each one):
 #   lo; ESTABLISHED,RELATED; tcp 80/443/22 (+ the ports in /etc/kvm/server.yaml);
 #   ICMP echo-request (rate limited); IGMP; DHCP client replies; mDNS; SSDP;
 #   usb0 and wlan0: DHCP server (udp 67) and DNS (udp/tcp 53); tailscale0: all.
@@ -48,6 +60,33 @@ configured_ports() {
             *) echo "$p" ;;
         esac
     done
+}
+
+# the configured mode: prints "open" or "drop". Unset, empty, or a missing file
+# is open; an unknown value is logged loudly and is open too (no guessing at
+# protection nobody asked for).
+firewall_mode() {
+    val=""
+    if [ -r "$SERVER_YAML" ]; then
+        val=$(awk '
+            /^firewall:/ {
+                v = $0
+                sub(/^firewall:[[:space:]]*/, "", v)
+                sub(/[[:space:]]*#.*$/, "", v)
+                gsub(/["\047[:space:]]/, "", v)
+                print v
+                exit
+            }
+        ' "$SERVER_YAML" 2>/dev/null)
+    fi
+    case "$val" in
+        ''|open) echo open ;;
+        drop) echo drop ;;
+        *)
+            log "WARNING: unknown 'firewall: $val' in $SERVER_YAML (want open or drop): treating it as open"
+            echo open
+            ;;
+    esac
 }
 
 # ipt <cmd> args...: run iptables or ip6tables, whichever this pass is for
@@ -222,7 +261,48 @@ build_rules() {
     return 0
 }
 
+# open mode for one address family: policy ACCEPT FIRST (so there is no moment
+# of DROP without our rules), then remove every trace of the drop-mode chains.
+# No netfilter at all is not an error here: nothing is filtering.
+open_family() {
+    IPT="$1"
+    fam="$2"
+
+    command -v "$IPT" >/dev/null 2>&1 || return 0
+    ipt -L INPUT -n >/dev/null 2>&1 || return 0
+
+    ipt -P INPUT ACCEPT || {
+        log "$IPT FAILED to set INPUT policy ACCEPT ($fam)"
+        return 1
+    }
+    for c in "$CHAIN" "$NEWCHAIN"; do
+        while ipt -D INPUT -j "$c" 2>/dev/null; do :; done
+        if ipt -n -L "$c" >/dev/null 2>&1; then
+            ipt -F "$c" 2>/dev/null || true
+            ipt -X "$c" 2>/dev/null || {
+                log "$IPT could not delete chain $c ($fam)"
+                return 1
+            }
+        fi
+    done
+    return 0
+}
+
 rc=0
+mode=$(firewall_mode)
+
+if [ "$mode" = "open" ]; then
+    if command -v iptables >/dev/null 2>&1; then
+        remove_legacy_v4
+    fi
+    open_family iptables ipv4 || rc=1
+    open_family ip6tables ipv6 || rc=1
+    if [ "$rc" -eq 0 ]; then
+        log "firewall open (server.yaml firewall: open/unset): INPUT policy ACCEPT"
+    fi
+    exit "$rc"
+fi
+
 if command -v iptables >/dev/null 2>&1; then
     remove_legacy_v4
     apply_family iptables ipv4 || rc=1

@@ -11,6 +11,9 @@ type Config struct {
 	Stun           string   `yaml:"stun"`
 	Turn           Turn     `yaml:"turn"`
 	Security       Security `yaml:"security"`
+	// Firewall is read by kvmapp/system/nanokvm-firewall, not by the server:
+	// "open" (default) or "drop". Declared here so Write() keeps the key.
+	Firewall string `yaml:"firewall"`
 
 	Hardware Hardware `yaml:"-"`
 }

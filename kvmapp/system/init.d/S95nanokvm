@@ -212,8 +212,10 @@ case "$1" in
         [ -e "$f" ] && chmod 600 "$f"
     done
 
-    # Default-DROP inbound firewall (own chain, idempotent; also removes the old
-    # ad hoc rules). Never blocks startup.
+    # Inbound firewall: OPEN by default (INPUT policy ACCEPT, none of our rules;
+    # also undoes an earlier drop and the old ad hoc rules). `firewall: drop` in
+    # /etc/kvm/server.yaml turns on the default-DROP allowlist (own chain,
+    # idempotent). Never blocks startup.
     apply_firewall
 
     # Logo selection
