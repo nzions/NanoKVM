@@ -1,3 +1,10 @@
+## 2.5.8 (2026-10-25)
+
+### Bug Fixes
+
+* An update (online or offline) flushes its files to disk before it reports success, so power lost seconds after an update no longer leaves `/kvmapp` with empty files
+* An empty `/kvmapp/version` counts as the default version (1.0.0) rather than an unparseable one, so a box left that way can still take an online update; an online update refused as not newer is logged as a warning
+
 ## 2.5.7 (2026-10-25)
 
 ### Features

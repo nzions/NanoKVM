@@ -3,6 +3,7 @@ package application
 import (
 	"crypto/sha512"
 	"encoding/base64"
+	"os"
 	"testing"
 )
 
@@ -116,5 +117,28 @@ func TestCheckNotRollback(t *testing.T) {
 		if (err != nil) != tt.wantErr {
 			t.Errorf("%s: checkNotRollback(%q, %q, %v) = %v, wantErr %v", tt.name, tt.current, tt.latest, tt.allow, err, tt.wantErr)
 		}
+	}
+}
+
+func TestInstalledVersion(t *testing.T) {
+	tests := []struct {
+		name string
+		data string
+		err  error
+		want string
+	}{
+		{"missing file is the default", "", os.ErrNotExist, defaultVersion},
+		{"empty file is the default", "", nil, defaultVersion},
+		{"whitespace-only file is the default", " \n", nil, defaultVersion},
+		{"trailing newline trimmed", "2.5.7\n", nil, "2.5.7"},
+	}
+	for _, tt := range tests {
+		if got := installedVersion([]byte(tt.data), tt.err); got != tt.want {
+			t.Errorf("%s: installedVersion(%q, %v) = %q, want %q", tt.name, tt.data, tt.err, got, tt.want)
+		}
+	}
+	// An empty version file must not lock out an online update.
+	if err := checkNotRollback(installedVersion(nil, nil), "2.5.8", false); err != nil {
+		t.Errorf("empty version file refused an online update: %v", err)
 	}
 }

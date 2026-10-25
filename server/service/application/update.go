@@ -63,6 +63,7 @@ func update(allowDowngrade bool) error {
 		return err
 	}
 	if err := checkNotRollback(currentVersion(), latest.Version, allowDowngrade); err != nil {
+		log.Warnf("online update: %v", err)
 		return err
 	}
 	if err := prepareCacheForUpdate(); err != nil {

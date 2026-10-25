@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"syscall"
 
 	"NanoKVM-Server/utils"
 	log "github.com/sirupsen/logrus"
@@ -43,6 +44,11 @@ func installPreparedPackage(sourceDir string) error {
 	if err := utils.ChmodRecursively(AppDir, 0o755); err != nil {
 		return fmt.Errorf("failed to chmod: %w", err)
 	}
+
+	// The moves above are renames the kernel may hold in memory for many seconds; power lost
+	// before writeback leaves /kvmapp with empty files (an empty version file among them).
+	// Flush before reporting success.
+	syscall.Sync()
 
 	return nil
 }

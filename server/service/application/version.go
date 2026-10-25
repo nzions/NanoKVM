@@ -66,15 +66,27 @@ func (s *Service) GetVersion(c *gin.Context) {
 	})
 }
 
-// currentVersion reads the installed version, defaulting to 1.0.0 for a fresh or legacy box.
+// defaultVersion is the installed version of a fresh or legacy box with no version file.
+const defaultVersion = "1.0.0"
+
+// currentVersion reads the installed version, defaulting to defaultVersion for a fresh or legacy box.
 func currentVersion() string {
-	version := "1.0.0"
+	data, err := os.ReadFile(fmt.Sprintf("%s/version", AppDir))
+	return installedVersion(data, err)
+}
 
-	versionFile := fmt.Sprintf("%s/version", AppDir)
-	if data, err := os.ReadFile(versionFile); err == nil {
-		version = strings.ReplaceAll(string(data), "\n", "")
+// installedVersion turns the version file's read into a version. An empty file counts as
+// defaultVersion too: power lost after an update before its writes reached disk leaves the
+// file empty, and refusing every online update as unparseable would strand the box.
+func installedVersion(data []byte, err error) string {
+	if err != nil {
+		return defaultVersion
 	}
-
+	version := strings.TrimSpace(string(data))
+	if version == "" {
+		log.Warnf("%s/version is empty; treating the installed version as %s", AppDir, defaultVersion)
+		return defaultVersion
+	}
 	return version
 }
 
