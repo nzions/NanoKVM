@@ -11,15 +11,18 @@ const vi = {
       login: 'Đăng nhập',
       placeholderUsername: 'Vui lòng nhập tên người dùng',
       placeholderPassword: 'vui lòng nhập mật khẩu',
+      placeholderCurrentPassword: 'Mật khẩu hiện tại',
       placeholderPassword2: 'vui lòng nhập lại mật khẩu',
       noEmptyUsername: 'tên người dùng không được để trống',
       noEmptyPassword: 'mật khẩu không được để trống',
+      passwordLength: 'Mật khẩu phải dài từ 8 đến 72 ký tự',
       noAccount:
         'Không thể lấy thông tin người dùng, vui lòng làm mới trang web hoặc đặt lại mật khẩu',
       invalidUser: 'tên người dùng hoặc mật khẩu không hợp lệ',
       locked: 'Đăng nhập quá nhiều, vui lòng thử lại sau',
       globalLocked: 'Hệ thống đang được bảo vệ, vui lòng thử lại sau',
       error: 'lỗi không mong đợi',
+      invalidCurrentPassword: 'Mật khẩu hiện tại không đúng',
       changePassword: 'Đổi mật khẩu',
       changePasswordDesc: 'Để bảo mật thiết bị của bạn, vui lòng thay đổi mật khẩu đăng nhập web.',
       differentPassword: 'mật khẩu không khớp',
@@ -114,6 +117,7 @@ const vi = {
         description:
           'H.264 Direct và H.264 WebRTC đang được sử dụng đồng thời. Điều này có thể gây xé hình hoặc video bị hỏng. Vui lòng chỉ sử dụng một chế độ H.264.'
       },
+      connecting: 'Đang kết nối…',
       webrtcConnectionFailed: {
         title: 'Kết nối WebRTC thất bại',
         description: 'Kiểm tra kết nối mạng hoặc chuyển đổi chế độ video.'
@@ -136,6 +140,7 @@ const vi = {
       placeholder: 'Vui lòng nhập',
       submit: 'Gửi',
       virtual: 'Bàn phím',
+      virtualDescription: 'Bàn phím trên màn hình gửi các phím bấm tới máy chủ từ xa',
       readClipboard: 'Đọc từ Clipboard',
       clipboardPermissionDenied:
         'Quyền bảng nhớ tạm bị từ chối. Vui lòng cho phép truy cập clipboard trong trình duyệt của bạn.',
@@ -210,13 +215,16 @@ const vi = {
         tip2: 'Ở chế độ HID-Chỉ, tính năng gắn hình ảnh bị tắt',
         tip3: 'NanoKVM sẽ tự động khởi động lại sau khi chuyển chế độ',
         enable: 'Bật chế độ HID-Chỉ',
-        disable: 'Tắt chế độ HID-Chỉ'
+        disable: 'Tắt chế độ HID-Chỉ',
+        setFailed: 'Không thể thay đổi chế độ HID. Vui lòng thử lại sau.',
+        getFailed: 'Không thể đọc chế độ HID hiện tại. Vui lòng thử lại sau.'
       }
     },
     image: {
       title: 'Hình ảnh',
       loading: 'Đang tải...',
       empty: 'Không tìm thấy',
+      emptyHint: 'Đặt tệp .iso hoặc .img vào /data trên thiết bị, hoặc dùng Image Downloader.',
       mountMode: 'Chế độ gắn kết',
       mountFailed: 'Mount thất bại',
       mountDesc: 'Trong một số hệ thống, cần phải eject đĩa ảo trên máy remote trước khi mount.',
@@ -253,6 +261,7 @@ const vi = {
     script: {
       title: 'Script',
       upload: 'Tải lên',
+      emptyHint: 'Chưa có tập lệnh nào. Tải tệp .sh hoặc .py lên bằng nút Tải lên.',
       run: 'Chạy',
       runBackground: 'Chạy nền',
       runFailed: 'Chạy thất bại',
@@ -399,6 +408,7 @@ const vi = {
         oled: {
           title: 'OLED',
           description: 'OLED screen automatically sleep',
+          notDetected: 'Không phát hiện',
           0: 'Không bao giờ',
           15: '15 sec',
           30: '30 sec',
@@ -508,6 +518,32 @@ const vi = {
           subnetMask: 'Mặt nạ mạng con',
           router: 'Bộ định tuyến',
           none: 'Không có'
+        },
+        interfaces: {
+          ethernet: 'Ethernet',
+          wifi: 'Wi-Fi',
+          notPresent: '{{name}}: không có trên thiết bị này',
+          noAddress: 'Không có địa chỉ',
+          dhcp: 'DHCP',
+          static: 'Tĩnh',
+          address: 'Địa chỉ',
+          gateway: 'Cổng kết nối',
+          optional: 'Tùy chọn',
+          save: 'Lưu',
+          invalidAddress: 'Nhập địa chỉ ở dạng CIDR, ví dụ 192.168.1.20/24 (tiền tố 1 đến 32)',
+          hostNotAllowed: 'Địa chỉ không được là địa chỉ mạng hoặc địa chỉ quảng bá của mạng con',
+          invalidGateway: 'Nhập cổng kết nối IPv4 hợp lệ, hoặc để trống',
+          gatewayOutsideSubnet: 'Cổng kết nối phải nằm trong mạng con của địa chỉ',
+          saveFailed: 'Không thể thay đổi cài đặt mạng',
+          confirmFailed: 'Không thể xác nhận thay đổi',
+          changedTitle: 'Mạng đã thay đổi',
+          changedDesc: 'Nếu vẫn truy cập được trang này, hãy xác nhận trong 120 giây, nếu không cài đặt cũ sẽ được khôi phục.',
+          countdown: 'Sẽ hoàn nguyên sau {{count}} giây nếu không xác nhận',
+          reverted: 'Hết thời gian, đang khôi phục cài đặt cũ',
+          newAddress: 'Địa chỉ mới:',
+          confirmFromNew: 'Thay đổi phải được xác nhận từ địa chỉ mới.',
+          confirm: 'Xác nhận',
+          close: 'Đóng'
         }
       },
       tailscale: {
@@ -601,12 +637,33 @@ const vi = {
       account: {
         title: 'Tài khoản',
         webAccount: 'Tên tài khoản web',
+        roles: {
+          admin: 'Quản trị viên',
+          user: 'Người dùng'
+        },
+        role: 'Vai trò',
         password: 'Mật khẩu',
         updateBtn: 'Update',
         logoutBtn: 'Đăng xuất',
         logoutDesc: 'Bạn có chắc chắn muốn đăng xuất không?',
         okBtn: 'Có',
-        cancelBtn: 'Không'
+        cancelBtn: 'Không',
+        users: {
+          title: 'Người dùng',
+          create: 'Tạo người dùng',
+          enabled: 'Đã bật',
+          disabled: 'Đã tắt',
+          deviceOwner: 'Chủ sở hữu thiết bị',
+          resetPassword: 'Đặt lại mật khẩu',
+          delete: 'Xóa',
+          deleteConfirm: 'Xóa người dùng này và thu hồi tất cả phiên của họ?',
+          created: 'Đã tạo người dùng',
+          deleted: 'Đã xóa người dùng',
+          passwordUpdated: 'Đã cập nhật mật khẩu',
+          loadFailed: 'Không thể tải danh sách người dùng',
+          saveFailed: 'Không thể lưu người dùng',
+          deleteFailed: 'Không thể xóa người dùng'
+        }
       }
     },
     picoclaw: {

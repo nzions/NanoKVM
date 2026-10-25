@@ -11,15 +11,18 @@ const it = {
       login: 'Accesso',
       placeholderUsername: 'Inserisci il nome utente',
       placeholderPassword: 'Inserisci la password',
+      placeholderCurrentPassword: 'Password attuale',
       placeholderPassword2: 'Inserisci nuovamente la password',
       noEmptyUsername: 'Il nome utente non può essere vuoto',
       noEmptyPassword: 'La password non può essere vuota',
+      passwordLength: 'La password deve contenere da 8 a 72 caratteri',
       noAccount:
         'Impossibile ottenere informazioni utente, aggiorna la pagina o reimposta la password',
       invalidUser: 'Nome utente o password non validi',
       locked: 'Troppi accessi, riprova più tardi',
       globalLocked: 'Sistema sotto protezione, riprova più tardi',
       error: 'Errore imprevisto',
+      invalidCurrentPassword: 'La password attuale non è corretta',
       changePassword: 'Cambia Password',
       changePasswordDesc:
         'Per la sicurezza del tuo dispositivo, modifica la password di accesso web.',
@@ -116,6 +119,7 @@ const it = {
         description:
           'I flussi H.264 Direct e H.264 WebRTC sono utilizzati contemporaneamente. Ciò può causare tearing dello schermo o video danneggiato. Utilizzare una sola modalità H.264.'
       },
+      connecting: 'Connessione in corso…',
       webrtcConnectionFailed: {
         title: 'Connessione WebRTC non riuscita',
         description: 'Controlla la connessione di rete o cambia la modalità video.'
@@ -138,6 +142,7 @@ const it = {
       placeholder: 'Inserisci testo',
       submit: 'Invia',
       virtual: 'Tastiera',
+      virtualDescription: 'Tastiera su schermo che invia la pressione dei tasti all\'host remoto',
       readClipboard: 'Leggi dagli Appunti',
       clipboardPermissionDenied:
         "Autorizzazione Appunti negata. Consenti l'accesso agli appunti nel tuo browser.",
@@ -213,13 +218,16 @@ const it = {
         tip2: "Nella modalità HID-Only, il montaggio dell'immagine è disabilitato",
         tip3: 'NanoKVM si riavvierà automaticamente dopo aver cambiato modalità',
         enable: 'Abilita la modalità HID-Solo',
-        disable: 'Disabilita la modalità HID-Solo'
+        disable: 'Disabilita la modalità HID-Solo',
+        setFailed: 'Impossibile cambiare la modalità HID. Riprova più tardi.',
+        getFailed: 'Impossibile leggere la modalità HID corrente. Riprova più tardi.'
       }
     },
     image: {
       title: 'Immagini',
       loading: 'Caricamento...',
       empty: 'Nessun risultato',
+      emptyHint: 'Metti i file .iso o .img in /data sul dispositivo, oppure usa l\'Image Downloader.',
       mountMode: 'Modalità di montaggio',
       mountFailed: 'Montaggio immagine fallito',
       mountDesc:
@@ -257,6 +265,7 @@ const it = {
     script: {
       title: 'Script',
       upload: 'Carica',
+      emptyHint: 'Nessuno script. Carica un file .sh o .py con il pulsante Carica.',
       run: 'Esegui',
       runBackground: 'Esegui in Background',
       runFailed: 'Esecuzione fallita',
@@ -404,6 +413,7 @@ const it = {
         oled: {
           title: 'OLED',
           description: 'OLED screen automatically sleep',
+          notDetected: 'Non rilevato',
           0: 'Mai',
           15: '15 sec',
           30: '30 sec',
@@ -515,6 +525,32 @@ const it = {
           subnetMask: 'Subnet mask',
           router: 'Router',
           none: 'Nessuno'
+        },
+        interfaces: {
+          ethernet: 'Ethernet',
+          wifi: 'Wi-Fi',
+          notPresent: '{{name}}: non presente su questo dispositivo',
+          noAddress: 'Nessun indirizzo',
+          dhcp: 'DHCP',
+          static: 'Statico',
+          address: 'Indirizzo',
+          gateway: 'Gateway',
+          optional: 'Facoltativo',
+          save: 'Salva',
+          invalidAddress: 'Inserisci un indirizzo in formato CIDR, ad esempio 192.168.1.20/24 (prefisso da 1 a 32)',
+          hostNotAllowed: 'L\'indirizzo non può essere l\'indirizzo di rete o di broadcast della sua sottorete',
+          invalidGateway: 'Inserisci un gateway IPv4 valido, oppure lascia vuoto',
+          gatewayOutsideSubnet: 'Il gateway deve trovarsi nella sottorete dell\'indirizzo',
+          saveFailed: 'Impossibile modificare le impostazioni di rete',
+          confirmFailed: 'Impossibile confermare la modifica',
+          changedTitle: 'Rete modificata',
+          changedDesc: 'Se questa pagina è ancora raggiungibile, conferma entro 120 s, altrimenti verranno ripristinate le vecchie impostazioni.',
+          countdown: 'Ripristino tra {{count}} s se non confermato',
+          reverted: 'Tempo scaduto, le vecchie impostazioni vengono ripristinate',
+          newAddress: 'Nuovo indirizzo:',
+          confirmFromNew: 'La modifica deve essere confermata dal nuovo indirizzo.',
+          confirm: 'Conferma',
+          close: 'Chiudi'
         }
       },
       tailscale: {
@@ -608,12 +644,33 @@ const it = {
       account: {
         title: 'Account',
         webAccount: 'Nome account web',
+        roles: {
+          admin: 'Amministratore',
+          user: 'Utente'
+        },
+        role: 'Ruolo',
         password: 'Password',
         updateBtn: 'Update',
         logoutBtn: 'Esci',
         logoutDesc: 'Sei sicuro di voler uscire?',
         okBtn: 'Sì',
-        cancelBtn: 'No'
+        cancelBtn: 'No',
+        users: {
+          title: 'Utenti',
+          create: 'Crea utente',
+          enabled: 'Abilitato',
+          disabled: 'Disabilitato',
+          deviceOwner: 'Proprietario del dispositivo',
+          resetPassword: 'Reimposta password',
+          delete: 'Elimina',
+          deleteConfirm: 'Eliminare questo utente e revocare tutte le sue sessioni?',
+          created: 'Utente creato',
+          deleted: 'Utente eliminato',
+          passwordUpdated: 'Password aggiornata',
+          loadFailed: 'Impossibile caricare gli utenti',
+          saveFailed: 'Impossibile salvare l\'utente',
+          deleteFailed: 'Impossibile eliminare l\'utente'
+        }
       }
     },
     picoclaw: {

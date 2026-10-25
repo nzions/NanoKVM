@@ -11,15 +11,18 @@ const tr = {
       login: 'Giriş',
       placeholderUsername: 'Kullanıcı Adı',
       placeholderPassword: 'Şifre',
+      placeholderCurrentPassword: 'Mevcut parola',
       placeholderPassword2: 'Şifrenizi tekrar deneyiniz',
       noEmptyUsername: 'Kullanıcı adı gereklidir',
       noEmptyPassword: 'Şifre gereklidir',
+      passwordLength: 'Parola 8 ile 72 karakter arasında olmalıdır',
       noAccount:
         'Kullanıcı verileri alınırken hata yaşandı, lütfen sayfayı yenileyiniz ya da şifrenizi sıfırlayınız',
       invalidUser: 'Yanlış kullanıcı adı ya da şifre',
       locked: 'Çok fazla giriş yapıldı, lütfen daha sonra tekrar deneyin',
       globalLocked: 'Sistem koruma altında, lütfen daha sonra tekrar deneyin',
       error: 'Beklenmedik bir hata',
+      invalidCurrentPassword: 'Mevcut parola yanlış',
       changePassword: 'Şifrenizi değiştiriniz',
       changePasswordDesc: 'Güvenlik sebebiyle lütfen şifrenizi değiştiriniz!',
       differentPassword: 'Şifreler eşleşmemektedir',
@@ -115,6 +118,7 @@ const tr = {
         description:
           'H.264 Direct ve H.264 WebRTC aynı anda kullanılıyor. Bu, ekran yırtılmasına veya bozuk videoya neden olabilir. Lütfen yalnızca bir H.264 modu kullanın.'
       },
+      connecting: 'Bağlanıyor…',
       webrtcConnectionFailed: {
         title: 'WebRTC bağlantısı başarısız',
         description: 'Ağ bağlantısını kontrol edin veya video modunu değiştirin.'
@@ -137,6 +141,7 @@ const tr = {
       placeholder: 'Girdi',
       submit: 'Gönder',
       virtual: 'Klavye',
+      virtualDescription: 'Tuş vuruşlarını uzak ana makineye gönderen ekran klavyesi',
       readClipboard: 'Panodan Oku',
       clipboardPermissionDenied:
         'Pano izni reddedildi. Lütfen tarayıcınızda pano erişimine izin verin.',
@@ -210,13 +215,16 @@ const tr = {
         tip2: 'Yalnızca HID modunda imaj bağlama devre dışıdır',
         tip3: 'NanoKVM mod değişiminden sonra kendiliğinden yeniden başlatılacaktır',
         enable: 'Yalnızca HID modunu etkinleştir',
-        disable: 'Yalnızca HID modunu devre dışı bırak'
+        disable: 'Yalnızca HID modunu devre dışı bırak',
+        setFailed: 'HID modu değiştirilemedi. Daha sonra tekrar deneyin.',
+        getFailed: 'Geçerli HID modu okunamadı. Daha sonra tekrar deneyin.'
       }
     },
     image: {
       title: 'Disk İmajları',
       loading: 'Yükleniyor...',
       empty: 'Hiçbir şey bulunamadı',
+      emptyHint: '.iso veya .img dosyalarını cihazdaki /data klasörüne koyun veya Image Downloader\'ı kullanın.',
       mountMode: 'Montaj modu',
       mountFailed: 'Bağlantı başarısız oldu',
       mountDesc:
@@ -254,6 +262,7 @@ const tr = {
     script: {
       title: 'Betikler',
       upload: 'Yükle',
+      emptyHint: 'Henüz betik yok. Yükle düğmesiyle bir .sh veya .py dosyası yükleyin.',
       run: 'Çalıştır',
       runBackground: 'Arka planda çalıştır',
       runFailed: 'Çalıştırma başarısız oldu',
@@ -401,6 +410,7 @@ const tr = {
         oled: {
           title: 'OLED',
           description: 'Oled ekranı ... sonra kapatın',
+          notDetected: 'Algılanmadı',
           0: 'Hiçbir zaman',
           15: '15 saniye',
           30: '30 saniye',
@@ -512,6 +522,32 @@ const tr = {
           subnetMask: 'Alt Ağ Maskesi',
           router: 'Yönlendirici',
           none: 'Yok'
+        },
+        interfaces: {
+          ethernet: 'Ethernet',
+          wifi: 'Wi-Fi',
+          notPresent: '{{name}}: bu cihazda yok',
+          noAddress: 'Adres yok',
+          dhcp: 'DHCP',
+          static: 'Statik',
+          address: 'Adres',
+          gateway: 'Ağ geçidi',
+          optional: 'İsteğe bağlı',
+          save: 'Kaydet',
+          invalidAddress: 'CIDR biçiminde bir adres girin, örneğin 192.168.1.20/24 (önek 1 ile 32 arası)',
+          hostNotAllowed: 'Adres, alt ağının ağ adresi veya yayın adresi olamaz',
+          invalidGateway: 'Geçerli bir IPv4 ağ geçidi girin veya boş bırakın',
+          gatewayOutsideSubnet: 'Ağ geçidi, adresin alt ağı içinde olmalıdır',
+          saveFailed: 'Ağ ayarları değiştirilemedi',
+          confirmFailed: 'Değişiklik onaylanamadı',
+          changedTitle: 'Ağ değiştirildi',
+          changedDesc: 'Bu sayfaya hâlâ erişilebiliyorsa 120 sn içinde onaylayın, aksi halde eski ayarlar geri yüklenir.',
+          countdown: 'Onaylanmazsa {{count}} sn içinde geri alınacak',
+          reverted: 'Süre doldu, eski ayarlar geri yükleniyor',
+          newAddress: 'Yeni adres:',
+          confirmFromNew: 'Değişiklik yeni adresten onaylanmalıdır.',
+          confirm: 'Onayla',
+          close: 'Kapat'
         }
       },
       tailscale: {
@@ -603,12 +639,33 @@ const tr = {
       account: {
         title: 'Hesap',
         webAccount: 'Web Hesap Adı',
+        roles: {
+          admin: 'Yönetici',
+          user: 'Kullanıcı'
+        },
+        role: 'Rol',
         password: 'Şifre',
         updateBtn: 'Değiştir',
         logoutBtn: 'Çıkış  yap',
         logoutDesc: 'Çıkış yapmak istediğinizden emin misiniz?',
         okBtn: 'Evet',
-        cancelBtn: 'Hayır'
+        cancelBtn: 'Hayır',
+        users: {
+          title: 'Kullanıcılar',
+          create: 'Kullanıcı oluştur',
+          enabled: 'Etkin',
+          disabled: 'Devre dışı',
+          deviceOwner: 'Cihaz sahibi',
+          resetPassword: 'Parolayı sıfırla',
+          delete: 'Sil',
+          deleteConfirm: 'Bu kullanıcı silinsin ve tüm oturumları iptal edilsin mi?',
+          created: 'Kullanıcı oluşturuldu',
+          deleted: 'Kullanıcı silindi',
+          passwordUpdated: 'Parola güncellendi',
+          loadFailed: 'Kullanıcılar yüklenemedi',
+          saveFailed: 'Kullanıcı kaydedilemedi',
+          deleteFailed: 'Kullanıcı silinemedi'
+        }
       }
     },
     picoclaw: {

@@ -11,15 +11,18 @@ const ca = {
       login: 'Inici de sessió',
       placeholderUsername: "Nom d'usuari",
       placeholderPassword: 'Contrasenya',
+      placeholderCurrentPassword: 'Contrasenya actual',
       placeholderPassword2: 'Torna a introduir la contrasenya',
       noEmptyUsername: "Cal introduir el nom d'usuari",
       noEmptyPassword: 'Cal introduir la contrasenya',
+      passwordLength: 'La contrasenya ha de tenir entre 8 i 72 caràcters',
       noAccount:
         "No s'ha pogut obtenir la informació de l'usuari, actualitza la pàgina web o restableix la contrasenya",
       invalidUser: "Nom d'usuari o contrasenya invàlids",
       locked: 'Massa inicis de sessió, si us plau, torna-ho a provar més tard',
       globalLocked: 'Sistema sota protecció, torneu-ho a provar més tard',
       error: 'Error inesperat',
+      invalidCurrentPassword: 'La contrasenya actual no és correcta',
       changePassword: 'Canviar la contrasenya',
       changePasswordDesc: 'Per a la seguretat del dispositiu, canvia la contrasenya!',
       differentPassword: 'Les contrasenyes no coincideixen',
@@ -114,6 +117,7 @@ const ca = {
         description:
           "S'estan utilitzant H.264 Direct i H.264 WebRTC alhora. Això pot provocar esquinçament de pantalla o vídeo corrupte. Utilitzeu només un mode H.264."
       },
+      connecting: 'Connectant…',
       webrtcConnectionFailed: {
         title: 'Error de connexió WebRTC',
         description: 'Comproveu la connexió de xarxa o canvieu el mode de vídeo.'
@@ -136,6 +140,7 @@ const ca = {
       placeholder: 'Escriu aquí',
       submit: 'Envia',
       virtual: 'Teclat',
+      virtualDescription: 'Teclat en pantalla que envia les tecles premudes a l\'amfitrió remot',
       readClipboard: 'Llegir des del porta-retalls',
       clipboardPermissionDenied:
         "S'ha denegat el permís del porta-retalls. Permet l'accés al porta-retalls al teu navegador.",
@@ -210,13 +215,16 @@ const ca = {
         tip2: 'En mode només HID, no es pot muntar imatges',
         tip3: 'El NanoKVM es reiniciarà automàticament en canviar de mode',
         enable: 'Activa mode només HID',
-        disable: 'Desactiva mode només HID'
+        disable: 'Desactiva mode només HID',
+        setFailed: 'No s\'ha pogut canviar el mode HID. Torneu-ho a provar més tard.',
+        getFailed: 'No s\'ha pogut llegir el mode HID actual. Torneu-ho a provar més tard.'
       }
     },
     image: {
       title: 'Imatges',
       loading: 'Carregant...',
       empty: "No s'ha trobat res",
+      emptyHint: 'Poseu fitxers .iso o .img a /data del dispositiu, o feu servir el Image Downloader.',
       mountMode: 'Mode de muntatge',
       mountFailed: 'Error en muntar',
       mountDesc: 'En alguns sistemes cal expulsar el disc virtual abans de muntar la imatge.',
@@ -253,6 +261,7 @@ const ca = {
     script: {
       title: 'Scripts',
       upload: 'Puja',
+      emptyHint: 'Encara no hi ha scripts. Pugeu un fitxer .sh o .py amb el botó Puja.',
       run: 'Executa',
       runBackground: 'Executa en segon pla',
       runFailed: "Error en l'execució",
@@ -400,6 +409,7 @@ const ca = {
         oled: {
           title: 'OLED',
           description: 'Apagar pantalla OLED després de',
+          notDetected: 'No detectat',
           0: 'Mai',
           15: '15 s',
           30: '30 s',
@@ -510,6 +520,32 @@ const ca = {
           subnetMask: 'Màscara de subxarxa',
           router: 'Encaminador',
           none: 'Cap'
+        },
+        interfaces: {
+          ethernet: 'Ethernet',
+          wifi: 'Wi-Fi',
+          notPresent: '{{name}}: no present en aquest dispositiu',
+          noAddress: 'Sense adreça',
+          dhcp: 'DHCP',
+          static: 'Estàtica',
+          address: 'Adreça',
+          gateway: 'Passarel·la',
+          optional: 'Opcional',
+          save: 'Desa',
+          invalidAddress: 'Introduïu una adreça en format CIDR, per exemple 192.168.1.20/24 (prefix de 1 a 32)',
+          hostNotAllowed: 'L\'adreça no pot ser l\'adreça de xarxa ni de difusió de la seva subxarxa',
+          invalidGateway: 'Introduïu una passarel·la IPv4 vàlida o deixeu-ho buit',
+          gatewayOutsideSubnet: 'La passarel·la ha d\'estar dins de la subxarxa de l\'adreça',
+          saveFailed: 'No s\'ha pogut canviar la configuració de xarxa',
+          confirmFailed: 'No s\'ha pogut confirmar el canvi',
+          changedTitle: 'Xarxa canviada',
+          changedDesc: 'Si aquesta pàgina encara és accessible, confirmeu en 120 s o es restauraran els paràmetres anteriors.',
+          countdown: 'Es revertirà en {{count}} s si no es confirma',
+          reverted: 'S\'ha acabat el temps, es restauren els paràmetres anteriors',
+          newAddress: 'Nova adreça:',
+          confirmFromNew: 'El canvi s\'ha de confirmar des de la nova adreça.',
+          confirm: 'Confirma',
+          close: 'Tanca'
         }
       },
       tailscale: {
@@ -602,12 +638,33 @@ const ca = {
       account: {
         title: 'Compte',
         webAccount: 'Nom del compte web',
+        roles: {
+          admin: 'Administrador',
+          user: 'Usuari'
+        },
+        role: 'Rol',
         password: 'Contrasenya',
         updateBtn: 'Canvia',
         logoutBtn: 'Tanca sessió',
         logoutDesc: 'Segur que vols tancar sessió?',
         okBtn: 'Sí',
-        cancelBtn: 'No'
+        cancelBtn: 'No',
+        users: {
+          title: 'Usuaris',
+          create: 'Crea usuari',
+          enabled: 'Activat',
+          disabled: 'Desactivat',
+          deviceOwner: 'Propietari del dispositiu',
+          resetPassword: 'Restableix la contrasenya',
+          delete: 'Elimina',
+          deleteConfirm: 'Voleu eliminar aquest usuari i revocar totes les seves sessions?',
+          created: 'Usuari creat',
+          deleted: 'Usuari eliminat',
+          passwordUpdated: 'Contrasenya actualitzada',
+          loadFailed: 'No s\'han pogut carregar els usuaris',
+          saveFailed: 'No s\'ha pogut desar l\'usuari',
+          deleteFailed: 'No s\'ha pogut eliminar l\'usuari'
+        }
       }
     },
     picoclaw: {

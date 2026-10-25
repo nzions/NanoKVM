@@ -11,15 +11,18 @@ const ja = {
       login: 'ログイン',
       placeholderUsername: 'ユーザー名を入力してください',
       placeholderPassword: 'パスワードを入力してください',
+      placeholderCurrentPassword: '現在のパスワード',
       placeholderPassword2: 'パスワードをもう一度入力してください',
       noEmptyUsername: 'ユーザー名は空にできません',
       noEmptyPassword: 'パスワードは空にできません',
+      passwordLength: 'パスワードは8〜72文字で入力してください',
       noAccount:
         'ユーザー情報の取得に失敗しました。ページを更新してもう一度お試しいただくか、パスワードをリセットしてください。',
       invalidUser: 'ユーザー名またはパスワードが正しくありません',
       locked: 'ログインが多すぎます。後でもう一度お試しください。',
       globalLocked: 'システムは保護されています。後でもう一度試してください。',
       error: '不明なエラー',
+      invalidCurrentPassword: '現在のパスワードが正しくありません',
       changePassword: 'パスワード変更',
       changePasswordDesc: 'デバイスのセキュリティのために、パスワードを変更してください！',
       differentPassword: 'パスワードが一致しません',
@@ -114,6 +117,7 @@ const ja = {
         description:
           'H.264 Direct と H.264 WebRTC が同時に使用されています。画面のティアリングや映像の破損が発生する可能性があります。H.264 モードは 1 つだけ使用してください。'
       },
+      connecting: '接続中…',
       webrtcConnectionFailed: {
         title: 'WebRTC 接続に失敗しました',
         description: 'ネットワーク接続を確認するか、ビデオモードを切り替えてください。'
@@ -136,6 +140,7 @@ const ja = {
       placeholder: '入力してください',
       submit: '送信',
       virtual: '仮想キーボード',
+      virtualDescription: 'キー入力をリモートホストに送信するオンスクリーンキーボード',
       readClipboard: 'クリップボードから読み取る',
       clipboardPermissionDenied:
         'クリップボードのアクセス許可が拒否されました。ブラウザでクリップボードへのアクセスを許可してください。',
@@ -211,13 +216,16 @@ const ja = {
         tip2: 'HID-Only モードでは、イメージのマウントは無効になります',
         tip3: 'モードを切り替えると、NanoKVM は自動的に再起動します。',
         enable: 'HID-Only モードを有効化',
-        disable: 'HID-Only モードを無効化'
+        disable: 'HID-Only モードを無効化',
+        setFailed: 'HIDモードを変更できませんでした。後でもう一度お試しください。',
+        getFailed: '現在のHIDモードを読み取れませんでした。後でもう一度お試しください。'
       }
     },
     image: {
       title: 'イメージ',
       loading: '読み込み中',
       empty: 'イメージファイルがありません',
+      emptyHint: '.iso または .img ファイルをデバイスの /data に置くか、Image Downloader を使用してください。',
       mountMode: 'マウントモード',
       mountFailed: 'マウントに失敗しました',
       mountDesc:
@@ -255,6 +263,7 @@ const ja = {
     script: {
       title: 'スクリプト',
       upload: 'アップロード',
+      emptyHint: 'スクリプトはまだありません。アップロードボタンで .sh または .py ファイルをアップロードしてください。',
       run: '実行',
       runBackground: 'バックグラウンドで実行',
       runFailed: '実行に失敗しました',
@@ -403,6 +412,7 @@ const ja = {
         oled: {
           title: 'OLED',
           description: 'OLED 画面の自動スリープ時間',
+          notDetected: '未検出',
           0: '無効',
           15: '15秒',
           30: '30秒',
@@ -514,6 +524,32 @@ const ja = {
           subnetMask: 'サブネットマスク',
           router: 'ルーター',
           none: 'なし'
+        },
+        interfaces: {
+          ethernet: 'イーサネット',
+          wifi: 'Wi-Fi',
+          notPresent: '{{name}}：このデバイスには存在しません',
+          noAddress: 'アドレスなし',
+          dhcp: 'DHCP',
+          static: '静的',
+          address: 'アドレス',
+          gateway: 'ゲートウェイ',
+          optional: '任意',
+          save: '保存',
+          invalidAddress: 'CIDR形式でアドレスを入力してください（例：192.168.1.20/24、プレフィックス1〜32）',
+          hostNotAllowed: 'ネットワークアドレスまたはブロードキャストアドレスは使用できません',
+          invalidGateway: '有効なIPv4ゲートウェイを入力するか、空のままにしてください',
+          gatewayOutsideSubnet: 'ゲートウェイはアドレスのサブネット内にある必要があります',
+          saveFailed: 'ネットワーク設定の変更に失敗しました',
+          confirmFailed: '変更の確認に失敗しました',
+          changedTitle: 'ネットワークが変更されました',
+          changedDesc: 'このページにまだアクセスできる場合は、120秒以内に確認してください。確認しないと以前の設定に戻ります。',
+          countdown: '確認しない場合、{{count}}秒後に元に戻ります',
+          reverted: '時間切れです。以前の設定を復元しています',
+          newAddress: '新しいアドレス：',
+          confirmFromNew: '変更は新しいアドレスから確認する必要があります。',
+          confirm: '確認',
+          close: '閉じる'
         }
       },
       tailscale: {
@@ -608,12 +644,33 @@ const ja = {
       account: {
         title: 'アカウント',
         webAccount: 'ウェブアカウント名',
+        roles: {
+          admin: '管理者',
+          user: 'ユーザー'
+        },
+        role: 'ロール',
         password: 'パスワード',
         updateBtn: '変更',
         logoutBtn: 'ログアウト',
         logoutDesc: 'ログアウトしてもよろしいですか？',
         okBtn: 'はい',
-        cancelBtn: 'いいえ'
+        cancelBtn: 'いいえ',
+        users: {
+          title: 'ユーザー',
+          create: 'ユーザーを作成',
+          enabled: '有効',
+          disabled: '無効',
+          deviceOwner: 'デバイス所有者',
+          resetPassword: 'パスワードをリセット',
+          delete: '削除',
+          deleteConfirm: 'このユーザーを削除し、すべてのセッションを取り消しますか？',
+          created: 'ユーザーを作成しました',
+          deleted: 'ユーザーを削除しました',
+          passwordUpdated: 'パスワードを更新しました',
+          loadFailed: 'ユーザーの読み込みに失敗しました',
+          saveFailed: 'ユーザーの保存に失敗しました',
+          deleteFailed: 'ユーザーの削除に失敗しました'
+        }
       }
     },
     picoclaw: {

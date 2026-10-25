@@ -11,15 +11,18 @@ const es = {
       login: 'Iniciar sesión',
       placeholderUsername: 'Introduce tu nombre de usuario',
       placeholderPassword: 'Introduce tu contraseña',
+      placeholderCurrentPassword: 'Contraseña actual',
       placeholderPassword2: 'Introduce tu contraseña de nuevo',
       noEmptyUsername: 'El nombre de usuario no puede estar vacío',
       noEmptyPassword: 'La contraseña no puede estar vacía',
+      passwordLength: 'La contraseña debe tener entre 8 y 72 caracteres',
       noAccount:
         'No se ha encontrado la cuenta. Por favor, recarga la página o recupera tu contraseña.',
       invalidUser: 'Nombre de usuario o contraseña incorrectos',
       locked: 'Demasiados inicios de sesión, inténtalo de nuevo más tarde',
       globalLocked: 'Sistema bajo protección, inténtelo nuevamente más tarde',
       error: 'Error inesperado',
+      invalidCurrentPassword: 'La contraseña actual es incorrecta',
       changePassword: 'Cambiar contraseña',
       changePasswordDesc:
         'Para la seguridad de su dispositivo, por favor, modifique la contraseña de inicio de sesión en la web.',
@@ -115,6 +118,7 @@ const es = {
         description:
           'H.264 Direct y H.264 WebRTC se están utilizando al mismo tiempo. Esto puede causar tearing de pantalla o vídeo corrupto. Utilice solo un modo H.264.'
       },
+      connecting: 'Conectando…',
       webrtcConnectionFailed: {
         title: 'Error de conexión de WebRTC',
         description: 'Compruebe la conexión de red o cambie el modo de vídeo.'
@@ -137,6 +141,7 @@ const es = {
       placeholder: 'Por favor, introduce el texto',
       submit: 'Enviar',
       virtual: 'Teclado virtual',
+      virtualDescription: 'Teclado en pantalla que envía las pulsaciones de teclas al host remoto',
       readClipboard: 'Leer del portapapeles',
       clipboardPermissionDenied:
         'Permiso de portapapeles denegado. Por favor, permite el acceso al portapapeles en tu navegador.',
@@ -212,13 +217,16 @@ const es = {
         tip2: 'En modo sólo HID, el montaje de imágenes está deshabilitado',
         tip3: 'El NanoKVM se reiniciará automáticamente después de cambiar de modo',
         enable: 'Habilitar modo sólo HID',
-        disable: 'Desactivar modo sólo HID'
+        disable: 'Desactivar modo sólo HID',
+        setFailed: 'No se pudo cambiar el modo HID. Inténtelo de nuevo más tarde.',
+        getFailed: 'No se pudo leer el modo HID actual. Inténtelo de nuevo más tarde.'
       }
     },
     image: {
       title: 'Imágenes',
       loading: 'Cargando...',
       empty: 'No se ha encontrado nada',
+      emptyHint: 'Coloque archivos .iso o .img en /data del dispositivo, o use el Image Downloader.',
       mountMode: 'Modo de montaje',
       mountFailed: 'Fallo al montar',
       mountDesc:
@@ -256,6 +264,7 @@ const es = {
     script: {
       title: 'Script',
       upload: 'Subir',
+      emptyHint: 'Aún no hay scripts. Suba un archivo .sh o .py con el botón Subir.',
       run: 'Ejecutar',
       runBackground: 'Ejecutar en segundo plano',
       runFailed: 'Ejecución fallida',
@@ -403,6 +412,7 @@ const es = {
         oled: {
           title: 'OLED',
           description: 'La pantalla OLED entra en reposo automáticamente',
+          notDetected: 'No detectado',
           0: 'Nunca',
           15: '15 s',
           30: '30 s',
@@ -514,6 +524,32 @@ const es = {
           subnetMask: 'Máscara de subred',
           router: 'Router',
           none: 'Ninguno'
+        },
+        interfaces: {
+          ethernet: 'Ethernet',
+          wifi: 'Wi-Fi',
+          notPresent: '{{name}}: no está presente en este dispositivo',
+          noAddress: 'Sin dirección',
+          dhcp: 'DHCP',
+          static: 'Estática',
+          address: 'Dirección',
+          gateway: 'Puerta de enlace',
+          optional: 'Opcional',
+          save: 'Guardar',
+          invalidAddress: 'Introduzca una dirección en formato CIDR, por ejemplo 192.168.1.20/24 (prefijo de 1 a 32)',
+          hostNotAllowed: 'La dirección no puede ser la dirección de red ni de difusión de su subred',
+          invalidGateway: 'Introduzca una puerta de enlace IPv4 válida o déjela vacía',
+          gatewayOutsideSubnet: 'La puerta de enlace debe estar dentro de la subred de la dirección',
+          saveFailed: 'No se pudo cambiar la configuración de red',
+          confirmFailed: 'No se pudo confirmar el cambio',
+          changedTitle: 'Red modificada',
+          changedDesc: 'Si esta página sigue accesible, confirme en 120 s o se restaurará la configuración anterior.',
+          countdown: 'Se revertirá en {{count}} s si no se confirma',
+          reverted: 'Se acabó el tiempo, se está restaurando la configuración anterior',
+          newAddress: 'Nueva dirección:',
+          confirmFromNew: 'El cambio debe confirmarse desde la nueva dirección.',
+          confirm: 'Confirmar',
+          close: 'Cerrar'
         }
       },
       tailscale: {
@@ -610,12 +646,33 @@ const es = {
       account: {
         title: 'Cuenta',
         webAccount: 'Nombre de la cuenta web',
+        roles: {
+          admin: 'Administrador',
+          user: 'Usuario'
+        },
+        role: 'Rol',
         password: 'Contraseña',
         updateBtn: 'Actualizar',
         logoutBtn: 'Cerrar sesión',
         logoutDesc: '¿Estás seguro de que deseas cerrar sesión?',
         okBtn: 'Sí',
-        cancelBtn: 'No'
+        cancelBtn: 'No',
+        users: {
+          title: 'Usuarios',
+          create: 'Crear usuario',
+          enabled: 'Habilitado',
+          disabled: 'Deshabilitado',
+          deviceOwner: 'Propietario del dispositivo',
+          resetPassword: 'Restablecer contraseña',
+          delete: 'Eliminar',
+          deleteConfirm: '¿Eliminar este usuario y revocar todas sus sesiones?',
+          created: 'Usuario creado',
+          deleted: 'Usuario eliminado',
+          passwordUpdated: 'Contraseña actualizada',
+          loadFailed: 'Error al cargar los usuarios',
+          saveFailed: 'Error al guardar el usuario',
+          deleteFailed: 'Error al eliminar el usuario'
+        }
       }
     },
     picoclaw: {

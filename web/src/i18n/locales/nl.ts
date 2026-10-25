@@ -11,15 +11,18 @@ const nl = {
       login: 'Inloggen',
       placeholderUsername: 'Voer gebruikersnaam in',
       placeholderPassword: 'Voer wachtwoord in',
+      placeholderCurrentPassword: 'Huidig wachtwoord',
       placeholderPassword2: 'Voer wachtwoord nogmaals in',
       noEmptyUsername: 'Gebruikersnaam mag niet leeg zijn',
       noEmptyPassword: 'Wachtwoord mag niet leeg zijn',
+      passwordLength: 'Het wachtwoord moet tussen 8 en 72 tekens lang zijn',
       noAccount:
         'Ophalen van gebruikersinformatie mislukt, vernieuw de webpagina of reset het wachtwoord',
       invalidUser: 'Ongeldige gebruikersnaam of wachtwoord',
       locked: 'Te veel aanmeldingen, probeer het later opnieuw',
       globalLocked: 'Systeem wordt beveiligd. Probeer het later opnieuw',
       error: 'Onverwachte fout',
+      invalidCurrentPassword: 'Het huidige wachtwoord is onjuist',
       changePassword: 'Wachtwoord wijzigen',
       changePasswordDesc:
         'Voor de veiligheid van uw apparaat, wijzig alstublieft het webaanmeldingswachtwoord.',
@@ -117,6 +120,7 @@ const nl = {
         description:
           'H.264 Direct en H.264 WebRTC worden tegelijkertijd gebruikt. Dit kan tearing of beschadigde video veroorzaken. Gebruik slechts één H.264-modus.'
       },
+      connecting: 'Verbinden…',
       webrtcConnectionFailed: {
         title: 'WebRTC-verbinding mislukt',
         description: 'Controleer de netwerkverbinding of wijzig de videomodus.'
@@ -139,6 +143,7 @@ const nl = {
       placeholder: 'Voer tekst in',
       submit: 'Verzenden',
       virtual: 'Toetsenbord',
+      virtualDescription: 'Schermtoetsenbord dat toetsaanslagen naar de externe host verstuurt',
       readClipboard: 'Lezen vanaf het Klembord',
       clipboardPermissionDenied:
         'Klembordtoestemming geweigerd. Sta klembordtoegang toe in uw browser.',
@@ -214,13 +219,16 @@ const nl = {
         tip2: 'In de modus HID-Alleen is beeldmontage uitgeschakeld',
         tip3: 'NanoKVM wordt automatisch opnieuw opgestart na het wisselen van modus',
         enable: 'Schakel de modus HID-Alleen in',
-        disable: 'Schakel de modus HID-Alleen uit'
+        disable: 'Schakel de modus HID-Alleen uit',
+        setFailed: 'Kan de HID-modus niet wijzigen. Probeer het later opnieuw.',
+        getFailed: 'Kan de huidige HID-modus niet lezen. Probeer het later opnieuw.'
       }
     },
     image: {
       title: 'Afbeeldingen',
       loading: 'Laden...',
       empty: 'Niets gevonden',
+      emptyHint: 'Plaats .iso- of .img-bestanden in /data op het apparaat, of gebruik de Image Downloader.',
       mountMode: 'Montagemodus',
       mountFailed: 'Koppelen mislukt',
       mountDesc:
@@ -258,6 +266,7 @@ const nl = {
     script: {
       title: 'Script',
       upload: 'Uploaden',
+      emptyHint: 'Nog geen scripts. Upload een .sh- of .py-bestand met de knop Uploaden.',
       run: 'Uitvoeren',
       runBackground: 'Op achtergrond uitvoeren',
       runFailed: 'Uitvoeren mislukt',
@@ -405,6 +414,7 @@ const nl = {
         oled: {
           title: 'OLED',
           description: 'OLED scherm automatisch slapen',
+          notDetected: 'Niet gedetecteerd',
           0: 'Nooit',
           15: '15 sec',
           30: '30 sec',
@@ -517,6 +527,32 @@ const nl = {
           subnetMask: 'Subnetmasker',
           router: 'Router',
           none: 'Geen'
+        },
+        interfaces: {
+          ethernet: 'Ethernet',
+          wifi: 'Wi-Fi',
+          notPresent: '{{name}}: niet aanwezig op dit apparaat',
+          noAddress: 'Geen adres',
+          dhcp: 'DHCP',
+          static: 'Statisch',
+          address: 'Adres',
+          gateway: 'Gateway',
+          optional: 'Optioneel',
+          save: 'Opslaan',
+          invalidAddress: 'Voer een adres in CIDR-notatie in, bijvoorbeeld 192.168.1.20/24 (prefix 1 tot 32)',
+          hostNotAllowed: 'Het adres mag niet het netwerk- of broadcastadres van het subnet zijn',
+          invalidGateway: 'Voer een geldige IPv4-gateway in, of laat het veld leeg',
+          gatewayOutsideSubnet: 'De gateway moet binnen het subnet van het adres liggen',
+          saveFailed: 'Netwerkinstellingen wijzigen mislukt',
+          confirmFailed: 'Wijziging bevestigen mislukt',
+          changedTitle: 'Netwerk gewijzigd',
+          changedDesc: 'Als deze pagina nog bereikbaar is, bevestig dan binnen 120 s, anders worden de oude instellingen hersteld.',
+          countdown: 'Terugdraaien over {{count}} s tenzij bevestigd',
+          reverted: 'Tijd is om, de oude instellingen worden hersteld',
+          newAddress: 'Nieuw adres:',
+          confirmFromNew: 'De wijziging moet worden bevestigd vanaf het nieuwe adres.',
+          confirm: 'Bevestigen',
+          close: 'Sluiten'
         }
       },
       tailscale: {
@@ -609,12 +645,33 @@ const nl = {
       account: {
         title: 'Account',
         webAccount: 'Web Account Naam',
+        roles: {
+          admin: 'Beheerder',
+          user: 'Gebruiker'
+        },
+        role: 'Rol',
         password: 'Wachtwoord',
         updateBtn: 'Update',
         logoutBtn: 'Afmelden',
         logoutDesc: 'Weet u zeker dat u wilt uitloggen?',
         okBtn: 'Ja',
-        cancelBtn: 'Nee'
+        cancelBtn: 'Nee',
+        users: {
+          title: 'Gebruikers',
+          create: 'Gebruiker aanmaken',
+          enabled: 'Ingeschakeld',
+          disabled: 'Uitgeschakeld',
+          deviceOwner: 'Apparaateigenaar',
+          resetPassword: 'Wachtwoord opnieuw instellen',
+          delete: 'Verwijderen',
+          deleteConfirm: 'Deze gebruiker verwijderen en al zijn sessies intrekken?',
+          created: 'Gebruiker aangemaakt',
+          deleted: 'Gebruiker verwijderd',
+          passwordUpdated: 'Wachtwoord bijgewerkt',
+          loadFailed: 'Gebruikers laden mislukt',
+          saveFailed: 'Gebruiker opslaan mislukt',
+          deleteFailed: 'Gebruiker verwijderen mislukt'
+        }
       }
     },
     picoclaw: {

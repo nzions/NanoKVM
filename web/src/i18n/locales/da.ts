@@ -11,15 +11,18 @@ const da = {
       login: 'Log ind',
       placeholderUsername: 'Indtast brugernavn',
       placeholderPassword: 'indtast adgangskode',
+      placeholderCurrentPassword: 'Nuværende adgangskode',
       placeholderPassword2: 'indtast adgangskode igen',
       noEmptyUsername: 'brugernavn kan ikke være tom',
       noEmptyPassword: 'adgangskode kan ikke være tom',
+      passwordLength: 'Adgangskoden skal være mellem 8 og 72 tegn',
       noAccount:
         'Kunne ikke hente brugeroplysninger. Prøv at opdater siden eller nulstil adgangskoden',
       invalidUser: 'ugyldigt brugernavn eller adgangskode',
       locked: 'For mange logins, prøv venligst igen senere',
       globalLocked: 'System under beskyttelse, prøv venligst igen senere',
       error: 'uventet fejl',
+      invalidCurrentPassword: 'Den nuværende adgangskode er forkert',
       changePassword: 'Skift adgangskode',
       changePasswordDesc: 'For sikkerheden af din enhed, bedes du ændre web-login adgangskoden.',
       differentPassword: 'Adgangskoder er ikke ens',
@@ -114,6 +117,7 @@ const da = {
         description:
           'H.264 Direct og H.264 WebRTC bruges samtidigt. Dette kan forårsage skærmrivning eller beskadiget video. Brug kun én H.264-tilstand.'
       },
+      connecting: 'Forbinder…',
       webrtcConnectionFailed: {
         title: 'WebRTC-forbindelse mislykkedes',
         description: 'Kontrollér netværksforbindelsen, eller skift videotilstand.'
@@ -136,6 +140,7 @@ const da = {
       placeholder: 'Indtast tekst',
       submit: 'Send',
       virtual: 'Tastatur',
+      virtualDescription: 'Skærmtastatur, der sender tastetryk til den eksterne vært',
       readClipboard: 'Læs fra udklipsholder',
       clipboardPermissionDenied:
         'Udklipsholdertilladelse nægtet. Tillad venligst udklipsholderadgang i din browser.',
@@ -210,13 +215,16 @@ const da = {
         tip2: 'I HID-Only-tilstand er billedmontering deaktiveret',
         tip3: 'NanoKVM genstarter automatisk efter at have skiftet tilstand',
         enable: 'Aktiver HID-kun tilstand',
-        disable: 'Deaktiver HID-kun tilstand'
+        disable: 'Deaktiver HID-kun tilstand',
+        setFailed: 'Kunne ikke ændre HID-tilstanden. Prøv igen senere.',
+        getFailed: 'Kunne ikke læse den aktuelle HID-tilstand. Prøv igen senere.'
       }
     },
     image: {
       title: 'Diskbilleder',
       loading: 'Kontrollerer...',
       empty: 'Ingen fundet',
+      emptyHint: 'Læg .iso- eller .img-filer i /data på enheden, eller brug Image Downloader.',
       mountMode: 'Monteringstilstand',
       mountFailed: 'Montering af diskbillede mislykkedes',
       mountDesc:
@@ -254,6 +262,7 @@ const da = {
     script: {
       title: 'Script',
       upload: 'Upload',
+      emptyHint: 'Ingen scripts endnu. Upload en .sh- eller .py-fil med knappen Upload.',
       run: 'Kør',
       runBackground: 'Kør i baggrunden',
       runFailed: 'Kørsel mislykkedes',
@@ -400,6 +409,7 @@ const da = {
         oled: {
           title: 'OLED',
           description: 'OLED screen automatically sleep',
+          notDetected: 'Ikke registreret',
           0: 'Aldrig',
           15: '15 sek.',
           30: '30 sek.',
@@ -509,6 +519,32 @@ const da = {
           subnetMask: 'Undernetmaske',
           router: 'Router',
           none: 'Ingen'
+        },
+        interfaces: {
+          ethernet: 'Ethernet',
+          wifi: 'Wi-Fi',
+          notPresent: '{{name}}: findes ikke på denne enhed',
+          noAddress: 'Ingen adresse',
+          dhcp: 'DHCP',
+          static: 'Statisk',
+          address: 'Adresse',
+          gateway: 'Gateway',
+          optional: 'Valgfri',
+          save: 'Gem',
+          invalidAddress: 'Angiv en adresse i CIDR-format, f.eks. 192.168.1.20/24 (præfiks 1 til 32)',
+          hostNotAllowed: 'Adressen må ikke være netværks- eller broadcast-adressen for sit undernet',
+          invalidGateway: 'Angiv en gyldig IPv4-gateway, eller lad feltet stå tomt',
+          gatewayOutsideSubnet: 'Gatewayen skal ligge i adressens undernet',
+          saveFailed: 'Kunne ikke ændre netværksindstillingerne',
+          confirmFailed: 'Kunne ikke bekræfte ændringen',
+          changedTitle: 'Netværk ændret',
+          changedDesc: 'Hvis denne side stadig kan nås, så bekræft inden for 120 s, ellers gendannes de gamle indstillinger.',
+          countdown: 'Gendanner om {{count}} s, medmindre det bekræftes',
+          reverted: 'Tiden er gået, de gamle indstillinger gendannes',
+          newAddress: 'Ny adresse:',
+          confirmFromNew: 'Ændringen skal bekræftes fra den nye adresse.',
+          confirm: 'Bekræft',
+          close: 'Luk'
         }
       },
       tailscale: {
@@ -601,12 +637,33 @@ const da = {
       account: {
         title: 'Konto',
         webAccount: 'Navn på webkonto',
+        roles: {
+          admin: 'Administrator',
+          user: 'Bruger'
+        },
+        role: 'Rolle',
         password: 'Adgangskode',
         updateBtn: 'Update',
         logoutBtn: 'Log ud',
         logoutDesc: 'Er du sikker på, at du vil logge ud?',
         okBtn: 'Ja',
-        cancelBtn: 'Annuller'
+        cancelBtn: 'Annuller',
+        users: {
+          title: 'Brugere',
+          create: 'Opret bruger',
+          enabled: 'Aktiveret',
+          disabled: 'Deaktiveret',
+          deviceOwner: 'Enhedens ejer',
+          resetPassword: 'Nulstil adgangskode',
+          delete: 'Slet',
+          deleteConfirm: 'Slet denne bruger og tilbagekald alle vedkommendes sessioner?',
+          created: 'Bruger oprettet',
+          deleted: 'Bruger slettet',
+          passwordUpdated: 'Adgangskode opdateret',
+          loadFailed: 'Kunne ikke indlæse brugere',
+          saveFailed: 'Kunne ikke gemme bruger',
+          deleteFailed: 'Kunne ikke slette bruger'
+        }
       }
     },
     picoclaw: {

@@ -1,4 +1,4 @@
-const cz = {
+const cs = {
   translation: {
     head: {
       desktop: 'Vzdálená plocha',
@@ -11,15 +11,18 @@ const cz = {
       login: 'Přihlášení',
       placeholderUsername: 'Zadejte prosím uživatelské jméno',
       placeholderPassword: 'Zadejte prosím heslo',
+      placeholderCurrentPassword: 'Současné heslo',
       placeholderPassword2: 'Zadejte prosím heslo znovu',
       noEmptyUsername: 'Uživatelské jméno nesmí být prázdné',
       noEmptyPassword: 'Heslo nesmí být prázdné',
+      passwordLength: 'Heslo musí mít 8 až 72 znaků',
       noAccount:
         'Nepodařilo se získat informace o uživateli, prosím obnovte stránku nebo resetujte heslo',
       invalidUser: 'Neplatné uživatelské jméno nebo heslo',
       locked: 'Příliš mnoho přihlášení, zkuste to znovu později',
       globalLocked: 'Systém je chráněn, zkuste to znovu později',
       error: 'Neočekávaná chyba',
+      invalidCurrentPassword: 'Současné heslo není správné',
       changePassword: 'Změnit heslo',
       changePasswordDesc:
         'Pro bezpečnost vašeho zařízení prosím změňte heslo pro přihlášení na webu.',
@@ -114,6 +117,7 @@ const cz = {
         description:
           'H.264 Direct a H.264 WebRTC se používají současně. To může způsobit trhání obrazu nebo poškozené video. Používejte pouze jeden režim H.264.'
       },
+      connecting: 'Připojování…',
       webrtcConnectionFailed: {
         title: 'Připojení WebRTC se nezdařilo',
         description: 'Zkontrolujte síťové připojení nebo přepněte režim videa.'
@@ -136,6 +140,7 @@ const cz = {
       placeholder: 'Zadejte text',
       submit: 'Odeslat',
       virtual: 'Klávesnice',
+      virtualDescription: 'Klávesnice na obrazovce, která odesílá stisky kláves vzdálenému hostiteli',
       readClipboard: 'Přečíst ze schránky',
       clipboardPermissionDenied:
         'Oprávnění ke schránce odepřeno. Povolte prosím přístup do schránky ve svém prohlížeči.',
@@ -211,13 +216,16 @@ const cz = {
         tip2: 'V režimu HID-Only je připojení obrazu zakázáno',
         tip3: 'NanoKVM se po přepnutí režimů automaticky restartuje',
         enable: 'Povolit režim HID-Only',
-        disable: 'Zakázat režim HID-Only'
+        disable: 'Zakázat režim HID-Only',
+        setFailed: 'Nelze změnit režim HID. Zkuste to později.',
+        getFailed: 'Nelze přečíst aktuální režim HID. Zkuste to později.'
       }
     },
     image: {
       title: 'Obrázky',
       loading: 'Načítání...',
       empty: 'Nic nenalezeno',
+      emptyHint: 'Umístěte soubory .iso nebo .img do /data na zařízení, nebo použijte Image Downloader.',
       mountMode: 'Režim připojení',
       mountFailed: 'Připojení se nezdařilo',
       mountDesc:
@@ -255,6 +263,7 @@ const cz = {
     script: {
       title: 'Skript',
       upload: 'Nahrát',
+      emptyHint: 'Zatím žádné skripty. Nahrajte soubor .sh nebo .py tlačítkem Nahrát.',
       run: 'Spustit',
       runBackground: 'Spustit na pozadí',
       runFailed: 'Spuštění se nezdařilo',
@@ -402,6 +411,7 @@ const cz = {
         oled: {
           title: 'OLED',
           description: 'OLED screen automatically sleep',
+          notDetected: 'Nezjištěno',
           0: 'Nikdy',
           15: '15 sec',
           30: '30 sec',
@@ -510,6 +520,32 @@ const cz = {
           subnetMask: 'Maska podsítě',
           router: 'Router',
           none: 'Žádné'
+        },
+        interfaces: {
+          ethernet: 'Ethernet',
+          wifi: 'Wi-Fi',
+          notPresent: '{{name}}: na tomto zařízení není k dispozici',
+          noAddress: 'Žádná adresa',
+          dhcp: 'DHCP',
+          static: 'Statická',
+          address: 'Adresa',
+          gateway: 'Brána',
+          optional: 'Volitelné',
+          save: 'Uložit',
+          invalidAddress: 'Zadejte adresu ve formátu CIDR, například 192.168.1.20/24 (prefix 1 až 32)',
+          hostNotAllowed: 'Adresa nesmí být adresou sítě ani broadcastu své podsítě',
+          invalidGateway: 'Zadejte platnou bránu IPv4 nebo pole nechte prázdné',
+          gatewayOutsideSubnet: 'Brána musí ležet v podsíti adresy',
+          saveFailed: 'Změna nastavení sítě se nezdařila',
+          confirmFailed: 'Potvrzení změny se nezdařilo',
+          changedTitle: 'Síť byla změněna',
+          changedDesc: 'Pokud je tato stránka stále dostupná, potvrďte změnu do 120 s, jinak se obnoví původní nastavení.',
+          countdown: 'Návrat za {{count}} s, pokud nebude potvrzeno',
+          reverted: 'Čas vypršel, obnovuje se původní nastavení',
+          newAddress: 'Nová adresa:',
+          confirmFromNew: 'Změnu je nutné potvrdit z nové adresy.',
+          confirm: 'Potvrdit',
+          close: 'Zavřít'
         }
       },
       tailscale: {
@@ -602,12 +638,33 @@ const cz = {
       account: {
         title: 'Účet',
         webAccount: 'Název webového účtu',
+        roles: {
+          admin: 'Správce',
+          user: 'Uživatel'
+        },
+        role: 'Role',
         password: 'Heslo',
         updateBtn: 'Update',
         logoutBtn: 'Odhlásit',
         logoutDesc: 'Opravdu se chcete odhlásit?',
         okBtn: 'Ano',
-        cancelBtn: 'Ne'
+        cancelBtn: 'Ne',
+        users: {
+          title: 'Uživatelé',
+          create: 'Vytvořit uživatele',
+          enabled: 'Povoleno',
+          disabled: 'Zakázáno',
+          deviceOwner: 'Vlastník zařízení',
+          resetPassword: 'Obnovit heslo',
+          delete: 'Smazat',
+          deleteConfirm: 'Smazat tohoto uživatele a zrušit všechny jeho relace?',
+          created: 'Uživatel vytvořen',
+          deleted: 'Uživatel smazán',
+          passwordUpdated: 'Heslo aktualizováno',
+          loadFailed: 'Nepodařilo se načíst uživatele',
+          saveFailed: 'Nepodařilo se uložit uživatele',
+          deleteFailed: 'Nepodařilo se smazat uživatele'
+        }
       }
     },
     picoclaw: {
@@ -788,4 +845,4 @@ const cz = {
   }
 };
 
-export default cz;
+export default cs;

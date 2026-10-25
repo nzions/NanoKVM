@@ -11,14 +11,17 @@ const zh_tw = {
       login: '登入',
       placeholderUsername: '使用者名稱',
       placeholderPassword: '密碼',
+      placeholderCurrentPassword: '目前密碼',
       placeholderPassword2: '請再次輸入密碼',
       noEmptyUsername: '使用者名稱不能為空',
       noEmptyPassword: '密碼不能為空',
+      passwordLength: '密碼長度必須為 8 到 72 個字元',
       noAccount: '找不到使用者，請重新整理網頁或重設密碼',
       invalidUser: '使用者名稱或密碼錯誤',
       locked: '登入次數過多，請稍後重試',
       globalLocked: '系統受保護，請稍後重試',
       error: '非預期性錯誤',
+      invalidCurrentPassword: '目前密碼不正確',
       changePassword: '更改密碼',
       changePasswordDesc: '為了您的裝置安全，請修改登入密碼。',
       differentPassword: '密碼不一致',
@@ -109,6 +112,7 @@ const zh_tw = {
         description:
           '偵測到 H.264 Direct 和 H.264 WebRTC 同時使用，可能導致畫面撕裂或影片損壞。請只保留一種 H.264 模式。'
       },
+      connecting: '正在連線…',
       webrtcConnectionFailed: {
         title: 'WebRTC 連線失敗',
         description: '請檢查網路連線或切換影片模式。'
@@ -131,6 +135,7 @@ const zh_tw = {
       placeholder: '請輸入內容',
       submit: '送出',
       virtual: '虛擬鍵盤',
+      virtualDescription: '將按鍵傳送到遠端主機的螢幕鍵盤',
       readClipboard: '從剪貼簿讀取',
       clipboardPermissionDenied: '剪貼簿權限被拒絕。請允許您的瀏覽器存取剪貼簿。',
       clipboardReadError: '無法讀取剪貼簿',
@@ -202,13 +207,16 @@ const zh_tw = {
         tip2: '在 HID-Only 模式下，映像檔掛載功能將被停用',
         tip3: 'NanoKVM 將在切換模式後自動重新啟動',
         enable: '啟用 HID-Only 模式',
-        disable: '停用 HID-Only 模式'
+        disable: '停用 HID-Only 模式',
+        setFailed: '無法變更 HID 模式，請稍後再試。',
+        getFailed: '無法讀取目前的 HID 模式，請稍後再試。'
       }
     },
     image: {
       title: '映像檔',
       loading: '載入中...',
       empty: '未找到任何內容',
+      emptyHint: '將 .iso 或 .img 檔案放入裝置的 /data 目錄，或使用 Image Downloader。',
       mountMode: '掛載模式',
       mountFailed: '掛載失敗',
       mountDesc: '在某些系統中，需要在遠端主機中彈出虛擬硬碟後再掛載映像檔。',
@@ -242,6 +250,7 @@ const zh_tw = {
     script: {
       title: '指令碼',
       upload: '上傳',
+      emptyHint: '尚無腳本。請使用上傳按鈕上傳 .sh 或 .py 檔案。',
       run: '執行',
       runBackground: '背景執行',
       runFailed: '執行失敗',
@@ -386,6 +395,7 @@ const zh_tw = {
         oled: {
           title: 'OLED',
           description: '設定 OLED 螢幕自動睡眠時間',
+          notDetected: '未偵測到',
           0: '永不',
           15: '15 秒',
           30: '30 秒',
@@ -494,6 +504,32 @@ const zh_tw = {
           subnetMask: '子網路遮罩',
           router: '路由器',
           none: '無'
+        },
+        interfaces: {
+          ethernet: '乙太網路',
+          wifi: 'Wi-Fi',
+          notPresent: '{{name}}：此裝置上不存在',
+          noAddress: '無位址',
+          dhcp: 'DHCP',
+          static: '靜態',
+          address: '位址',
+          gateway: '閘道',
+          optional: '選填',
+          save: '儲存',
+          invalidAddress: '請輸入 CIDR 格式的位址，例如 192.168.1.20/24（前綴 1 到 32）',
+          hostNotAllowed: '位址不能是其子網路的網路位址或廣播位址',
+          invalidGateway: '請輸入有效的 IPv4 閘道，或留空',
+          gatewayOutsideSubnet: '閘道必須位於該位址所在的子網路內',
+          saveFailed: '變更網路設定失敗',
+          confirmFailed: '確認變更失敗',
+          changedTitle: '網路已變更',
+          changedDesc: '如果仍能存取此頁面，請在 120 秒內確認，否則將還原原有設定。',
+          countdown: '若未確認，將在 {{count}} 秒後還原',
+          reverted: '時間已到，正在還原原有設定',
+          newAddress: '新位址：',
+          confirmFromNew: '必須在新位址上確認此變更。',
+          confirm: '確認',
+          close: '關閉'
         }
       },
       tailscale: {
@@ -583,12 +619,33 @@ const zh_tw = {
       account: {
         title: '帳號',
         webAccount: '網頁帳號',
+        roles: {
+          admin: '管理員',
+          user: '使用者'
+        },
+        role: '角色',
         password: '密碼',
         updateBtn: '修改',
         logoutBtn: '登出',
         logoutDesc: '您確定要登出嗎?',
         okBtn: '確定',
-        cancelBtn: '取消'
+        cancelBtn: '取消',
+        users: {
+          title: '使用者',
+          create: '建立使用者',
+          enabled: '已啟用',
+          disabled: '已停用',
+          deviceOwner: '裝置擁有者',
+          resetPassword: '重設密碼',
+          delete: '刪除',
+          deleteConfirm: '刪除此使用者並撤銷其所有工作階段？',
+          created: '使用者已建立',
+          deleted: '使用者已刪除',
+          passwordUpdated: '密碼已更新',
+          loadFailed: '載入使用者失敗',
+          saveFailed: '儲存使用者失敗',
+          deleteFailed: '刪除使用者失敗'
+        }
       }
     },
     picoclaw: {

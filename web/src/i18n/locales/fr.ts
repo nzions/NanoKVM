@@ -11,15 +11,18 @@ const fr = {
       login: 'Connexion',
       placeholderUsername: "Veuillez entrer votre nom d'utilisateur",
       placeholderPassword: 'Veuillez entrer votre mot de passe',
+      placeholderCurrentPassword: 'Mot de passe actuel',
       placeholderPassword2: 'Veuillez entrer votre mot de passe à nouveau',
       noEmptyUsername: "Le nom d'utilisateur ne peut pas être vide",
       noEmptyPassword: 'Le mot de passe ne peut pas être vide',
+      passwordLength: 'Le mot de passe doit comporter entre 8 et 72 caractères',
       noAccount:
         "Impossible de récupérer les informations de l'utilisateur, veuillez rafraîchir la page ou réinitialiser le mot de passe",
       invalidUser: "Nom d'utilisateur ou mot de passe invalide",
       locked: 'Trop de connexions, veuillez réessayer plus tard',
       globalLocked: 'Système sous protection, veuillez réessayer plus tard',
       error: 'Erreur inattendue',
+      invalidCurrentPassword: 'Le mot de passe actuel est incorrect',
       changePassword: 'Changer le mot de passe',
       changePasswordDesc:
         'Pour la sécurité de votre appareil, veuillez modifier le mot de passe de connexion Web.',
@@ -117,6 +120,7 @@ const fr = {
         description:
           'Les modes H.264 Direct et H.264 WebRTC sont utilisés simultanément. Cela peut provoquer des déchirures d’écran ou une vidéo corrompue. Veuillez n’utiliser qu’un seul mode H.264.'
       },
+      connecting: 'Connexion en cours…',
       webrtcConnectionFailed: {
         title: 'Échec de la connexion WebRTC',
         description: 'Vérifiez la connexion réseau ou changez de mode vidéo.'
@@ -139,6 +143,7 @@ const fr = {
       placeholder: 'Veuillez saisir',
       submit: 'Soumettre',
       virtual: 'Clavier',
+      virtualDescription: 'Clavier à l\'écran qui envoie les appuis de touches à l\'hôte distant',
       readClipboard: 'Lire le presse-papiers',
       clipboardPermissionDenied:
         "Accès au presse-papiers refusé. Veuillez autoriser l'accès dans votre navigateur.",
@@ -214,13 +219,16 @@ const fr = {
         tip2: "En mode HID-Only, le montage d'image est désactivé",
         tip3: 'NanoKVM redémarrera automatiquement après avoir changé de mode',
         enable: 'Activer le mode HID uniquement',
-        disable: 'Désactiver le mode HID uniquement'
+        disable: 'Désactiver le mode HID uniquement',
+        setFailed: 'Impossible de changer le mode HID. Réessayez plus tard.',
+        getFailed: 'Impossible de lire le mode HID actuel. Réessayez plus tard.'
       }
     },
     image: {
       title: 'Images',
       loading: 'Chargement',
       empty: 'Vide',
+      emptyHint: 'Placez des fichiers .iso ou .img dans /data sur l\'appareil, ou utilisez l\'Image Downloader.',
       mountMode: 'Mode de montage',
       mountFailed: "Échec du montage de l'image.",
       mountDesc:
@@ -258,6 +266,7 @@ const fr = {
     script: {
       title: 'Script',
       upload: 'Téléverser',
+      emptyHint: 'Aucun script pour le moment. Téléversez un fichier .sh ou .py avec le bouton Téléverser.',
       run: 'Exécuter',
       runBackground: 'Exécuter en arrière-plan',
       runFailed: "Échec de l'exécution",
@@ -405,6 +414,7 @@ const fr = {
         oled: {
           title: 'OLED',
           description: "Écran OLED s'éteint automatiquement",
+          notDetected: 'Non détecté',
           0: 'Jamais',
           15: '15 sec',
           30: '30 sec',
@@ -516,6 +526,32 @@ const fr = {
           subnetMask: 'Masque de sous-réseau',
           router: 'Routeur',
           none: 'Aucun'
+        },
+        interfaces: {
+          ethernet: 'Ethernet',
+          wifi: 'Wi-Fi',
+          notPresent: '{{name}} : absent de cet appareil',
+          noAddress: 'Aucune adresse',
+          dhcp: 'DHCP',
+          static: 'Statique',
+          address: 'Adresse',
+          gateway: 'Passerelle',
+          optional: 'Facultatif',
+          save: 'Enregistrer',
+          invalidAddress: 'Saisissez une adresse au format CIDR, par exemple 192.168.1.20/24 (préfixe de 1 à 32)',
+          hostNotAllowed: 'L\'adresse ne peut pas être l\'adresse réseau ou de diffusion de son sous-réseau',
+          invalidGateway: 'Saisissez une passerelle IPv4 valide, ou laissez le champ vide',
+          gatewayOutsideSubnet: 'La passerelle doit se trouver dans le sous-réseau de l\'adresse',
+          saveFailed: 'Échec de la modification des paramètres réseau',
+          confirmFailed: 'Échec de la confirmation de la modification',
+          changedTitle: 'Réseau modifié',
+          changedDesc: 'Si cette page est toujours accessible, confirmez dans les 120 s, sinon les anciens paramètres seront rétablis.',
+          countdown: 'Retour en arrière dans {{count}} s sans confirmation',
+          reverted: 'Temps écoulé, les anciens paramètres sont en cours de restauration',
+          newAddress: 'Nouvelle adresse :',
+          confirmFromNew: 'La modification doit être confirmée depuis la nouvelle adresse.',
+          confirm: 'Confirmer',
+          close: 'Fermer'
         }
       },
       tailscale: {
@@ -610,12 +646,33 @@ const fr = {
       account: {
         title: 'Compte',
         webAccount: 'Nom du compte Web',
+        roles: {
+          admin: 'Administrateur',
+          user: 'Utilisateur'
+        },
+        role: 'Rôle',
         password: 'Mot de passe',
         updateBtn: 'Mettre à jour',
         logoutBtn: 'Déconnexion',
         logoutDesc: 'Êtes-vous sûr de vouloir vous déconnecter?',
         okBtn: 'Oui',
-        cancelBtn: 'Non'
+        cancelBtn: 'Non',
+        users: {
+          title: 'Utilisateurs',
+          create: 'Créer un utilisateur',
+          enabled: 'Activé',
+          disabled: 'Désactivé',
+          deviceOwner: 'Propriétaire de l\'appareil',
+          resetPassword: 'Réinitialiser le mot de passe',
+          delete: 'Supprimer',
+          deleteConfirm: 'Supprimer cet utilisateur et révoquer toutes ses sessions ?',
+          created: 'Utilisateur créé',
+          deleted: 'Utilisateur supprimé',
+          passwordUpdated: 'Mot de passe mis à jour',
+          loadFailed: 'Échec du chargement des utilisateurs',
+          saveFailed: 'Échec de l\'enregistrement de l\'utilisateur',
+          deleteFailed: 'Échec de la suppression de l\'utilisateur'
+        }
       }
     },
     picoclaw: {

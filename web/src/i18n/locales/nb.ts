@@ -11,15 +11,18 @@ const nb = {
       login: 'Logg inn',
       placeholderUsername: 'Brukernavn',
       placeholderPassword: 'Passord',
+      placeholderCurrentPassword: 'Nåværende passord',
       placeholderPassword2: 'Oppgi passord igjen',
       noEmptyUsername: 'Brukernavn påkrevd',
       noEmptyPassword: 'Passord påkrevd',
+      passwordLength: 'Passordet må være mellom 8 og 72 tegn',
       noAccount:
         'Kunne ikke hente brukerinformasjon. Vennligst last inn siden på nytt eller gjenopprett passord',
       invalidUser: 'Ugyldig brukernavn eller passord',
       locked: 'For mange pålogginger, vennligst prøv igjen senere',
       globalLocked: 'System under beskyttelse, prøv igjen senere',
       error: 'Uventet feil',
+      invalidCurrentPassword: 'Det nåværende passordet er feil',
       changePassword: 'Endre passord',
       changePasswordDesc:
         'For sikkerheten til enheten, vennligst endre passordet ditt for web-innlogging.',
@@ -115,6 +118,7 @@ const nb = {
         description:
           'H.264 Direct og H.264 WebRTC brukes samtidig. Dette kan føre til skjermriving eller ødelagt video. Bruk bare én H.264-modus.'
       },
+      connecting: 'Kobler til…',
       webrtcConnectionFailed: {
         title: 'WebRTC-tilkobling mislyktes',
         description: 'Kontroller nettverkstilkoblingen eller bytt videomodus.'
@@ -137,6 +141,7 @@ const nb = {
       placeholder: 'Vennligst angi teksten du vil lime inn',
       submit: 'Lim inn',
       virtual: 'Åpne tastatur',
+      virtualDescription: 'Skjermtastatur som sender tastetrykk til den eksterne verten',
       readClipboard: 'Les fra utklippstavlen',
       clipboardPermissionDenied:
         'Utklippstavle tillatelse nektet. Tillat utklippstavletilgang i nettleseren din.',
@@ -211,13 +216,16 @@ const nb = {
         tip2: 'I HID-Only-modus er bildemontering deaktivert',
         tip3: 'NanoKVM vil automatisk starte på nytt etter bytte av modus',
         enable: 'Aktiver HID-Only-modus',
-        disable: 'Deaktiver HID-bare-modus'
+        disable: 'Deaktiver HID-bare-modus',
+        setFailed: 'Kunne ikke endre HID-modus. Prøv igjen senere.',
+        getFailed: 'Kunne ikke lese gjeldende HID-modus. Prøv igjen senere.'
       }
     },
     image: {
       title: 'Bilder',
       loading: 'Laster...',
       empty: 'Ingen funnet',
+      emptyHint: 'Legg .iso- eller .img-filer i /data på enheten, eller bruk Image Downloader.',
       mountMode: 'Monteringsmodus',
       mountFailed: 'Montering feilet',
       mountDesc:
@@ -255,6 +263,7 @@ const nb = {
     script: {
       title: 'Skript',
       upload: 'Last opp',
+      emptyHint: 'Ingen skript ennå. Last opp en .sh- eller .py-fil med Last opp-knappen.',
       run: 'Kjør',
       runBackground: 'Kjør i bakgrunnen',
       runFailed: 'Kjøring feilet',
@@ -401,6 +410,7 @@ const nb = {
         oled: {
           title: 'OLED',
           description: 'OLED screen automatically sleep',
+          notDetected: 'Ikke oppdaget',
           0: 'Aldri',
           15: '15 sec',
           30: '30 sec',
@@ -509,6 +519,32 @@ const nb = {
           subnetMask: 'Subnettmaske',
           router: 'Ruter',
           none: 'Ingen'
+        },
+        interfaces: {
+          ethernet: 'Ethernet',
+          wifi: 'Wi-Fi',
+          notPresent: '{{name}}: finnes ikke på denne enheten',
+          noAddress: 'Ingen adresse',
+          dhcp: 'DHCP',
+          static: 'Statisk',
+          address: 'Adresse',
+          gateway: 'Gateway',
+          optional: 'Valgfritt',
+          save: 'Lagre',
+          invalidAddress: 'Skriv inn en adresse i CIDR-format, for eksempel 192.168.1.20/24 (prefiks 1 til 32)',
+          hostNotAllowed: 'Adressen kan ikke være nettverks- eller kringkastingsadressen til subnettet sitt',
+          invalidGateway: 'Skriv inn en gyldig IPv4-gateway, eller la feltet stå tomt',
+          gatewayOutsideSubnet: 'Gatewayen må ligge i adressens subnett',
+          saveFailed: 'Kunne ikke endre nettverksinnstillingene',
+          confirmFailed: 'Kunne ikke bekrefte endringen',
+          changedTitle: 'Nettverket er endret',
+          changedDesc: 'Hvis denne siden fortsatt er tilgjengelig, bekreft innen 120 s, ellers gjenopprettes de gamle innstillingene.',
+          countdown: 'Tilbakestilles om {{count}} s med mindre det bekreftes',
+          reverted: 'Tiden er ute, de gamle innstillingene gjenopprettes',
+          newAddress: 'Ny adresse:',
+          confirmFromNew: 'Endringen må bekreftes fra den nye adressen.',
+          confirm: 'Bekreft',
+          close: 'Lukk'
         }
       },
       tailscale: {
@@ -601,12 +637,33 @@ const nb = {
       account: {
         title: 'Konto',
         webAccount: 'Navn på webkonto',
+        roles: {
+          admin: 'Administrator',
+          user: 'Bruker'
+        },
+        role: 'Rolle',
         password: 'Passord',
         updateBtn: 'Update',
         logoutBtn: 'Logg ut',
         logoutDesc: 'Er du sikker på at du vil logge ut?',
         okBtn: 'Ja',
-        cancelBtn: 'Nei'
+        cancelBtn: 'Nei',
+        users: {
+          title: 'Brukere',
+          create: 'Opprett bruker',
+          enabled: 'Aktivert',
+          disabled: 'Deaktivert',
+          deviceOwner: 'Enhetens eier',
+          resetPassword: 'Tilbakestill passord',
+          delete: 'Slett',
+          deleteConfirm: 'Slette denne brukeren og tilbakekalle alle øktene deres?',
+          created: 'Bruker opprettet',
+          deleted: 'Bruker slettet',
+          passwordUpdated: 'Passord oppdatert',
+          loadFailed: 'Kunne ikke laste brukere',
+          saveFailed: 'Kunne ikke lagre bruker',
+          deleteFailed: 'Kunne ikke slette bruker'
+        }
       }
     },
     picoclaw: {

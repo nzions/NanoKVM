@@ -11,15 +11,18 @@ const de = {
       login: 'Anmelden',
       placeholderUsername: 'Benutzername',
       placeholderPassword: 'Passwort',
+      placeholderCurrentPassword: 'Aktuelles Passwort',
       placeholderPassword2: 'Bitte Passwort erneut eingeben',
       noEmptyUsername: 'Benutzername benötigt',
       noEmptyPassword: 'Passwort benötigt',
+      passwordLength: 'Das Passwort muss zwischen 8 und 72 Zeichen lang sein',
       noAccount:
         'Abfragen der Benutzerdaten fehlgeschlagen, bitte die Seite neu laden oder Passwort zurücksetzen',
       invalidUser: 'Falscher Benutzername oder falsches Passwort',
       locked: 'Zu viele Anmeldungen, bitte versuchen Sie es später noch einmal',
       globalLocked: 'System wird geschützt, bitte versuchen Sie es später erneut',
       error: 'Unerwarteter Fehler',
+      invalidCurrentPassword: 'Das aktuelle Passwort ist falsch',
       changePassword: 'Passwort ändern',
       changePasswordDesc: 'Für die Sicherheit Ihres Geräts ändern Sie bitte das Passwort!',
       differentPassword: 'Passwörter stimmen nicht überein',
@@ -118,6 +121,7 @@ const de = {
         description:
           'H.264 Direct und H.264 WebRTC werden gleichzeitig verwendet. Dies kann zu Bildschirm-Tearing oder beschädigtem Video führen. Bitte verwenden Sie nur einen H.264-Modus.'
       },
+      connecting: 'Verbindung wird hergestellt…',
       webrtcConnectionFailed: {
         title: 'WebRTC-Verbindung fehlgeschlagen',
         description: 'Überprüfen Sie die Netzwerkverbindung oder wechseln Sie den Videomodus.'
@@ -140,6 +144,7 @@ const de = {
       placeholder: 'Bitte eingeben',
       submit: 'Senden',
       virtual: 'Tastatur',
+      virtualDescription: 'Bildschirmtastatur, die Tastendrücke an den entfernten Host sendet',
       readClipboard: 'Aus der Zwischenablage lesen',
       clipboardPermissionDenied:
         'Berechtigung für die Zwischenablage verweigert. Bitte erlauben Sie den Zugriff auf die Zwischenablage in Ihrem Browser.',
@@ -215,13 +220,16 @@ const de = {
         tip2: 'Im HID-Only Modus ist das Einbinden von Systemabbilder deaktiviert.',
         tip3: 'NanoKVM wird nach dem Wechsel in den neuen Modus automatisch neu gestartet.',
         enable: 'HID-Only Modus aktivieren',
-        disable: 'HID-Only Modus deaktivieren'
+        disable: 'HID-Only Modus deaktivieren',
+        setFailed: 'Der HID-Modus konnte nicht geändert werden. Bitte später erneut versuchen.',
+        getFailed: 'Der aktuelle HID-Modus konnte nicht gelesen werden. Bitte später erneut versuchen.'
       }
     },
     image: {
       title: 'Bilder',
       loading: 'Lädt...',
       empty: 'Nichts gefunden',
+      emptyHint: 'Legen Sie .iso- oder .img-Dateien in /data auf dem Gerät ab oder verwenden Sie den Image Downloader.',
       mountMode: 'Mount-Modus',
       mountFailed: 'Einbinden fehlgeschlagen',
       mountDesc:
@@ -259,6 +267,7 @@ const de = {
     script: {
       title: 'Skripte',
       upload: 'Hochladen',
+      emptyHint: 'Noch keine Skripte. Laden Sie eine .sh- oder .py-Datei mit der Schaltfläche Hochladen hoch.',
       run: 'Ausführen',
       runBackground: 'Im Hintergrund ausführen',
       runFailed: '',
@@ -408,6 +417,7 @@ const de = {
         oled: {
           title: 'OLED',
           description: 'Schalte OLED Bildschirm aus nach',
+          notDetected: 'Nicht erkannt',
           0: 'Nie',
           15: '15 Sek',
           30: '30 Sek',
@@ -519,6 +529,32 @@ const de = {
           subnetMask: 'Subnetzmaske',
           router: 'Router',
           none: 'Keine'
+        },
+        interfaces: {
+          ethernet: 'Ethernet',
+          wifi: 'WLAN',
+          notPresent: '{{name}}: auf diesem Gerät nicht vorhanden',
+          noAddress: 'Keine Adresse',
+          dhcp: 'DHCP',
+          static: 'Statisch',
+          address: 'Adresse',
+          gateway: 'Gateway',
+          optional: 'Optional',
+          save: 'Speichern',
+          invalidAddress: 'Geben Sie eine Adresse im CIDR-Format ein, z. B. 192.168.1.20/24 (Präfix 1 bis 32)',
+          hostNotAllowed: 'Die Adresse darf nicht die Netzwerk- oder Broadcast-Adresse ihres Subnetzes sein',
+          invalidGateway: 'Geben Sie ein gültiges IPv4-Gateway ein oder lassen Sie das Feld leer',
+          gatewayOutsideSubnet: 'Das Gateway muss im Subnetz der Adresse liegen',
+          saveFailed: 'Netzwerkeinstellungen konnten nicht geändert werden',
+          confirmFailed: 'Änderung konnte nicht bestätigt werden',
+          changedTitle: 'Netzwerk geändert',
+          changedDesc: 'Wenn diese Seite noch erreichbar ist, bestätigen Sie innerhalb von 120 s, sonst werden die alten Einstellungen wiederhergestellt.',
+          countdown: 'Zurücksetzen in {{count}} s, sofern nicht bestätigt',
+          reverted: 'Zeit abgelaufen, die alten Einstellungen werden wiederhergestellt',
+          newAddress: 'Neue Adresse:',
+          confirmFromNew: 'Die Änderung muss von der neuen Adresse aus bestätigt werden.',
+          confirm: 'Bestätigen',
+          close: 'Schließen'
         }
       },
       tailscale: {
@@ -613,12 +649,33 @@ const de = {
       account: {
         title: 'Konto',
         webAccount: 'Web Konto Name',
+        roles: {
+          admin: 'Administrator',
+          user: 'Benutzer'
+        },
+        role: 'Rolle',
         password: 'Passwort',
         updateBtn: 'Ändern',
         logoutBtn: 'Abmelden',
         logoutDesc: 'Möchten Sie sich wirklich abmelden?',
         okBtn: 'Ja',
-        cancelBtn: 'Nein'
+        cancelBtn: 'Nein',
+        users: {
+          title: 'Benutzer',
+          create: 'Benutzer erstellen',
+          enabled: 'Aktiviert',
+          disabled: 'Deaktiviert',
+          deviceOwner: 'Gerätebesitzer',
+          resetPassword: 'Passwort zurücksetzen',
+          delete: 'Löschen',
+          deleteConfirm: 'Diesen Benutzer löschen und alle seine Sitzungen widerrufen?',
+          created: 'Benutzer erstellt',
+          deleted: 'Benutzer gelöscht',
+          passwordUpdated: 'Passwort aktualisiert',
+          loadFailed: 'Benutzer konnten nicht geladen werden',
+          saveFailed: 'Benutzer konnte nicht gespeichert werden',
+          deleteFailed: 'Benutzer konnte nicht gelöscht werden'
+        }
       }
     },
     picoclaw: {

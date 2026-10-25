@@ -112,6 +112,7 @@ const zh = {
         description:
           '检测到 H.264 Direct 和 H.264 WebRTC 同时使用，可能导致画面撕裂或花屏。请只保留一种 H.264 模式。'
       },
+      connecting: '正在连接…',
       webrtcConnectionFailed: {
         title: 'WebRTC 连接失败',
         description: '请检查网络连接或切换视频模式。'
@@ -134,6 +135,7 @@ const zh = {
       placeholder: '请输入内容',
       submit: '确定',
       virtual: '虚拟键盘',
+      virtualDescription: '将按键发送到远程主机的屏幕键盘',
       readClipboard: '从剪贴板读取',
       clipboardPermissionDenied: '剪贴板权限被拒绝。请允许您的浏览器访问剪贴板。',
       clipboardReadError: '无法读取剪贴板',
@@ -205,13 +207,16 @@ const zh = {
         tip2: 'HID-Only 模式下，镜像挂载将被禁用',
         tip3: '切换模式后将自动重启 NanoKVM',
         enable: '启用 HID-Only 模式',
-        disable: '关闭 HID-Only 模式'
+        disable: '关闭 HID-Only 模式',
+        setFailed: '无法更改 HID 模式，请稍后重试。',
+        getFailed: '无法读取当前 HID 模式，请稍后重试。'
       }
     },
     image: {
       title: '镜像',
       loading: '加载中',
       empty: '无镜像文件',
+      emptyHint: '将 .iso 或 .img 文件放入设备的 /data 目录，或使用 Image Downloader。',
       mountMode: '挂载模式',
       mountFailed: '挂载失败',
       mountDesc: '在某些系统中，需要在远程主机中弹出虚拟硬盘后再挂载镜像。',
@@ -245,6 +250,7 @@ const zh = {
     script: {
       title: '脚本',
       upload: '上传',
+      emptyHint: '暂无脚本。请使用上传按钮上传 .sh 或 .py 文件。',
       run: '运行',
       runBackground: '后台运行',
       runFailed: '运行失败',
@@ -389,6 +395,7 @@ const zh = {
         oled: {
           title: 'OLED',
           description: '设置 OLED 屏幕自动休眠时间',
+          notDetected: '未检测到',
           0: '永不',
           15: '15秒',
           30: '30秒',
@@ -497,6 +504,32 @@ const zh = {
           subnetMask: '子网掩码',
           router: '路由器',
           none: '无'
+        },
+        interfaces: {
+          ethernet: '以太网',
+          wifi: 'Wi-Fi',
+          notPresent: '{{name}}：此设备上不存在',
+          noAddress: '无地址',
+          dhcp: 'DHCP',
+          static: '静态',
+          address: '地址',
+          gateway: '网关',
+          optional: '可选',
+          save: '保存',
+          invalidAddress: '请输入 CIDR 格式的地址，例如 192.168.1.20/24（前缀 1 到 32）',
+          hostNotAllowed: '地址不能是其子网的网络地址或广播地址',
+          invalidGateway: '请输入有效的 IPv4 网关，或留空',
+          gatewayOutsideSubnet: '网关必须位于该地址所在的子网内',
+          saveFailed: '更改网络设置失败',
+          confirmFailed: '确认更改失败',
+          changedTitle: '网络已更改',
+          changedDesc: '如果仍能访问此页面，请在 120 秒内确认，否则将恢复原有设置。',
+          countdown: '若不确认，将在 {{count}} 秒后恢复',
+          reverted: '时间已到，正在恢复原有设置',
+          newAddress: '新地址：',
+          confirmFromNew: '必须在新地址上确认此更改。',
+          confirm: '确认',
+          close: '关闭'
         }
       },
       tailscale: {

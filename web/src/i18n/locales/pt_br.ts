@@ -11,15 +11,18 @@ const pt_br = {
       login: 'Login',
       placeholderUsername: 'Nome de usuário',
       placeholderPassword: 'Senha',
+      placeholderCurrentPassword: 'Senha atual',
       placeholderPassword2: 'Por favor, digite a senha novamente',
       noEmptyUsername: 'Nome de usuário é obrigatório',
       noEmptyPassword: 'Senha é obrigatória',
+      passwordLength: 'A senha deve ter entre 8 e 72 caracteres',
       noAccount:
         'Falha ao obter informações do usuário, por favor atualize a página ou redefina a senha',
       invalidUser: 'Nome de usuário ou senha inválidos',
       locked: 'Muitos logins, tente novamente mais tarde',
       globalLocked: 'Sistema sob proteção, tente novamente mais tarde',
       error: 'Erro inesperado',
+      invalidCurrentPassword: 'A senha atual está incorreta',
       changePassword: 'Mudar Senha',
       changePasswordDesc: 'Para a segurança do seu dispositivo, por favor, mude a senha!',
       differentPassword: 'Senhas não conferem',
@@ -114,6 +117,7 @@ const pt_br = {
         description:
           'H.264 Direct e H.264 WebRTC estão sendo usados ao mesmo tempo. Isso pode causar rasgos na tela ou vídeo corrompido. Use apenas um modo H.264.'
       },
+      connecting: 'Conectando…',
       webrtcConnectionFailed: {
         title: 'Falha na conexão WebRTC',
         description: 'Verifique a conexão de rede ou alterne o modo de vídeo.'
@@ -136,6 +140,7 @@ const pt_br = {
       placeholder: 'Por favor, digite',
       submit: 'Enviar',
       virtual: 'Teclado',
+      virtualDescription: 'Teclado na tela que envia as teclas pressionadas ao host remoto',
       readClipboard: 'Ler da área de transferência',
       clipboardPermissionDenied:
         'Permissão da área de transferência negada. Permita o acesso à área de transferência no seu navegador.',
@@ -211,13 +216,16 @@ const pt_br = {
         tip2: 'No modo Somente-HID, a montagem de imagem está desativada',
         tip3: 'NanoKVM será reiniciado automaticamente após a troca de modos',
         enable: 'Habilitar modo Somente-HID',
-        disable: 'Desabilitar modo Somente-HID'
+        disable: 'Desabilitar modo Somente-HID',
+        setFailed: 'Não foi possível alterar o modo HID. Tente novamente mais tarde.',
+        getFailed: 'Não foi possível ler o modo HID atual. Tente novamente mais tarde.'
       }
     },
     image: {
       title: 'Imagens',
       loading: 'Carregando...',
       empty: 'Nada Encontrado',
+      emptyHint: 'Coloque arquivos .iso ou .img em /data no dispositivo, ou use o Image Downloader.',
       mountMode: 'Modo de montagem',
       mountFailed: 'Falha na Montagem',
       mountDesc:
@@ -255,6 +263,7 @@ const pt_br = {
     script: {
       title: 'Scripts',
       upload: 'Upload',
+      emptyHint: 'Nenhum script ainda. Envie um arquivo .sh ou .py com o botão Enviar.',
       run: 'Executar',
       runBackground: 'Executar em segundo plano',
       runFailed: 'Falha na execução',
@@ -402,6 +411,7 @@ const pt_br = {
         oled: {
           title: 'OLED',
           description: 'Desligar tela OLED após',
+          notDetected: 'Não detectado',
           0: 'Nunca',
           15: '15 seg',
           30: '30 seg',
@@ -511,6 +521,32 @@ const pt_br = {
           subnetMask: 'Máscara de sub-rede',
           router: 'Roteador',
           none: 'Nenhum'
+        },
+        interfaces: {
+          ethernet: 'Ethernet',
+          wifi: 'Wi-Fi',
+          notPresent: '{{name}}: não presente neste dispositivo',
+          noAddress: 'Sem endereço',
+          dhcp: 'DHCP',
+          static: 'Estático',
+          address: 'Endereço',
+          gateway: 'Gateway',
+          optional: 'Opcional',
+          save: 'Salvar',
+          invalidAddress: 'Informe um endereço no formato CIDR, por exemplo 192.168.1.20/24 (prefixo de 1 a 32)',
+          hostNotAllowed: 'O endereço não pode ser o endereço de rede nem de broadcast da sua sub-rede',
+          invalidGateway: 'Informe um gateway IPv4 válido ou deixe em branco',
+          gatewayOutsideSubnet: 'O gateway deve estar dentro da sub-rede do endereço',
+          saveFailed: 'Falha ao alterar as configurações de rede',
+          confirmFailed: 'Falha ao confirmar a alteração',
+          changedTitle: 'Rede alterada',
+          changedDesc: 'Se esta página ainda estiver acessível, confirme em até 120 s ou as configurações antigas serão restauradas.',
+          countdown: 'Revertendo em {{count}} s se não for confirmado',
+          reverted: 'O tempo acabou, as configurações antigas estão sendo restauradas',
+          newAddress: 'Novo endereço:',
+          confirmFromNew: 'A alteração deve ser confirmada a partir do novo endereço.',
+          confirm: 'Confirmar',
+          close: 'Fechar'
         }
       },
       tailscale: {
@@ -603,12 +639,33 @@ const pt_br = {
       account: {
         title: 'Conta',
         webAccount: 'Nome da Conta Web',
+        roles: {
+          admin: 'Administrador',
+          user: 'Usuário'
+        },
+        role: 'Função',
         password: 'Senha',
         updateBtn: 'Alterar',
         logoutBtn: 'Sair',
         logoutDesc: 'Tem certeza de que deseja sair?',
         okBtn: 'Sim',
-        cancelBtn: 'Não'
+        cancelBtn: 'Não',
+        users: {
+          title: 'Usuários',
+          create: 'Criar usuário',
+          enabled: 'Ativado',
+          disabled: 'Desativado',
+          deviceOwner: 'Proprietário do dispositivo',
+          resetPassword: 'Redefinir senha',
+          delete: 'Excluir',
+          deleteConfirm: 'Excluir este usuário e revogar todas as suas sessões?',
+          created: 'Usuário criado',
+          deleted: 'Usuário excluído',
+          passwordUpdated: 'Senha atualizada',
+          loadFailed: 'Falha ao carregar os usuários',
+          saveFailed: 'Falha ao salvar o usuário',
+          deleteFailed: 'Falha ao excluir o usuário'
+        }
       }
     },
     picoclaw: {

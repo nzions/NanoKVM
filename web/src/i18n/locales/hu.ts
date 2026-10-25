@@ -11,15 +11,18 @@ const hu = {
       login: 'Bejelentkezés',
       placeholderUsername: 'Adja meg a felhasználónevet',
       placeholderPassword: 'Adja meg a jelszót',
+      placeholderCurrentPassword: 'Jelenlegi jelszó',
       placeholderPassword2: 'Adja meg újra a jelszót',
       noEmptyUsername: 'A felhasználónév nem lehet üres',
       noEmptyPassword: 'A jelszó nem lehet üres',
+      passwordLength: 'A jelszónak 8 és 72 karakter közötti hosszúságúnak kell lennie',
       noAccount:
         'Nem sikerült megszerezni a felhasználói információkat, frissítse az oldalt vagy állítsa vissza a jelszót',
       invalidUser: 'Érvénytelen felhasználónév vagy jelszó',
       locked: 'Túl sok bejelentkezés, kérjük, próbálja újra később',
       globalLocked: 'A rendszer védelem alatt áll, próbálkozzon újra később',
       error: 'Váratlan hiba',
+      invalidCurrentPassword: 'A jelenlegi jelszó helytelen',
       changePassword: 'Jelszó megváltoztatása',
       changePasswordDesc:
         'Az eszköz biztonsága érdekében módosítsa a webes bejelentkezési jelszót.',
@@ -116,6 +119,7 @@ const hu = {
         description:
           'Az H.264 Direct és az H.264 WebRTC egyszerre van használatban. Ez képtörést vagy sérült videót okozhat. Csak egy H.264 módot használjon.'
       },
+      connecting: 'Csatlakozás…',
       webrtcConnectionFailed: {
         title: 'A WebRTC-kapcsolat sikertelen',
         description: 'Ellenőrizze a hálózati kapcsolatot, vagy váltson videómódot.'
@@ -138,6 +142,7 @@ const hu = {
       placeholder: 'Írja be',
       submit: 'Elküldés',
       virtual: 'Billentyűzet',
+      virtualDescription: 'Képernyő-billentyűzet, amely a billentyűleütéseket a távoli gépnek küldi',
       readClipboard: 'Olvasás a vágólapról',
       clipboardPermissionDenied:
         'A vágólap engedélye megtagadva. Kérjük, engedélyezze a vágólaphoz való hozzáférést a böngészőjében.',
@@ -213,13 +218,16 @@ const hu = {
         tip2: 'HID-Csak módban a képrögzítés le van tiltva',
         tip3: 'A NanoKVM automatikusan újraindul az üzemmódváltás után',
         enable: 'Engedélyezze a HID-Csak módot',
-        disable: 'A HID-Csak mód letiltása'
+        disable: 'A HID-Csak mód letiltása',
+        setFailed: 'Nem sikerült módosítani a HID módot. Próbálja újra később.',
+        getFailed: 'Nem sikerült beolvasni a jelenlegi HID módot. Próbálja újra később.'
       }
     },
     image: {
       title: 'Képek',
       loading: 'Betöltés...',
       empty: 'Nem található semmi',
+      emptyHint: 'Helyezzen .iso vagy .img fájlokat az eszköz /data mappájába, vagy használja az Image Downloadert.',
       mountMode: 'Felszerelési mód',
       mountFailed: 'Csatlakoztatás sikertelen',
       mountDesc:
@@ -257,6 +265,7 @@ const hu = {
     script: {
       title: 'Szkriptek',
       upload: 'Feltöltés',
+      emptyHint: 'Még nincs szkript. Tölts fel egy .sh vagy .py fájlt a Feltöltés gombbal.',
       run: 'Futtatás',
       runBackground: 'Háttérben futtatás',
       runFailed: 'Futtatás sikertelen',
@@ -404,6 +413,7 @@ const hu = {
         oled: {
           title: 'OLED',
           description: 'OLED screen automatically sleep',
+          notDetected: 'Nem észlelhető',
           0: 'Soha',
           15: '15 sec',
           30: '30 sec',
@@ -513,6 +523,32 @@ const hu = {
           subnetMask: 'Alhálózati maszk',
           router: 'Router',
           none: 'Nincs'
+        },
+        interfaces: {
+          ethernet: 'Ethernet',
+          wifi: 'Wi-Fi',
+          notPresent: '{{name}}: nincs jelen ezen az eszközön',
+          noAddress: 'Nincs cím',
+          dhcp: 'DHCP',
+          static: 'Statikus',
+          address: 'Cím',
+          gateway: 'Átjáró',
+          optional: 'Opcionális',
+          save: 'Mentés',
+          invalidAddress: 'Adjon meg egy címet CIDR formában, például 192.168.1.20/24 (előtag: 1–32)',
+          hostNotAllowed: 'A cím nem lehet az alhálózat hálózati vagy szórási címe',
+          invalidGateway: 'Adjon meg érvényes IPv4 átjárót, vagy hagyja üresen',
+          gatewayOutsideSubnet: 'Az átjárónak a cím alhálózatán belül kell lennie',
+          saveFailed: 'Nem sikerült módosítani a hálózati beállításokat',
+          confirmFailed: 'Nem sikerült megerősíteni a módosítást',
+          changedTitle: 'A hálózat módosult',
+          changedDesc: 'Ha ez az oldal még elérhető, erősítse meg 120 másodpercen belül, különben a régi beállítások visszaállnak.',
+          countdown: 'Visszaállítás {{count}} s múlva, ha nincs megerősítve',
+          reverted: 'Az idő lejárt, a régi beállítások visszaállítása folyamatban van',
+          newAddress: 'Új cím:',
+          confirmFromNew: 'A módosítást az új címről kell megerősíteni.',
+          confirm: 'Megerősítés',
+          close: 'Bezárás'
         }
       },
       tailscale: {
@@ -605,12 +641,33 @@ const hu = {
       account: {
         title: 'Fiók',
         webAccount: 'Webes fiók neve',
+        roles: {
+          admin: 'Rendszergazda',
+          user: 'Felhasználó'
+        },
+        role: 'Szerepkör',
         password: 'Jelszó',
         updateBtn: 'Update',
         logoutBtn: 'Kijelentkezés',
         logoutDesc: 'Biztos, hogy ki szeretne jelentkezni?',
         okBtn: 'Igen',
-        cancelBtn: 'Nem'
+        cancelBtn: 'Nem',
+        users: {
+          title: 'Felhasználók',
+          create: 'Felhasználó létrehozása',
+          enabled: 'Engedélyezve',
+          disabled: 'Letiltva',
+          deviceOwner: 'Eszköz tulajdonosa',
+          resetPassword: 'Jelszó visszaállítása',
+          delete: 'Törlés',
+          deleteConfirm: 'Törli ezt a felhasználót és visszavonja az összes munkamenetét?',
+          created: 'Felhasználó létrehozva',
+          deleted: 'Felhasználó törölve',
+          passwordUpdated: 'Jelszó frissítve',
+          loadFailed: 'Nem sikerült betölteni a felhasználókat',
+          saveFailed: 'Nem sikerült menteni a felhasználót',
+          deleteFailed: 'Nem sikerült törölni a felhasználót'
+        }
       }
     },
     picoclaw: {

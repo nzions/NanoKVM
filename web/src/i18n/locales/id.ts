@@ -11,15 +11,18 @@ const id = {
       login: 'Masuk',
       placeholderUsername: 'Silahkan masukkan username',
       placeholderPassword: 'Silahkan masukkan password',
+      placeholderCurrentPassword: 'Kata sandi saat ini',
       placeholderPassword2: 'Silahkan masukkan password again',
       noEmptyUsername: 'nama user tidak boleh kosong',
       noEmptyPassword: 'sandi  tidak boleh kosong',
+      passwordLength: 'Kata sandi harus terdiri dari 8 hingga 72 karakter',
       noAccount:
         'Gagal mendapatkan informasi user, silahkan segarkan halaman atau atur ulang sandi',
       invalidUser: 'invalid username or password',
       locked: 'Terlalu banyak login, silakan coba lagi nanti',
       globalLocked: 'Sistem dalam perlindungan, silakan coba lagi nanti',
       error: 'terjadi kesalahan tak terduga',
+      invalidCurrentPassword: 'Kata sandi saat ini salah',
       changePassword: 'Ganti Sandi',
       changePasswordDesc: 'Untuk keamanan perangkat Anda, silakan ubah kata sandi masuk web.',
       differentPassword: 'sandi tidak sesuai',
@@ -114,6 +117,7 @@ const id = {
         description:
           'H.264 Direct dan H.264 WebRTC sedang digunakan secara bersamaan. Hal ini dapat menyebabkan layar robek atau video rusak. Harap gunakan hanya satu mode H.264.'
       },
+      connecting: 'Menghubungkan…',
       webrtcConnectionFailed: {
         title: 'Koneksi WebRTC gagal',
         description: 'Periksa koneksi jaringan atau ganti mode video.'
@@ -136,6 +140,7 @@ const id = {
       placeholder: 'Silahkan isi',
       submit: 'Kirimkan',
       virtual: 'Keyboard',
+      virtualDescription: 'Keyboard di layar yang mengirim penekanan tombol ke host jarak jauh',
       readClipboard: 'Membaca dari Papan Klip',
       clipboardPermissionDenied:
         'Izin papan klip ditolak. Harap izinkan akses clipboard di browser Anda.',
@@ -211,13 +216,16 @@ const id = {
         tip2: 'Dalam mode HID-Only, pemasangan gambar dinonaktifkan',
         tip3: 'NanoKVM akan otomatis reboot setelah berpindah mode',
         enable: 'Aktifkan mode HID-Hanya',
-        disable: 'Nonaktifkan mode HID-Hanya'
+        disable: 'Nonaktifkan mode HID-Hanya',
+        setFailed: 'Tidak dapat mengubah mode HID. Coba lagi nanti.',
+        getFailed: 'Tidak dapat membaca mode HID saat ini. Coba lagi nanti.'
       }
     },
     image: {
       title: 'Gambar',
       loading: 'Memuat...',
       empty: 'Tidak ada yang ditemukan',
+      emptyHint: 'Letakkan file .iso atau .img di /data pada perangkat, atau gunakan Image Downloader.',
       mountMode: 'Mode pemasangan',
       mountFailed: 'Pemasangan Gagal',
       mountDesc:
@@ -255,6 +263,7 @@ const id = {
     script: {
       title: 'Script',
       upload: 'Mengunggah',
+      emptyHint: 'Belum ada skrip. Unggah file .sh atau .py dengan tombol Unggah.',
       run: 'Jalankan',
       runBackground: 'Jalankan di belakang',
       runFailed: 'Gagal menjalankan',
@@ -402,6 +411,7 @@ const id = {
         oled: {
           title: 'OLED',
           description: 'OLED screen automatically sleep',
+          notDetected: 'Tidak terdeteksi',
           0: 'Tidak pernah',
           15: '15 sec',
           30: '30 sec',
@@ -510,6 +520,32 @@ const id = {
           subnetMask: 'Subnet mask',
           router: 'Router',
           none: 'Tidak ada'
+        },
+        interfaces: {
+          ethernet: 'Ethernet',
+          wifi: 'Wi-Fi',
+          notPresent: '{{name}}: tidak ada di perangkat ini',
+          noAddress: 'Tanpa alamat',
+          dhcp: 'DHCP',
+          static: 'Statis',
+          address: 'Alamat',
+          gateway: 'Gateway',
+          optional: 'Opsional',
+          save: 'Simpan',
+          invalidAddress: 'Masukkan alamat dalam format CIDR, misalnya 192.168.1.20/24 (prefiks 1 sampai 32)',
+          hostNotAllowed: 'Alamat tidak boleh berupa alamat jaringan atau broadcast dari subnetnya',
+          invalidGateway: 'Masukkan gateway IPv4 yang valid, atau biarkan kosong',
+          gatewayOutsideSubnet: 'Gateway harus berada di dalam subnet alamat',
+          saveFailed: 'Gagal mengubah pengaturan jaringan',
+          confirmFailed: 'Gagal mengonfirmasi perubahan',
+          changedTitle: 'Jaringan berubah',
+          changedDesc: 'Jika halaman ini masih dapat diakses, konfirmasi dalam 120 dtk atau pengaturan lama akan dipulihkan.',
+          countdown: 'Dikembalikan dalam {{count}} dtk kecuali dikonfirmasi',
+          reverted: 'Waktu habis, pengaturan lama sedang dipulihkan',
+          newAddress: 'Alamat baru:',
+          confirmFromNew: 'Perubahan harus dikonfirmasi dari alamat baru.',
+          confirm: 'Konfirmasi',
+          close: 'Tutup'
         }
       },
       tailscale: {
@@ -602,12 +638,33 @@ const id = {
       account: {
         title: 'Akun',
         webAccount: 'Nama akun web',
+        roles: {
+          admin: 'Administrator',
+          user: 'Pengguna'
+        },
+        role: 'Peran',
         password: 'Kata sandi',
         updateBtn: 'Update',
         logoutBtn: 'Keluar',
         logoutDesc: 'Apakah Anda yakin ingin logout?',
         okBtn: 'Ya',
-        cancelBtn: 'Tidak'
+        cancelBtn: 'Tidak',
+        users: {
+          title: 'Pengguna',
+          create: 'Buat Pengguna',
+          enabled: 'Aktif',
+          disabled: 'Nonaktif',
+          deviceOwner: 'Pemilik perangkat',
+          resetPassword: 'Atur Ulang Kata Sandi',
+          delete: 'Hapus',
+          deleteConfirm: 'Hapus pengguna ini dan cabut semua sesinya?',
+          created: 'Pengguna dibuat',
+          deleted: 'Pengguna dihapus',
+          passwordUpdated: 'Kata sandi diperbarui',
+          loadFailed: 'Gagal memuat pengguna',
+          saveFailed: 'Gagal menyimpan pengguna',
+          deleteFailed: 'Gagal menghapus pengguna'
+        }
       }
     },
     picoclaw: {

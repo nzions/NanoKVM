@@ -11,14 +11,17 @@ const th = {
       login: 'เข้าสู่ระบบ',
       placeholderUsername: 'ชื่อผู้ใช้งาน',
       placeholderPassword: 'รห้สผ่าน',
+      placeholderCurrentPassword: 'รหัสผ่านปัจจุบัน',
       placeholderPassword2: 'ใส่รหัสผ่านอีกครั้ง',
       noEmptyUsername: 'ต้องใส่ชื่อผู้ใช้งาน',
       noEmptyPassword: 'ต้องใส้รหัสผ่าน',
+      passwordLength: 'รหัสผ่านต้องมีความยาว 8 ถึง 72 ตัวอักษร',
       noAccount: 'ไม่สามารถอ่านข้อมูลได้, โปรดรีเฟรชหน้าเว็บหรือรีเซ็ตรหัสผ่าน',
       invalidUser: 'ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง',
       locked: 'มีการเข้าสู่ระบบมากเกินไป โปรดลองอีกครั้งในภายหลัง',
       globalLocked: 'ระบบอยู่ระหว่างการป้องกัน โปรดลองอีกครั้งในภายหลัง',
       error: 'เกิดข้อผิดพลาด',
+      invalidCurrentPassword: 'รหัสผ่านปัจจุบันไม่ถูกต้อง',
       changePassword: 'เปลี่ยนรหัสผ่าน',
       changePasswordDesc: 'เพื่อความปลอดภัย, โปรดเปลี่ยนรหัสผ่าน!',
       differentPassword: 'รหัสผ่านไม่ตรงกัน',
@@ -111,6 +114,7 @@ const th = {
         description:
           'กำลังใช้งาน H.264 Direct และ H.264 WebRTC พร้อมกัน ซึ่งอาจทำให้ภาพฉีกขาดหรือวิดีโอเสียหาย โปรดใช้โหมด H.264 เพียงโหมดเดียว'
       },
+      connecting: 'กำลังเชื่อมต่อ…',
       webrtcConnectionFailed: {
         title: 'การเชื่อมต่อ WebRTC ล้มเหลว',
         description: 'โปรดตรวจสอบการเชื่อมต่อเครือข่ายหรือสลับโหมดวิดีโอ'
@@ -133,6 +137,7 @@ const th = {
       placeholder: 'กรุณาป้อน',
       submit: 'ยืนยัน',
       virtual: 'คีบอร์ด',
+      virtualDescription: 'แป้นพิมพ์บนหน้าจอที่ส่งการกดแป้นไปยังโฮสต์ระยะไกล',
       readClipboard: 'อ่านจากคลิปบอร์ด',
       clipboardPermissionDenied:
         'การอนุญาตคลิปบอร์ดถูกปฏิเสธ โปรดอนุญาตการเข้าถึงคลิปบอร์ดในเบราว์เซอร์ของคุณ',
@@ -205,13 +210,16 @@ const th = {
         tip2: 'ในโหมด HID-Only ดิสก์จะลองจะถูกปิดใช้งาน',
         tip3: 'NanoKVM จะรีบูตอัตโนมัติหลังจากเปลี่ยนโหมด',
         enable: 'เปิดใช้งานโหมด HID-Only',
-        disable: 'ปิดใช้งานโหมด HID-Only'
+        disable: 'ปิดใช้งานโหมด HID-Only',
+        setFailed: 'ไม่สามารถเปลี่ยนโหมด HID ได้ โปรดลองอีกครั้งในภายหลัง',
+        getFailed: 'ไม่สามารถอ่านโหมด HID ปัจจุบันได้ โปรดลองอีกครั้งในภายหลัง'
       }
     },
     image: {
       title: 'ดิสก์จำลอง',
       loading: 'กำลังโหลด...',
       empty: 'ไม่พบดิสก์',
+      emptyHint: 'วางไฟล์ .iso หรือ .img ไว้ใน /data บนอุปกรณ์ หรือใช้ Image Downloader',
       mountMode: 'โหมดเมาท์',
       mountFailed: 'การติดตั้งล้มเหลว',
       mountDesc: 'ในบางระบบ, จะต้อง eject ดิสก์จำลองก่อนที่จะใส่ดิสก์ใหม่.',
@@ -248,6 +256,7 @@ const th = {
     script: {
       title: 'สคริปต์',
       upload: 'อัปโหลด',
+      emptyHint: 'ยังไม่มีสคริปต์ อัปโหลดไฟล์ .sh หรือ .py ด้วยปุ่มอัปโหลด',
       run: 'เรียกใช้',
       runBackground: 'เรียกใช้ในพื้นหลัง',
       runFailed: 'การเรียกใช้ล้มเหลว',
@@ -394,6 +403,7 @@ const th = {
         oled: {
           title: 'OLED',
           description: 'เวลาก่อนจอ OLED จะปิดอัตโนมัติ',
+          notDetected: 'ตรวจไม่พบ',
           0: 'ไม่เลย',
           15: '15 วินาที',
           30: '30 วินาที',
@@ -502,6 +512,32 @@ const th = {
           subnetMask: 'ซับเน็ตมาสก์',
           router: 'เราเตอร์',
           none: 'ไม่มี'
+        },
+        interfaces: {
+          ethernet: 'Ethernet',
+          wifi: 'Wi-Fi',
+          notPresent: '{{name}}: ไม่มีในอุปกรณ์นี้',
+          noAddress: 'ไม่มีที่อยู่',
+          dhcp: 'DHCP',
+          static: 'คงที่',
+          address: 'ที่อยู่',
+          gateway: 'เกตเวย์',
+          optional: 'ไม่บังคับ',
+          save: 'บันทึก',
+          invalidAddress: 'ป้อนที่อยู่ในรูปแบบ CIDR เช่น 192.168.1.20/24 (พรีฟิกซ์ 1 ถึง 32)',
+          hostNotAllowed: 'ที่อยู่ต้องไม่ใช่ที่อยู่เครือข่ายหรือที่อยู่บรอดแคสต์ของซับเน็ต',
+          invalidGateway: 'ป้อนเกตเวย์ IPv4 ที่ถูกต้อง หรือเว้นว่างไว้',
+          gatewayOutsideSubnet: 'เกตเวย์ต้องอยู่ภายในซับเน็ตของที่อยู่',
+          saveFailed: 'เปลี่ยนการตั้งค่าเครือข่ายไม่สำเร็จ',
+          confirmFailed: 'ยืนยันการเปลี่ยนแปลงไม่สำเร็จ',
+          changedTitle: 'เปลี่ยนเครือข่ายแล้ว',
+          changedDesc: 'หากยังเข้าถึงหน้านี้ได้ โปรดยืนยันภายใน 120 วินาที มิฉะนั้นการตั้งค่าเดิมจะถูกคืนค่า',
+          countdown: 'จะย้อนกลับใน {{count}} วินาที หากไม่ยืนยัน',
+          reverted: 'หมดเวลา กำลังคืนค่าการตั้งค่าเดิม',
+          newAddress: 'ที่อยู่ใหม่:',
+          confirmFromNew: 'ต้องยืนยันการเปลี่ยนแปลงจากที่อยู่ใหม่',
+          confirm: 'ยืนยัน',
+          close: 'ปิด'
         }
       },
       tailscale: {
@@ -593,12 +629,33 @@ const th = {
       account: {
         title: 'บัญชี',
         webAccount: 'ชื่อผู้ใช้',
+        roles: {
+          admin: 'ผู้ดูแลระบบ',
+          user: 'ผู้ใช้'
+        },
+        role: 'บทบาท',
         password: 'รหัสผ่าน',
         updateBtn: 'ยืนยัน',
         logoutBtn: 'ออกจากระบบ',
         logoutDesc: 'คุณแน่ใจที่จะออกจากระบบหรือไม่?',
         okBtn: 'ใช่',
-        cancelBtn: 'ไม่ใช่'
+        cancelBtn: 'ไม่ใช่',
+        users: {
+          title: 'ผู้ใช้',
+          create: 'สร้างผู้ใช้',
+          enabled: 'เปิดใช้งาน',
+          disabled: 'ปิดใช้งาน',
+          deviceOwner: 'เจ้าของอุปกรณ์',
+          resetPassword: 'รีเซ็ตรหัสผ่าน',
+          delete: 'ลบ',
+          deleteConfirm: 'ลบผู้ใช้นี้และเพิกถอนเซสชันทั้งหมดของผู้ใช้หรือไม่',
+          created: 'สร้างผู้ใช้แล้ว',
+          deleted: 'ลบผู้ใช้แล้ว',
+          passwordUpdated: 'อัปเดตรหัสผ่านแล้ว',
+          loadFailed: 'โหลดผู้ใช้ไม่สำเร็จ',
+          saveFailed: 'บันทึกผู้ใช้ไม่สำเร็จ',
+          deleteFailed: 'ลบผู้ใช้ไม่สำเร็จ'
+        }
       }
     },
     picoclaw: {

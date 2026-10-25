@@ -53,8 +53,23 @@ function getWithExpiry(key: string) {
   return item.value;
 }
 
+// Language codes that were renamed to their ISO 639-1 form (cz -> cs, se -> sv).
+const LEGACY_LANGUAGES = new Map<string, string>([
+  ['cz', 'cs'],
+  ['se', 'sv']
+]);
+
 export function getLanguage() {
-  return localStorage.getItem(LANGUAGE_KEY);
+  const language = localStorage.getItem(LANGUAGE_KEY);
+
+  // one-time migration: keep the choice of users who stored the old code
+  const migrated = language ? LEGACY_LANGUAGES.get(language) : undefined;
+  if (migrated) {
+    localStorage.setItem(LANGUAGE_KEY, migrated);
+    return migrated;
+  }
+
+  return language;
 }
 
 export function setLanguage(language: string) {

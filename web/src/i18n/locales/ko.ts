@@ -11,15 +11,18 @@ const ko = {
       login: '로그인',
       placeholderUsername: '사용자 이름을 입력하세요.',
       placeholderPassword: '비밀번호를 입력하세요.',
+      placeholderCurrentPassword: '현재 비밀번호',
       placeholderPassword2: '비밀번호를 다시 입력하세요.',
       noEmptyUsername: '사용자 이름은 비어있을 수 없습니다.',
       noEmptyPassword: '비밀번호는 비어있을 수 없습니다.',
+      passwordLength: '비밀번호는 8자 이상 72자 이하여야 합니다',
       noAccount:
         '사용자 정보를 불러오는 데 실패했습니다. 페이지를 새로고침하거나 비밀번호를 초기화하세요.',
       invalidUser: '사용자 이름이나 비밀번호가 틀렸습니다.',
       locked: '로그인 횟수가 너무 많습니다. 나중에 다시 시도해 주세요.',
       globalLocked: '시스템이 보호 중입니다. 나중에 다시 시도해 주세요.',
       error: '알 수 없는 오류',
+      invalidCurrentPassword: '현재 비밀번호가 올바르지 않습니다',
       changePassword: '비밀번호 변경',
       changePasswordDesc: '보안을 위해 웹 로그인 비밀번호를 변경하세요.',
       differentPassword: '비밀번호가 서로 일치하지 않습니다.',
@@ -112,6 +115,7 @@ const ko = {
         description:
           'H.264 Direct와 H.264 WebRTC가 동시에 사용되고 있습니다. 화면 찢어짐이나 손상된 영상이 발생할 수 있습니다. H.264 모드는 하나만 사용하세요.'
       },
+      connecting: '연결 중…',
       webrtcConnectionFailed: {
         title: 'WebRTC 연결에 실패했습니다',
         description: '네트워크 연결을 확인하거나 비디오 모드를 전환하세요.'
@@ -134,6 +138,7 @@ const ko = {
       placeholder: '입력하세요',
       submit: '전송',
       virtual: '키보드',
+      virtualDescription: '키 입력을 원격 호스트로 전송하는 화상 키보드',
       readClipboard: '클립보드에서 읽기',
       clipboardPermissionDenied:
         '클립보드 권한이 거부되었습니다. 브라우저에서 클립보드 액세스를 허용해 주세요.',
@@ -206,13 +211,16 @@ const ko = {
         tip2: 'HID 전용 모드에서는 이미지 마운트가 비활성화됩니다',
         tip3: '모드 전환 후 NanoKVM이 자동으로 재부팅됩니다',
         enable: 'HID 전용 모드 활성화',
-        disable: 'HID 전용 모드 비활성화'
+        disable: 'HID 전용 모드 비활성화',
+        setFailed: 'HID 모드를 변경할 수 없습니다. 나중에 다시 시도하세요.',
+        getFailed: '현재 HID 모드를 읽을 수 없습니다. 나중에 다시 시도하세요.'
       }
     },
     image: {
       title: '이미지',
       loading: '불러오는 중...',
       empty: '아무것도 없습니다.',
+      emptyHint: '.iso 또는 .img 파일을 장치의 /data에 넣거나 Image Downloader를 사용하세요.',
       mountMode: '마운트 모드',
       mountFailed: '마운트 실패',
       mountDesc:
@@ -250,6 +258,7 @@ const ko = {
     script: {
       title: '스크립트',
       upload: '업로드',
+      emptyHint: '스크립트가 아직 없습니다. 업로드 버튼으로 .sh 또는 .py 파일을 업로드하세요.',
       run: '실행',
       runBackground: '백그라운드에서 실행',
       runFailed: '실행 실패',
@@ -396,6 +405,7 @@ const ko = {
         oled: {
           title: 'OLED',
           description: 'OLED 화면 자동 절전',
+          notDetected: '감지되지 않음',
           0: '사용 안 함',
           15: '15초',
           30: '30초',
@@ -505,6 +515,32 @@ const ko = {
           subnetMask: '서브넷 마스크',
           router: '라우터',
           none: '없음'
+        },
+        interfaces: {
+          ethernet: '이더넷',
+          wifi: 'Wi-Fi',
+          notPresent: '{{name}}: 이 장치에 없음',
+          noAddress: '주소 없음',
+          dhcp: 'DHCP',
+          static: '고정',
+          address: '주소',
+          gateway: '게이트웨이',
+          optional: '선택 사항',
+          save: '저장',
+          invalidAddress: 'CIDR 형식으로 주소를 입력하세요. 예: 192.168.1.20/24 (프리픽스 1~32)',
+          hostNotAllowed: '서브넷의 네트워크 주소 또는 브로드캐스트 주소는 사용할 수 없습니다',
+          invalidGateway: '올바른 IPv4 게이트웨이를 입력하거나 비워 두세요',
+          gatewayOutsideSubnet: '게이트웨이는 주소의 서브넷 안에 있어야 합니다',
+          saveFailed: '네트워크 설정 변경에 실패했습니다',
+          confirmFailed: '변경 확인에 실패했습니다',
+          changedTitle: '네트워크가 변경되었습니다',
+          changedDesc: '이 페이지에 계속 접속할 수 있다면 120초 이내에 확인하세요. 그렇지 않으면 이전 설정으로 복원됩니다.',
+          countdown: '확인하지 않으면 {{count}}초 후 되돌립니다',
+          reverted: '시간이 초과되어 이전 설정을 복원하는 중입니다',
+          newAddress: '새 주소:',
+          confirmFromNew: '변경은 새 주소에서 확인해야 합니다.',
+          confirm: '확인',
+          close: '닫기'
         }
       },
       tailscale: {
@@ -595,12 +631,33 @@ const ko = {
       account: {
         title: '계정',
         webAccount: '웹 계정',
+        roles: {
+          admin: '관리자',
+          user: '사용자'
+        },
+        role: '역할',
         password: '비밀번호',
         updateBtn: '업데이트',
         logoutBtn: '로그아웃',
         logoutDesc: '정말로 로그아웃 하시겠습니까?',
         okBtn: '네',
-        cancelBtn: '아니오'
+        cancelBtn: '아니오',
+        users: {
+          title: '사용자',
+          create: '사용자 만들기',
+          enabled: '사용',
+          disabled: '사용 안 함',
+          deviceOwner: '장치 소유자',
+          resetPassword: '비밀번호 재설정',
+          delete: '삭제',
+          deleteConfirm: '이 사용자를 삭제하고 모든 세션을 취소하시겠습니까?',
+          created: '사용자가 생성되었습니다',
+          deleted: '사용자가 삭제되었습니다',
+          passwordUpdated: '비밀번호가 업데이트되었습니다',
+          loadFailed: '사용자를 불러오지 못했습니다',
+          saveFailed: '사용자를 저장하지 못했습니다',
+          deleteFailed: '사용자를 삭제하지 못했습니다'
+        }
       }
     },
     picoclaw: {

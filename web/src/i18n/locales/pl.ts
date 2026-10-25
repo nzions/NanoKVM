@@ -11,15 +11,18 @@ const pl = {
       login: 'Logowanie',
       placeholderUsername: 'Wprowadź nazwę użykownika',
       placeholderPassword: 'wprowadź hasło',
+      placeholderCurrentPassword: 'Obecne hasło',
       placeholderPassword2: 'wprowadź hasło ponownie',
       noEmptyUsername: 'nazwa użykownika nie może być pusta',
       noEmptyPassword: 'hasło nie może być puste',
+      passwordLength: 'Hasło musi mieć od 8 do 72 znaków',
       noAccount:
         'Nie udało się uzyskać informacji o użytkowniku, odśwież stronę lub zresetuj hasło',
       invalidUser: 'Błędne hasło lub nazwa użykownika',
       locked: 'Zbyt wiele loginów, spróbuj ponownie później',
       globalLocked: 'System chroniony, spróbuj ponownie później',
       error: 'niespodziewany błąd',
+      invalidCurrentPassword: 'Obecne hasło jest nieprawidłowe',
       changePassword: 'Zmień Hasło',
       changePasswordDesc:
         'Dla bezpieczeństwa Twojego urządzenia, proszę zmień hasło do logowania w sieci.',
@@ -115,6 +118,7 @@ const pl = {
         description:
           'Strumienie H.264 Direct i H.264 WebRTC są używane jednocześnie. Może to powodować rozrywanie obrazu lub uszkodzenie wideo. Używaj tylko jednego trybu H.264.'
       },
+      connecting: 'Łączenie…',
       webrtcConnectionFailed: {
         title: 'Połączenie WebRTC nie powiodło się',
         description: 'Sprawdź połączenie sieciowe lub zmień tryb wideo.'
@@ -137,6 +141,7 @@ const pl = {
       placeholder: 'Proszę wprowadzić coś',
       submit: 'Prześlij',
       virtual: 'Klawiatura',
+      virtualDescription: 'Klawiatura ekranowa wysyłająca naciśnięcia klawiszy do zdalnego hosta',
       readClipboard: 'Czytaj ze schowka',
       clipboardPermissionDenied:
         'Odmowa dostępu do schowka. Zezwól na dostęp do schowka w przeglądarce.',
@@ -212,13 +217,16 @@ const pl = {
         tip2: 'W trybie HID-Only montowanie obrazu jest wyłączone',
         tip3: 'NanoKVM automatycznie uruchomi się ponownie po przełączeniu trybów',
         enable: 'Włącz tryb HID-Only',
-        disable: 'Wyłącz tryb HID-Tylko'
+        disable: 'Wyłącz tryb HID-Tylko',
+        setFailed: 'Nie udało się zmienić trybu HID. Spróbuj ponownie później.',
+        getFailed: 'Nie udało się odczytać bieżącego trybu HID. Spróbuj ponownie później.'
       }
     },
     image: {
       title: 'Obrazy',
       loading: 'Ładowanie...',
       empty: 'Nic nie znaleziono',
+      emptyHint: 'Umieść pliki .iso lub .img w /data na urządzeniu albo użyj Image Downloader.',
       mountMode: 'Tryb montowania',
       mountFailed: 'Nie udało się zamontować obrazu',
       mountDesc:
@@ -256,6 +264,7 @@ const pl = {
     script: {
       title: 'Skrypty',
       upload: 'Prześlij',
+      emptyHint: 'Brak skryptów. Prześlij plik .sh lub .py przyciskiem Prześlij.',
       run: 'Uruchom',
       runBackground: 'Uruchomiony w tle',
       runFailed: 'Uruchomienie nie powiodło się',
@@ -403,6 +412,7 @@ const pl = {
         oled: {
           title: 'OLED',
           description: 'OLED screen automatically sleep',
+          notDetected: 'Nie wykryto',
           0: 'Nigdy',
           15: '15 sec',
           30: '30 sec',
@@ -513,6 +523,32 @@ const pl = {
           subnetMask: 'Maska podsieci',
           router: 'Router',
           none: 'Brak'
+        },
+        interfaces: {
+          ethernet: 'Ethernet',
+          wifi: 'Wi-Fi',
+          notPresent: '{{name}}: brak na tym urządzeniu',
+          noAddress: 'Brak adresu',
+          dhcp: 'DHCP',
+          static: 'Statyczny',
+          address: 'Adres',
+          gateway: 'Brama',
+          optional: 'Opcjonalne',
+          save: 'Zapisz',
+          invalidAddress: 'Wpisz adres w formacie CIDR, na przykład 192.168.1.20/24 (prefiks od 1 do 32)',
+          hostNotAllowed: 'Adres nie może być adresem sieci ani adresem rozgłoszeniowym swojej podsieci',
+          invalidGateway: 'Wpisz prawidłową bramę IPv4 lub zostaw pole puste',
+          gatewayOutsideSubnet: 'Brama musi leżeć w podsieci adresu',
+          saveFailed: 'Nie udało się zmienić ustawień sieci',
+          confirmFailed: 'Nie udało się potwierdzić zmiany',
+          changedTitle: 'Sieć została zmieniona',
+          changedDesc: 'Jeśli ta strona jest nadal dostępna, potwierdź w ciągu 120 s, w przeciwnym razie zostaną przywrócone stare ustawienia.',
+          countdown: 'Przywrócenie za {{count}} s, o ile nie potwierdzisz',
+          reverted: 'Czas minął, trwa przywracanie starych ustawień',
+          newAddress: 'Nowy adres:',
+          confirmFromNew: 'Zmianę trzeba potwierdzić z nowego adresu.',
+          confirm: 'Potwierdź',
+          close: 'Zamknij'
         }
       },
       tailscale: {
@@ -605,12 +641,33 @@ const pl = {
       account: {
         title: 'Konto',
         webAccount: 'Nazwa konta web',
+        roles: {
+          admin: 'Administrator',
+          user: 'Użytkownik'
+        },
+        role: 'Rola',
         password: 'Hasło',
         updateBtn: 'Update',
         logoutBtn: 'Wyloguj',
         logoutDesc: 'Czy na pewno chcesz się wylogować?',
         okBtn: 'Tak',
-        cancelBtn: 'Nie'
+        cancelBtn: 'Nie',
+        users: {
+          title: 'Użytkownicy',
+          create: 'Utwórz użytkownika',
+          enabled: 'Włączony',
+          disabled: 'Wyłączony',
+          deviceOwner: 'Właściciel urządzenia',
+          resetPassword: 'Zresetuj hasło',
+          delete: 'Usuń',
+          deleteConfirm: 'Usunąć tego użytkownika i unieważnić wszystkie jego sesje?',
+          created: 'Użytkownik utworzony',
+          deleted: 'Użytkownik usunięty',
+          passwordUpdated: 'Hasło zaktualizowane',
+          loadFailed: 'Nie udało się wczytać użytkowników',
+          saveFailed: 'Nie udało się zapisać użytkownika',
+          deleteFailed: 'Nie udało się usunąć użytkownika'
+        }
       }
     },
     picoclaw: {

@@ -1,4 +1,4 @@
-const se = {
+const sv = {
   translation: {
     head: {
       desktop: 'Fjärrskrivbord',
@@ -11,14 +11,17 @@ const se = {
       login: 'Logga in',
       placeholderUsername: 'Användarnamn',
       placeholderPassword: 'Lösenord',
+      placeholderCurrentPassword: 'Nuvarande lösenord',
       placeholderPassword2: 'Vänligen ange lösenordet igen',
       noEmptyUsername: 'Användarnamn krävs',
       noEmptyPassword: 'Lösenord krävs',
+      passwordLength: 'Lösenordet måste vara mellan 8 och 72 tecken',
       noAccount: 'Kunde inte hämta användarinformation, uppdatera sidan eller återställ lösenordet',
       invalidUser: 'Ogiltigt användarnamn eller lösenord',
       locked: 'För många inloggningar, försök igen senare',
       globalLocked: 'System under skydd, försök igen senare',
       error: 'Oväntat fel',
+      invalidCurrentPassword: 'Det nuvarande lösenordet är felaktigt',
       changePassword: 'Byt lösenord',
       changePasswordDesc: 'För din enhets säkerhet, byt lösenord!',
       differentPassword: 'Lösenorden matchar inte',
@@ -111,6 +114,7 @@ const se = {
         description:
           'H.264 Direct och H.264 WebRTC används samtidigt. Detta kan orsaka skärmrivningar eller skadad video. Använd endast ett H.264-läge.'
       },
+      connecting: 'Ansluter…',
       webrtcConnectionFailed: {
         title: 'WebRTC-anslutningen misslyckades',
         description: 'Kontrollera nätverksanslutningen eller byt videoläge.'
@@ -133,6 +137,7 @@ const se = {
       placeholder: 'Ange text',
       submit: 'Skicka',
       virtual: 'Tangentbord',
+      virtualDescription: 'Skärmtangentbord som skickar tangenttryckningar till fjärrvärden',
       readClipboard: 'Läs från Urklipp',
       clipboardPermissionDenied:
         'Behörighet till Urklipp nekad. Vänligen tillåt åtkomst till Urklipp i din webbläsare.',
@@ -207,13 +212,16 @@ const se = {
         tip2: 'I Endast-HID-läge är avbildningsmontering inaktiverat',
         tip3: 'NanoKVM kommer automatiskt att starta om efter lägesbyte',
         enable: 'Aktivera Endast-HID-läge',
-        disable: 'Inaktivera Endast-HID-läge'
+        disable: 'Inaktivera Endast-HID-läge',
+        setFailed: 'Det gick inte att ändra HID-läge. Försök igen senare.',
+        getFailed: 'Det gick inte att läsa av aktuellt HID-läge. Försök igen senare.'
       }
     },
     image: {
       title: 'Avbildningar',
       loading: 'Laddar...',
       empty: 'Inget hittades',
+      emptyHint: 'Lägg .iso- eller .img-filer i /data på enheten, eller använd Image Downloader.',
       mountMode: 'Monteringsläge',
       mountFailed: 'Montering misslyckades',
       mountDesc:
@@ -251,6 +259,7 @@ const se = {
     script: {
       title: 'Skript',
       upload: 'Ladda upp',
+      emptyHint: 'Inga skript ännu. Ladda upp en .sh- eller .py-fil med knappen Ladda upp.',
       run: 'Kör',
       runBackground: 'Kör i bakgrunden',
       runFailed: 'Körning misslyckades',
@@ -398,6 +407,7 @@ const se = {
         oled: {
           title: 'OLED',
           description: 'Stäng av OLED-skärmen efter',
+          notDetected: 'Ej upptäckt',
           0: 'Aldrig',
           15: '15 sek',
           30: '30 sek',
@@ -508,6 +518,32 @@ const se = {
           subnetMask: 'Subnätmask',
           router: 'Router',
           none: 'Ingen'
+        },
+        interfaces: {
+          ethernet: 'Ethernet',
+          wifi: 'Wi-Fi',
+          notPresent: '{{name}}: finns inte på den här enheten',
+          noAddress: 'Ingen adress',
+          dhcp: 'DHCP',
+          static: 'Statisk',
+          address: 'Adress',
+          gateway: 'Gateway',
+          optional: 'Valfritt',
+          save: 'Spara',
+          invalidAddress: 'Ange en adress i CIDR-format, till exempel 192.168.1.20/24 (prefix 1 till 32)',
+          hostNotAllowed: 'Adressen får inte vara nätverks- eller broadcast-adressen för sitt undernät',
+          invalidGateway: 'Ange en giltig IPv4-gateway, eller lämna fältet tomt',
+          gatewayOutsideSubnet: 'Gatewayen måste ligga i adressens undernät',
+          saveFailed: 'Det gick inte att ändra nätverksinställningarna',
+          confirmFailed: 'Det gick inte att bekräfta ändringen',
+          changedTitle: 'Nätverket har ändrats',
+          changedDesc: 'Om den här sidan fortfarande är nåbar, bekräfta inom 120 s, annars återställs de gamla inställningarna.',
+          countdown: 'Återställs om {{count}} s om det inte bekräftas',
+          reverted: 'Tiden är ute, de gamla inställningarna återställs',
+          newAddress: 'Ny adress:',
+          confirmFromNew: 'Ändringen måste bekräftas från den nya adressen.',
+          confirm: 'Bekräfta',
+          close: 'Stäng'
         }
       },
       tailscale: {
@@ -599,12 +635,33 @@ const se = {
       account: {
         title: 'Konto',
         webAccount: 'Webbkonto-namn',
+        roles: {
+          admin: 'Administratör',
+          user: 'Användare'
+        },
+        role: 'Roll',
         password: 'Lösenord',
         updateBtn: 'Byt',
         logoutBtn: 'Logga ut',
         logoutDesc: 'Är du säker på att du vill logga ut?',
         okBtn: 'Ja',
-        cancelBtn: 'Nej'
+        cancelBtn: 'Nej',
+        users: {
+          title: 'Användare',
+          create: 'Skapa användare',
+          enabled: 'Aktiverad',
+          disabled: 'Inaktiverad',
+          deviceOwner: 'Enhetens ägare',
+          resetPassword: 'Återställ lösenord',
+          delete: 'Ta bort',
+          deleteConfirm: 'Ta bort den här användaren och återkalla alla dess sessioner?',
+          created: 'Användare skapad',
+          deleted: 'Användare borttagen',
+          passwordUpdated: 'Lösenord uppdaterat',
+          loadFailed: 'Det gick inte att läsa in användare',
+          saveFailed: 'Det gick inte att spara användaren',
+          deleteFailed: 'Det gick inte att ta bort användaren'
+        }
       }
     },
     picoclaw: {
@@ -785,4 +842,4 @@ const se = {
   }
 };
 
-export default se;
+export default sv;
