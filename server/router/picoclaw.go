@@ -24,7 +24,6 @@ const (
 	picoclawScreenshotPath       = "/screenshot"
 	picoclawActionsPath          = "/actions"
 	picoclawMCPPath              = "/mcp"
-	picoclawLoadImagePath        = "/load-image"
 )
 
 var picoclawLoopbackHTTPAllowedPaths = []string{
@@ -32,7 +31,6 @@ var picoclawLoopbackHTTPAllowedPaths = []string{
 	picoclawBasePath + picoclawRuntimeSessionPath,
 	picoclawBasePath + picoclawScreenshotPath,
 	picoclawBasePath + picoclawActionsPath,
-	picoclawBasePath + picoclawLoadImagePath,
 }
 
 func PicoclawLoopbackHTTPAllowedPaths() []string {
@@ -49,7 +47,7 @@ func picoclawRouter(r *gin.Engine, service *picoclaw.Service) {
 	localAPI.GET(picoclawScreenshotPath, service.Screenshot)
 	localAPI.POST(picoclawActionsPath, service.Actions)
 	localAPI.POST(picoclawMCPPath, service.MCPHandler)
-	localAPI.POST(picoclawLoadImagePath, service.LoadImage)
+
 	localAPI.GET(picoclawRuntimeSessionPath, service.GetRuntimeSession)
 
 	frontendAPI.POST(picoclawModelConfigPath, service.UpdateModelConfig)

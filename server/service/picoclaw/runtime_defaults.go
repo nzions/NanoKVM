@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
 	serverConfig "NanoKVM-Server/config"
@@ -23,16 +24,36 @@ type picoclawConfigDefault struct {
 	value any
 }
 
-var picoclawNanoKVMDefaults = []picoclawConfigDefault{
-	{path: []string{"agents", "defaults", "restrict_to_workspace"}, value: false},
-	{path: []string{"agents", "defaults", "allow_read_outside_workspace"}, value: true},
+// picoclawDisabledTools are the picoclaw built-in tools switched off
+// (tools.<name>.enabled=false) on every start: shell, file read/write, web,
+// scheduler-with-commands, sub-agents and skill installers. picoclaw is locked
+// down to driving the remote host's HID through the NanoKVM MCP server and
+// nothing else (F6). The key names follow picoclaw's config schema, which
+// lives in the closed binary and is not verifiable from this repo, so this is
+// defence in depth: the real control is the server refusing every non-HID
+// request that carries the internal token (middleware.LoopbackInternalTokenPermits).
+var picoclawDisabledTools = []string{
+	"exec", "cron",
+	"read_file", "write_file", "edit_file", "append_file", "list_dir", "send_file",
+	"web", "web_fetch",
+	"spawn", "subagent",
+	"install_skill", "find_skills",
+	"i2c", "spi",
+}
+
+// picoclawAllowedMCPServers are the only MCP servers picoclaw may keep.
+var picoclawAllowedMCPServers = []string{"nanokvm"}
+
+var picoclawNanoKVMDefaults = append([]picoclawConfigDefault{
+	{path: []string{"agents", "defaults", "restrict_to_workspace"}, value: true},
+	{path: []string{"agents", "defaults", "allow_read_outside_workspace"}, value: false},
 	{path: []string{"agents", "defaults", "tool_feedback", "enabled"}, value: true},
 	{path: []string{"gateway", "host"}, value: defaultPicoclawGatewayHost},
 	{path: []string{"gateway", "port"}, value: defaultPicoclawGatewayPort},
 	{path: []string{"gateway", "hot_reload"}, value: false},
-	{path: []string{"tools", "cron", "allow_command"}, value: true},
-	{path: []string{"tools", "exec", "allow_remote"}, value: true},
-	{path: []string{"tools", "exec", "enable_deny_patterns"}, value: false},
+	{path: []string{"tools", "cron", "allow_command"}, value: false},
+	{path: []string{"tools", "exec", "allow_remote"}, value: false},
+	{path: []string{"tools", "exec", "enable_deny_patterns"}, value: true},
 	{path: []string{"channel_list", "pico", "type"}, value: "pico"},
 	{path: []string{"channel_list", "pico", "settings", "allow_token_query"}, value: false},
 	{path: []string{"channel_list", "pico", "settings", "ping_interval"}, value: defaultPicoclawPingSec},
@@ -40,6 +61,17 @@ var picoclawNanoKVMDefaults = []picoclawConfigDefault{
 	{path: []string{"channel_list", "pico", "settings", "write_timeout"}, value: defaultPicoclawWriteSec},
 	{path: []string{"channel_list", "pico", "settings", "max_connections"}, value: defaultPicoclawMaxConns},
 	{path: []string{"tools", "mcp", "enabled"}, value: true},
+}, disabledToolDefaults()...)
+
+func disabledToolDefaults() []picoclawConfigDefault {
+	defaults := make([]picoclawConfigDefault, 0, len(picoclawDisabledTools))
+	for _, tool := range picoclawDisabledTools {
+		defaults = append(defaults, picoclawConfigDefault{
+			path:  []string{"tools", tool, "enabled"},
+			value: false,
+		})
+	}
+	return defaults
 }
 
 func ensurePicoclawStartupDefaults() error {
@@ -100,6 +132,7 @@ func applyPicoclawStartupDefaults(editor *picoclawConfigEditor) error {
 		return err
 	}
 	editor.setMCPServer("nanokvm", server)
+	editor.pruneMCPServers(picoclawAllowedMCPServers)
 	return nil
 }
 
@@ -194,6 +227,18 @@ func (e *picoclawConfigEditor) setMCPServer(name string, fields map[string]any) 
 		}
 		entry[key] = value
 		e.changed = true
+	}
+}
+
+// pruneMCPServers drops every MCP server not in keep: an operator-added MCP
+// server could hand the agent a shell or a filesystem.
+func (e *picoclawConfigEditor) pruneMCPServers(keep []string) {
+	servers := e.ensureObject("tools", "mcp", "servers")
+	for name := range servers {
+		if !slices.Contains(keep, name) {
+			delete(servers, name)
+			e.changed = true
+		}
 	}
 }
 

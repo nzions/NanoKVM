@@ -90,7 +90,11 @@ func (s *Service) startRuntimeContext(ctx context.Context) (string, string, *Pic
 	startCtx, cancel := context.WithTimeout(ctx, picoclawStartTimeout)
 	defer cancel()
 
-	output, execErr := exec.CommandContext(startCtx, "/bin/sh", scriptPath, "start").CombinedOutput()
+	// The script only starts picoclaw at boot when the operator enabled it;
+	// this call IS the operator's (or the persisted enable's) explicit start.
+	startCmd := exec.CommandContext(startCtx, "/bin/sh", scriptPath, "start")
+	startCmd.Env = append(os.Environ(), picoclawExplicitStartEnv+"=1")
+	output, execErr := startCmd.CombinedOutput()
 	trimmedOutput := strings.TrimSpace(string(output))
 	if execErr != nil {
 		if lifecycleErr := runtimeLifecycleOperationError(ctx); lifecycleErr != nil {

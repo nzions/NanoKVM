@@ -259,9 +259,3 @@ type SessionManager struct {
 	mu       sync.RWMutex
 	sessions map[string]*GatewaySession
 }
-
-type LoadImageRequest struct {
-	Path     string `json:"path"`
-	Prompt   string `json:"prompt"`
-	Filename string `json:"filename"`
-}

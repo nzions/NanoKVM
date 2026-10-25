@@ -58,8 +58,39 @@ func redirectHost(requestHost string, httpsPort string) string {
 	return host
 }
 
-func allowByLoopbackInternalToken(req *http.Request) bool {
+// loopbackInternalTokenAllowlist is the complete set of (method, path) pairs
+// the picoclaw internal token may reach. The token sits in picoclaw's own
+// config, so it is held by an LLM agent: it may drive the remote host's HID
+// (keyboard/mouse), look at the HDMI frame it is driving, read its own session
+// and ask the HID gadget to recover. Nothing else - no file read, no image
+// load, no management route. Any other request carrying a valid token is
+// refused 403. This is the control; the prompts and picoclaw's tool config are
+// only advice.
+var loopbackInternalTokenAllowlist = map[string]struct{}{
+	http.MethodGet + " /api/picoclaw/screenshot":      {}, // HDMI frame, the feedback for HID
+	http.MethodPost + " /api/picoclaw/actions":        {}, // HID: click/move/drag/scroll/type/hotkey
+	http.MethodPost + " /api/picoclaw/mcp":            {}, // kvm_screenshot + kvm_actions only
+	http.MethodGet + " /api/picoclaw/runtime/session": {}, // its own session id
+	http.MethodPost + " /api/internal/usb/recover":    {}, // HID gadget recovery
+}
+
+// LoopbackInternalTokenPermits reports whether the internal token may call
+// method+path at all.
+func LoopbackInternalTokenPermits(method string, path string) bool {
+	_, ok := loopbackInternalTokenAllowlist[method+" "+path]
+	return ok
+}
+
+// loopbackInternalTokenValid: a loopback caller with the right token. It says
+// nothing about WHAT the caller may do; see LoopbackInternalTokenPermits.
+func loopbackInternalTokenValid(req *http.Request) bool {
 	return req != nil && isLoopbackRemote(req.RemoteAddr) && hasValidLoopbackHTTPToken(req)
+}
+
+func allowByLoopbackInternalToken(req *http.Request) bool {
+	return loopbackInternalTokenValid(req) &&
+		req.URL != nil &&
+		LoopbackInternalTokenPermits(req.Method, req.URL.Path)
 }
 
 func isLoopbackAllowedPath(req *http.Request, allowedPaths map[string]struct{}) bool {

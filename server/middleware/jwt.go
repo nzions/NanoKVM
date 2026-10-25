@@ -134,10 +134,21 @@ func CurrentPrincipal(c *gin.Context) (Principal, bool) {
 	return principal, ok
 }
 
+// abortInternalTokenForbidden refuses a valid internal token on a route the
+// token may not reach (see loopbackInternalTokenAllowlist).
+func abortInternalTokenForbidden(c *gin.Context) {
+	c.JSON(http.StatusForbidden, "forbidden")
+	c.Abort()
+}
+
 func CheckLoopbackInternalToken() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if allowByLoopbackInternalToken(c.Request) {
 			c.Next()
+			return
+		}
+		if loopbackInternalTokenValid(c.Request) {
+			abortInternalTokenForbidden(c)
 			return
 		}
 		abortUnauthorized(c)
@@ -148,6 +159,10 @@ func CheckTokenOrLoopbackInternalToken() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if allowByLoopbackInternalToken(c.Request) {
 			c.Next()
+			return
+		}
+		if loopbackInternalTokenValid(c.Request) {
+			abortInternalTokenForbidden(c)
 			return
 		}
 

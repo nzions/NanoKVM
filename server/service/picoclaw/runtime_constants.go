@@ -5,9 +5,17 @@ import (
 )
 
 const (
-	picoclawBinaryPath  = "/usr/bin/picoclaw"
-	picoclawCacheDir    = "/root/.picoclaw-cache"
-	picoclawPIDFileName = ".picoclaw.pid"
+	picoclawBinaryPath = "/usr/bin/picoclaw"
+	// picoclawExplicitStartEnv tells S96picoclaw this start is not the boot-time
+	// init run, so the persisted enable need not be checked.
+	picoclawExplicitStartEnv = "NANOKVM_PICOCLAW_EXPLICIT"
+	picoclawCacheDir         = "/root/.picoclaw-cache"
+	picoclawPIDFileName      = ".picoclaw.pid"
+	// picoclawHomeDir is the gateway's home: owned by the unprivileged
+	// picoclaw user, not world-readable (it holds the model api key).
+	// picoclawLegacyHomeDir is where releases before F6 kept it, as root.
+	picoclawHomeDir       = "/etc/kvm/picoclaw"
+	picoclawLegacyHomeDir = "/root/.picoclaw"
 	// The runtime is fetched from <update base>/picoclaw/v<version>/<archive>
 	// with its signature at <archive URL>.sig. The signed name is
 	// picoclaw-<version>-riscv64 (updatesign.PicoclawName).

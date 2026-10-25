@@ -1,30 +1,67 @@
 #!/bin/sh
 
+# picoclaw is an LLM agent gateway. It is OFF by default and, when the
+# operator turns it on, runs as the unprivileged PICOCLAW_USER, never root:
+# its only job is to drive the remote host's keyboard/mouse through the
+# NanoKVM server (MCP over loopback, authenticated by the token in its own
+# config.json). It cannot read /etc/kvm/.picoclaw_internal_token (root, 0600)
+# and does not need to. The server refuses everything but HID for that token.
+
 BIN_PATH="${PICOCLAW_BIN_PATH:-/usr/bin/picoclaw}"
-LOG_FILE="${PICOCLAW_LOG_FILE:-/tmp/picoclaw.log}"
 BIN_NAME="$(basename "$BIN_PATH")"
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 
-resolve_user_home() {
-  user_name="$(id -un 2>/dev/null || echo root)"
-  user_home="$(awk -F: -v user="$user_name" '$1 == user { print $6; exit }' /etc/passwd)"
-  if [ -n "$user_home" ] && [ -d "$user_home" ]; then
-    printf '%s\n' "$user_home"
+# A dedicated system user, created on first start with busybox
+# `adduser -S -D -H` (no password, no login shell, no home skeleton).
+PICOCLAW_USER="${PICOCLAW_USER:-picoclaw}"
+PICOCLAW_ROOT_DIR="${PICOCLAW_ROOT_DIR:-/etc/kvm/picoclaw}"
+# The server (root) records "start at boot" here once the operator has
+# enabled picoclaw in the UI. Absent or false means off.
+INTENT_FILE="${PICOCLAW_INTENT_FILE:-/etc/kvm/picoclaw-runtime.json}"
+# The log lives in RAM, one generation is kept across restarts.
+LOG_DIR="${PICOCLAW_LOG_DIR:-/tmp/picoclaw-log}"
+LOG_FILE="${PICOCLAW_LOG_FILE:-$LOG_DIR/picoclaw.log}"
+LOG_MAX_BYTES=1048576
+
+# The boot-time init run (no NANOKVM_PICOCLAW_EXPLICIT) only starts picoclaw
+# if the operator enabled it. The server sets NANOKVM_PICOCLAW_EXPLICIT=1 when
+# the operator pressed start (or the server restores a persisted enable).
+intent_enabled() {
+  [ -f "$INTENT_FILE" ] || return 1
+  grep -Eq '"desired_running"[[:space:]]*:[[:space:]]*true' "$INTENT_FILE" 2>/dev/null
+}
+
+ensure_picoclaw_user() {
+  if id "$PICOCLAW_USER" >/dev/null 2>&1; then
     return 0
   fi
 
-  if [ -n "${HOME:-}" ] && [ -d "${HOME}" ]; then
-    printf '%s\n' "$HOME"
-    return 0
-  fi
+  adduser -S -D -H -h "$PICOCLAW_ROOT_DIR" -s /bin/false "$PICOCLAW_USER" >/dev/null 2>&1 || {
+    echo "failed to create user: $PICOCLAW_USER"
+    return 1
+  }
+  id "$PICOCLAW_USER" >/dev/null 2>&1
+}
 
-  printf '%s\n' "/root"
+# run_as_picoclaw '<sh snippet>' runs the snippet as PICOCLAW_USER. There is
+# deliberately no fallback to root: no way to drop privileges means no start.
+run_as_picoclaw() {
+  if command -v setuidgid >/dev/null 2>&1; then
+    setuidgid "$PICOCLAW_USER" /bin/sh -c "$1"
+    return $?
+  fi
+  if command -v su >/dev/null 2>&1; then
+    su -s /bin/sh "$PICOCLAW_USER" -c "$1"
+    return $?
+  fi
+  echo "no setuidgid or su: refusing to run picoclaw as root"
+  return 1
 }
 
 setup_picoclaw_home() {
-  USER_HOME="$(resolve_user_home)"
-  PICOCLAW_HOME="${PICOCLAW_HOME:-$USER_HOME/.picoclaw}"
-  HOME="$USER_HOME"
+  ensure_picoclaw_user || return 1
+
+  PICOCLAW_HOME="${PICOCLAW_HOME:-$PICOCLAW_ROOT_DIR}"
+  HOME="$PICOCLAW_HOME"
   export HOME
   export PICOCLAW_HOME
 
@@ -32,6 +69,19 @@ setup_picoclaw_home() {
     echo "failed to create picoclaw home: $PICOCLAW_HOME"
     return 1
   }
+  # The user must be able to reach its home through the parents.
+  [ "$(dirname "$PICOCLAW_HOME")" = "/etc/kvm" ] && chmod a+x /etc/kvm 2>/dev/null
+  # The server (root) writes config.json and .security.yml (model api key,
+  # internal token): hand everything to the user and keep it private.
+  chown -R "$PICOCLAW_USER" "$PICOCLAW_HOME" 2>/dev/null || {
+    echo "failed to chown picoclaw home: $PICOCLAW_HOME"
+    return 1
+  }
+  chmod 700 "$PICOCLAW_HOME"
+  for secret in "$PICOCLAW_HOME/config.json" "$PICOCLAW_HOME/.security.yml"; do
+    [ -e "$secret" ] && chmod 600 "$secret"
+  done
+
   PICOCLAW_PID_FILE="${PICOCLAW_PID_FILE:-$PICOCLAW_HOME/.picoclaw.pid}"
   export PICOCLAW_PID_FILE
 
@@ -39,6 +89,23 @@ setup_picoclaw_home() {
     echo "failed to enter picoclaw home: $PICOCLAW_HOME"
     return 1
   }
+}
+
+# Bounded log: one previous generation, rotated by rename only (root never
+# opens a file inside the user-owned directory); the user opens the new file.
+setup_log() {
+  mkdir -p "$LOG_DIR" || return 1
+  chown "$PICOCLAW_USER" "$LOG_DIR" || return 1
+  chmod 700 "$LOG_DIR"
+  if [ -e "$LOG_FILE" ]; then
+    mv -f "$LOG_FILE" "$LOG_FILE.1" 2>/dev/null || true
+  fi
+  size="$(wc -c <"$LOG_FILE.1" 2>/dev/null | tr -d '[:space:]')"
+  case "$size" in
+    ''|*[!0-9]*) ;;
+    *) [ "$size" -gt "$LOG_MAX_BYTES" ] && rm -f "$LOG_FILE.1" ;;
+  esac
+  return 0
 }
 
 setup_runtime_env() {
@@ -110,43 +177,12 @@ gateway_running_pid() {
   printf '%s\n' "$pid"
 }
 
-resolve_kvm_control_source() {
-  for candidate in \
-    "/kvmapp/picoclaw/skills/kvm-control" \
-    "/kvmapp/skills/kvm-control" \
-    "$SCRIPT_DIR/../../../picoclaw/skills/kvm-control"
-  do
-    if [ -d "$candidate" ] && [ -f "$candidate/SKILL.md" ]; then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  done
 
-  return 1
-}
-
-sync_kvm_control_skill() {
-  source_dir="$(resolve_kvm_control_source)" || {
-    echo "kvm-control skill source not found"
-    return 1
-  }
-
-  skills_dir="$PICOCLAW_HOME/workspace/skills"
-  target_dir="$skills_dir/kvm-control"
-  mkdir -p "$skills_dir" || {
-    echo "failed to create skills directory: $skills_dir"
-    return 1
-  }
-
-  rm -rf "$target_dir" || {
-    echo "failed to remove old kvm-control skill: $target_dir"
-    return 1
-  }
-
-  cp -R "$source_dir" "$target_dir" || {
-    echo "failed to copy kvm-control skill to $target_dir"
-    return 1
-  }
+# The kvm-control skill drives nanokvm-bridge.sh through a shell, which the
+# locked-down agent no longer has (and the bridge cannot read the root-only
+# internal token as this user). It is not installed; remove an old copy.
+remove_kvm_control_skill() {
+  rm -rf "$PICOCLAW_HOME/workspace/skills/kvm-control"
 }
 
 sync_agent_profile() {
@@ -168,9 +204,15 @@ sync_agent_profile() {
     echo "failed to copy agent profile to $target_file"
     return 1
   }
+  chown "$PICOCLAW_USER" "$workspace_dir" "$target_file" 2>/dev/null
 }
 
 start_service() {
+  if [ "${NANOKVM_PICOCLAW_EXPLICIT:-}" != "1" ] && ! intent_enabled; then
+    echo "picoclaw is disabled (enable it in the NanoKVM UI)"
+    return 0
+  fi
+
   setup_runtime_env || return 1
 
   if pid="$(gateway_running_pid)"; then
@@ -183,24 +225,52 @@ start_service() {
     return 1
   fi
 
-  "$BIN_PATH" gateway >>"$LOG_FILE" 2>&1 &
-  gateway_pid="$!"
+  setup_log || {
+    echo "failed to prepare picoclaw log directory: $LOG_DIR"
+    return 1
+  }
+
+  # su may stay as the parent of the gateway, so $! is not the gateway pid:
+  # find the gateway by its command line once it is up.
+  run_as_picoclaw "PICOCLAW_HOME='$PICOCLAW_HOME' HOME='$PICOCLAW_HOME' PICOCLAW_PID_FILE='$PICOCLAW_PID_FILE' exec '$BIN_PATH' gateway >>'$LOG_FILE' 2>&1" &
+  launcher_pid="$!"
+
+  count=0
+  gateway_pid=""
+  while [ "$count" -lt 5 ]; do
+    count=$((count + 1))
+    sleep 1
+    gateway_pid="$(find_gateway_pid 2>/dev/null)" && break
+    gateway_pid=""
+    kill -0 "$launcher_pid" 2>/dev/null || break
+  done
+  [ -n "$gateway_pid" ] || {
+    echo "picoclaw gateway did not start; see $LOG_FILE"
+    return 1
+  }
+
   printf '%s\n' "$gateway_pid" >"$PICOCLAW_PID_FILE" || {
     echo "failed to write picoclaw pid file: $PICOCLAW_PID_FILE"
     return 1
   }
+  chown "$PICOCLAW_USER" "$PICOCLAW_PID_FILE" 2>/dev/null
   echo "picoclaw gateway started (PID: $gateway_pid)"
 }
 
 onboard_service() {
   setup_runtime_env || return 1
-  "$BIN_PATH" onboard >>"$LOG_FILE" 2>&1 || return 1
-  sync_kvm_control_skill || return 1
+  setup_log || return 1
+  run_as_picoclaw "PICOCLAW_HOME='$PICOCLAW_HOME' HOME='$PICOCLAW_HOME' exec '$BIN_PATH' onboard >>'$LOG_FILE' 2>&1" || return 1
+  remove_kvm_control_skill
   sync_agent_profile || return 1
+  chown -R "$PICOCLAW_USER" "$PICOCLAW_HOME" 2>/dev/null
 }
 
 stop_service() {
-  setup_picoclaw_home || return 1
+  # Stopping must work on a box where the user was never created.
+  PICOCLAW_HOME="${PICOCLAW_HOME:-$PICOCLAW_ROOT_DIR}"
+  PICOCLAW_PID_FILE="${PICOCLAW_PID_FILE:-$PICOCLAW_HOME/.picoclaw.pid}"
+  export PICOCLAW_HOME PICOCLAW_PID_FILE
 
   pid="$(gateway_running_pid 2>/dev/null)" || {
     cleanup_stale_pid_file

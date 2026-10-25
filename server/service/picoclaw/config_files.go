@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
-	"os/user"
 	"path/filepath"
 	"strings"
 
@@ -130,17 +130,53 @@ func resolvePicoclawHome() (string, error) {
 		return home, nil
 	}
 
-	currentUser, err := user.Current()
-	if err == nil && currentUser.HomeDir != "" {
-		return filepath.Join(currentUser.HomeDir, ".picoclaw"), nil
+	// The gateway runs as an unprivileged user (S96picoclaw), so its home is
+	// not under /root. The server runs as root and reaches it by this path.
+	migrateLegacyPicoclawHome(picoclawLegacyHomeDir, picoclawHomeDir)
+	return picoclawHomeDir, nil
+}
+
+// migrateLegacyPicoclawHome moves a pre-F6 /root/.picoclaw (config, api key,
+// workspace) to the unprivileged home once, so an upgrade keeps the operator's
+// model config. Regular files and directories only; the legacy copy is
+// removed after a complete copy so no stale api key stays behind in /root.
+func migrateLegacyPicoclawHome(legacy string, home string) {
+	if _, err := os.Stat(filepath.Join(home, "config.json")); err == nil {
+		return
 	}
-	if home := strings.TrimSpace(os.Getenv("HOME")); home != "" {
-		return filepath.Join(home, ".picoclaw"), nil
+	if _, err := os.Stat(filepath.Join(legacy, "config.json")); err != nil {
+		return
 	}
-	if err != nil {
-		return "", fmt.Errorf("failed to resolve PICOCLAW_HOME: %w", err)
+	if err := os.MkdirAll(home, 0o700); err != nil {
+		return
 	}
-	return filepath.Join("/root", ".picoclaw"), nil
+
+	copyErr := filepath.WalkDir(legacy, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(legacy, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(home, rel)
+		switch {
+		case entry.IsDir():
+			return os.MkdirAll(target, 0o700)
+		case entry.Type().IsRegular():
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			return os.WriteFile(target, data, 0o600)
+		default:
+			return nil
+		}
+	})
+	if copyErr != nil {
+		return
+	}
+	_ = os.RemoveAll(legacy)
 }
 
 func expandPicoclawPath(path string) string {
