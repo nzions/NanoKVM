@@ -20,6 +20,7 @@ const MENU_DISABLED_ITEMS_KEY = 'nano-kvm-menu-disabled-items';
 const MENU_AUTO_HIDE_KEY = 'nano-kvm-menu-auto-hide';
 const KEYBOARD_LED_STATUS_VISIBLE_KEY = 'nano-kvm-keyboard-led-status-visible';
 const POWER_CONFIRM_KEY = 'nano-kvm-power-confirm';
+const THEME_KEY = 'nano-kvm-theme';
 
 type ItemWithExpiry = {
   value: string;
@@ -254,4 +255,15 @@ export function getPowerConfirm() {
 
 export function setPowerConfirm(enabled: boolean) {
   localStorage.setItem(POWER_CONFIRM_KEY, String(enabled));
+}
+
+export type ThemeMode = 'dark' | 'light' | 'system';
+
+export function getThemeMode(): ThemeMode {
+  const value = localStorage.getItem(THEME_KEY);
+  return value === 'light' || value === 'system' ? value : 'dark';
+}
+
+export function setThemeMode(mode: ThemeMode) {
+  localStorage.setItem(THEME_KEY, mode);
 }

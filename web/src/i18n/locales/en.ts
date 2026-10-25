@@ -375,6 +375,13 @@ const en = {
         languageDesc: 'Select the language for the interface',
         webTitle: 'Web Title',
         webTitleDesc: 'Customize the web page title',
+        theme: {
+          title: 'Theme',
+          desc: 'Dark, light, or follow the system setting',
+          dark: 'Dark',
+          light: 'Light',
+          system: 'System'
+        },
         menuBar: {
           title: 'Menu Bar',
           mode: 'Display Mode',
@@ -487,6 +494,20 @@ const en = {
           joinBtn: 'Join',
           confirmBtn: 'Ok',
           cancelBtn: 'Cancel'
+        },
+        firewall: {
+          title: 'Firewall',
+          description: 'Open: all ports are reachable. Drop: only the KVM service ports are allowed.',
+          tip: 'Drop blocks inbound connections to every port except the KVM web interface (HTTP/HTTPS), SSH, ping, DHCP, DNS (on the USB and Wi-Fi AP networks) and mDNS. Other services you run on the device become unreachable from the network.',
+          open: 'Open',
+          drop: 'Drop',
+          confirmTitle: 'Switch the firewall to Drop?',
+          confirmContent:
+            'Only the KVM service ports will stay reachable. Anything else listening on this device, for example a service you installed yourself, will no longer be reachable from the network. If the web interface runs on a custom port it is kept open. Continue?',
+          confirmOk: 'Switch to Drop',
+          confirmCancel: 'Cancel',
+          applied: 'Firewall mode applied',
+          failed: 'Failed to apply the firewall mode; the previous mode is kept'
         },
         tls: {
           description: 'Enable HTTPS protocol',
