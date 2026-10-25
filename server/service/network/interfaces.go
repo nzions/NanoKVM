@@ -314,16 +314,18 @@ func validateIfaceStatic(address, gateway string) (ifaceConfig, error) {
 	if !addr.Is4() {
 		return cfg, errors.New("only IPv4 is supported")
 	}
-	if prefix.Bits() < 1 || prefix.Bits() > 31 {
-		return cfg, errors.New("prefix length must be between 1 and 31")
+	if prefix.Bits() < 1 || prefix.Bits() > 32 {
+		return cfg, errors.New("prefix length must be between 1 and 32")
 	}
 	if err := checkIfaceHost(addr, "address"); err != nil {
 		return cfg, err
 	}
 
-	// A /31 is a point-to-point link (RFC 3021): both addresses are hosts.
+	// A /31 is a point-to-point link (RFC 3021): both addresses are hosts. A /32
+	// is a lone host whose gateway lies outside it (S30eth adds a host route).
 	network := prefix.Masked()
-	p2p := prefix.Bits() == 31
+	p2p := prefix.Bits() >= 31
+	host := prefix.Bits() == 32
 	if !p2p && addr == network.Addr() {
 		return cfg, errors.New("address is the network address")
 	}
@@ -342,7 +344,7 @@ func validateIfaceStatic(address, gateway string) (ifaceConfig, error) {
 		if err := checkIfaceHost(gw, "gateway"); err != nil {
 			return cfg, err
 		}
-		if !network.Contains(gw) {
+		if !host && !network.Contains(gw) {
 			return cfg, errors.New("gateway is not inside the address's network")
 		}
 		if gw == addr {

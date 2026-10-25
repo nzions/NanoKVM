@@ -152,11 +152,16 @@ EOF
             echo "wlan.nodhcp: ignoring invalid gateway" >&2
             continue
         fi
-        [ -z "$gw" ] && gw=$(calc_gw "$addr" "$netid")
+        # a /32 has no peer to guess: no gateway means no default route
+        [ -z "$gw" ] && [ "$netid" != 32 ] && gw=$(calc_gw "$addr" "$netid")
         arping -Dqc2 -Iwlan0 "$addr" || continue
         ip a add "$inet" brd + dev wlan0
-        ip r add default via "$gw" dev wlan0
-        printf 'nameserver %s\n' "$gw" >> /etc/resolv.conf
+        if [ -n "$gw" ]; then
+            # a /32's gateway is outside the subnet: reach it with a host route first
+            [ "$netid" = 32 ] && ip r add "$gw" dev wlan0
+            ip r add default via "$gw" dev wlan0
+            printf 'nameserver %s\n' "$gw" >> /etc/resolv.conf
+        fi
         return 0
     done < /boot/wlan.nodhcp
     return 1

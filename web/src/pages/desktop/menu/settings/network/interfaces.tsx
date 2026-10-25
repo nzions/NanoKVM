@@ -9,7 +9,7 @@ import { ipv4ToInt, isNetworkOrBroadcast, parseCidr, sameSubnet } from '@/lib/ci
 
 import { Wifi } from './wifi.tsx';
 
-const maxPrefix = 31;
+const maxPrefix = 32;
 
 function hostOf(address: string) {
   return address.split('/')[0];
@@ -75,7 +75,7 @@ const InterfacePanel = ({ info, onChanged }: PanelProps) => {
   function validate(): string {
     if (mode === 'dhcp') return '';
 
-    // the server accepts /1 to /31, a /31 being point-to-point (server/service/network/interfaces.go)
+    // the server accepts /1 to /32: /31 is point-to-point, /32 a lone host (server/service/network/interfaces.go)
     const cidr = parseCidr(address);
     if (!cidr || cidr.prefix > maxPrefix) return t('settings.network.interfaces.invalidAddress');
     if (isNetworkOrBroadcast(cidr.ip, cidr.prefix)) {
@@ -85,7 +85,8 @@ const InterfacePanel = ({ info, onChanged }: PanelProps) => {
     const gw = gateway.trim();
     if (gw) {
       if (ipv4ToInt(gw) === null) return t('settings.network.interfaces.invalidGateway');
-      if (!sameSubnet(gw, cidr.ip, cidr.prefix)) {
+      // a /32's gateway is always outside it
+      if (cidr.prefix < 32 && !sameSubnet(gw, cidr.ip, cidr.prefix)) {
         return t('settings.network.interfaces.gatewayOutsideSubnet');
       }
     }

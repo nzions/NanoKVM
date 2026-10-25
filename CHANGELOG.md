@@ -4,6 +4,7 @@
 
 * Settings → Network: a static address is entered as one CIDR field (e.g. 192.168.1.20/24) instead of separate address and netmask fields, and the static form opens prefilled with the interface's current address and gateway
 * A static address may be a /31 point-to-point link (RFC 3021): both addresses of the pair are usable, and with no gateway given the other address is used
+* A static address may be a /32: a gateway outside it is reached through a host route; with no gateway there is no default route
 
 ## 2.5.6 (2026-10-25)
 
