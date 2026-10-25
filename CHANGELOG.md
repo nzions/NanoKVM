@@ -1,3 +1,18 @@
+## 2.5.2 (2026-10-25)
+
+### Security
+
+* Default-DROP inbound firewall in its own chain (web, ssh, DHCP, mDNS, SSDP, usb0/AP DHCP+DNS, tailscale0 allowed; built in a scratch chain and swapped in before the policy closes; a failed load leaves the previous state)
+* PicoClaw is off by default, runs as the unprivileged `picoclaw` user with a private home in /etc/kvm/picoclaw, and its internal token reaches only HID routes (screenshot, actions, MCP, session, USB recover); shell, file, web, cron and skill tools are disabled in its config and the load-image route is gone
+* HDMI frame dimensions are bounded before any copy into encode buffers; bounded string copies in kvm_mmf
+
+### Bug Fixes
+
+* NanoKVM-Server and kvm_system run from /kvmapp under a restarting supervisor, and /dev/watchdog is fed when the board has one
+* Each device presents its own USB serial number instead of 0123456789ABCDEF
+* First-boot hardware detection is idempotent and reboots PCIe boards at most once, after the result is saved
+* Fixed the H.264 encoder copying every NV21 row to the same offset when the stride differs from the width
+
 ## 2.5.1 (2026-09-09)
 
 ### Features
