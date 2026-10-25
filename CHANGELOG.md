@@ -1,3 +1,9 @@
+## 2.5.4 (2026-10-25)
+
+### Bug Fixes
+
+* The network confirm dialog no longer repeats its title in the message
+
 ## 2.5.3 (2026-10-25)
 
 ### Features

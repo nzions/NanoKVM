@@ -528,7 +528,7 @@ const en = {
           confirmFailed: 'Failed to confirm the change',
           changedTitle: 'Network changed',
           changedDesc:
-            'Network changed. If this page is still reachable, confirm within 120 s or the old settings come back.',
+            'If this page is still reachable, confirm within 120 s or the old settings come back.',
           countdown: 'Reverting in {{count}} s unless confirmed',
           reverted: 'Time is up, the old settings are being restored',
           newAddress: 'New address:',
