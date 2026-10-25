@@ -1,3 +1,5 @@
+//go:build !nokvm
+
 package common
 
 /*
