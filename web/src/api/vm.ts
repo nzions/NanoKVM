@@ -240,3 +240,19 @@ export function setTLS(enabled: boolean) {
 export function reboot() {
   return http.post('/api/vm/system/reboot');
 }
+
+export type FirewallMode = 'open' | 'drop';
+
+export interface FirewallState {
+  mode: FirewallMode;
+}
+
+// get the inbound firewall mode
+export function getFirewall() {
+  return http.get('/api/vm/firewall');
+}
+
+// set the inbound firewall mode (the server applies it and answers only once it is applied)
+export function setFirewall(mode: FirewallMode) {
+  return http.post('/api/vm/firewall', { mode });
+}

@@ -73,6 +73,9 @@ func vmRouter(r *gin.Engine) {
 
 	admin.POST("/vm/tls", service.SetTls) // enable/disable TLS
 
+	admin.GET("/vm/firewall", service.GetFirewall)  // get firewall mode (open/drop)
+	admin.POST("/vm/firewall", service.SetFirewall) // set firewall mode and apply it
+
 	admin.GET("/vm/autostart", service.GetAutostart)              // get autostart list
 	admin.GET("/vm/autostart/:name", service.GetAutostartContent) // get autostart content
 	admin.DELETE("/vm/autostart/:name", service.DeleteAutostart)  // delete autostart script

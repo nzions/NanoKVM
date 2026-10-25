@@ -86,3 +86,25 @@ type InterfaceInfo struct {
 type GetInterfacesRsp struct {
 	Interfaces []InterfaceInfo `json:"interfaces"`
 }
+
+// FirewallMode is the inbound firewall mode: the `firewall:` key in
+// /etc/kvm/server.yaml, applied by kvmapp/system/nanokvm-firewall.
+type FirewallMode string
+
+const (
+	FirewallOpen FirewallMode = "open" // all ports reachable
+	FirewallDrop FirewallMode = "drop" // only the KVM's own service ports
+)
+
+// Valid reports whether m is one of the two known modes.
+func (m FirewallMode) Valid() bool {
+	return m == FirewallOpen || m == FirewallDrop
+}
+
+type GetFirewallRsp struct {
+	Mode FirewallMode `json:"mode"`
+}
+
+type SetFirewallReq struct {
+	Mode FirewallMode `json:"mode" form:"mode" validate:"required,oneof=open drop"`
+}

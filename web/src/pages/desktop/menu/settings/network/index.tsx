@@ -2,6 +2,7 @@ import { Divider } from 'antd';
 import { useTranslation } from 'react-i18next';
 
 import { DNS } from './dns.tsx';
+import { Firewall } from './firewall.tsx';
 import { Interfaces } from './interfaces.tsx';
 import { Tls } from './tls.tsx';
 
@@ -15,6 +16,7 @@ export const Network = () => {
 
       <div className="flex flex-col space-y-8">
         <Tls />
+        <Firewall />
         <Interfaces />
       </div>
 
