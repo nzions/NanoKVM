@@ -233,3 +233,40 @@ with `-kernel Image` and
 `-append 'root=/dev/vda2 rw console=ttyS0 init=/usr/bin/init'`. There is no
 initrd and no modules. The old 4-byte patch of Ubuntu's `linux-riscv` `vmlinuz`
 (`emu-image.sh --patch-kernel`) is gone.
+
+## sd-image.sh: a flashable microSD image for real hardware
+
+`sd-image.sh` is the real-device counterpart of `emu-image.sh`. It takes
+Sipeed's stock image and one of our signed releases and writes an image that
+boots what an OTA of that release leaves on a stock device. The kernel, boot
+partition, musl loaders and sysvinit stay stock (none of `emu-image.sh`'s
+emulator edits apply). No root, no loop mount: dd cut-out of partition 2,
+`debugfs -w`, `e2fsck`, dd splice back, then a read-back of the whole `/kvmapp`
+tree against the release.
+
+```bash
+scripts/sd-image.sh [--stock-sha256 <hex>] [--sha256 <hex>] \
+    <20260610_NanoKVM_Rev1_4_3.img> <nanokvm_2.5.12.tar.gz> <out.img>
+```
+
+- Both inputs are verified by sha256 (stock: the 1.4.3 image is the default;
+  tarball: `--sha256` or the `<tarball>.sha256` next to it) and the tarball by
+  the updater's rules (one `nanokvm_<ver>/` root, only directories and regular
+  files, riscv64 server and `kvm_system`, `version` matches).
+- The stock `/kvmapp` is removed and the release tree is installed in its
+  place (files 0755, root:root). `kvm_new_app` stays in the tree and
+  `kvm_new_img` is carried over from the stock image, so `kvm_system` runs its
+  normal first-boot steps. The release's `S00kmod S01fs S03usbdev S15kvmhwd
+  S30eth S50sshd S95nanokvm` (and `S30wifi`) are copied to `/etc/init.d`, the
+  copies `new_app_init` makes, so the first boot already runs our supervised
+  `S95nanokvm`, firewall step and boot recovery.
+- No credential is written: `/etc/kvm/pwd`, `initial.pass`, `root.pass` and
+  `server.yaml` do not exist in the image. On first boot the server seeds the
+  `admin` owner with a random password, shows it on the OLED, stores it in
+  `/etc/kvm/initial.pass` (0600), sets it as the root password too, and the
+  owner must change it at first login. `/etc/kvm/ssh_stop` stays as the stock
+  image ships it (sshd off until enabled in the UI).
+- The result cannot be boot-tested under QEMU: the stock kernel and xthead
+  loaders need the SG2002's C906 vector unit and cvi video hardware.
+- Flash the (xz-decompressed) image to the card, for example
+  `dd if=nanokvm-cube-2.5.12-sd.img of=/dev/rdiskN bs=4m` on macOS.
