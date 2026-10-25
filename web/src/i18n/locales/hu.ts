@@ -381,6 +381,13 @@ const hu = {
         languageDesc: 'Válassza ki a felület nyelvét',
         webTitle: 'Webcím',
         webTitleDesc: 'A weboldal címének testreszabása',
+        theme: {
+          title: 'Téma',
+          desc: 'Sötét, világos, vagy a rendszerbeállítás követése',
+          dark: 'Sötét',
+          light: 'Világos',
+          system: 'Rendszer'
+        },
         menuBar: {
           title: 'Menüsor',
           mode: 'Megjelenítési mód',
@@ -495,6 +502,19 @@ const hu = {
           joinBtn: 'Csatlakozás',
           confirmBtn: 'OK',
           cancelBtn: 'Mégse'
+        },
+        firewall: {
+          title: 'Tűzfal',
+          description: 'Nyitott: minden port elérhető. Eldobás: csak a KVM szolgáltatás portjai engedélyezettek.',
+          tip: 'Az Eldobás blokkolja a bejövő kapcsolatokat minden portra, kivéve a KVM webes felületét (HTTP/HTTPS), az SSH-t, a pinget, a DHCP-t, a DNS-t (az USB és a Wi-Fi AP hálózatokon) és az mDNS-t. Az eszközön futó egyéb szolgáltatások nem lesznek elérhetők a hálózatról.',
+          open: 'Nyitott',
+          drop: 'Eldobás',
+          confirmTitle: 'Átállítja a tűzfalat Eldobás módra?',
+          confirmContent: 'Csak a KVM szolgáltatás portjai maradnak elérhetők. Minden más, ami ezen az eszközön figyel, például egy Ön által telepített szolgáltatás, nem lesz elérhető a hálózatról. Ha a webes felület egyéni porton fut, az nyitva marad. Folytatja?',
+          confirmOk: 'Váltás Eldobás módra',
+          confirmCancel: 'Mégse',
+          applied: 'Tűzfal mód alkalmazva',
+          failed: 'A tűzfal módját nem sikerült alkalmazni; az előző mód marad érvényben'
         },
         tls: {
           description: 'HTTPS protokoll engedélyezése',

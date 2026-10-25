@@ -377,6 +377,13 @@ const ca = {
         languageDesc: "Seleccioneu l'idioma per a la interfície",
         webTitle: 'Títol web',
         webTitleDesc: 'Personalitza el títol de la pàgina',
+        theme: {
+          title: 'Tema',
+          desc: 'Fosc, clar o segons la configuració del sistema',
+          dark: 'Fosc',
+          light: 'Clar',
+          system: 'Sistema'
+        },
         menuBar: {
           title: 'Barra de menús',
           mode: 'Mode de visualització',
@@ -492,6 +499,19 @@ const ca = {
           joinBtn: 'Connecta',
           confirmBtn: "D'acord",
           cancelBtn: 'Cancel·la'
+        },
+        firewall: {
+          title: 'Tallafocs',
+          description: 'Obert: tots els ports són accessibles. Descarta: només es permeten els ports del servei KVM.',
+          tip: 'Descarta bloqueja les connexions entrants a tots els ports excepte la interfície web del KVM (HTTP/HTTPS), SSH, ping, DHCP, DNS (a les xarxes USB i AP Wi-Fi) i mDNS. Els altres serveis que executeu al dispositiu deixaran de ser accessibles des de la xarxa.',
+          open: 'Obert',
+          drop: 'Descarta',
+          confirmTitle: 'Canviar el tallafocs a Descarta?',
+          confirmContent: 'Només els ports del servei KVM continuaran accessibles. Qualsevol altra cosa que escolti en aquest dispositiu, per exemple un servei instal·lat per vosaltres, deixarà de ser accessible des de la xarxa. Si la interfície web s\'executa en un port personalitzat, es manté oberta. Voleu continuar?',
+          confirmOk: 'Canvia a Descarta',
+          confirmCancel: 'Cancel·la',
+          applied: 'Mode del tallafocs aplicat',
+          failed: 'No s\'ha pogut aplicar el mode del tallafocs; es manté el mode anterior'
         },
         tls: {
           description: 'Activa el protocol HTTPS',

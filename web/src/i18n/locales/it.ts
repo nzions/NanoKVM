@@ -381,6 +381,13 @@ const it = {
         languageDesc: "Seleziona la lingua per l'interfaccia",
         webTitle: 'Titolo web',
         webTitleDesc: 'Personalizza il titolo della pagina web',
+        theme: {
+          title: 'Tema',
+          desc: 'Scuro, chiaro o secondo l\'impostazione di sistema',
+          dark: 'Scuro',
+          light: 'Chiaro',
+          system: 'Sistema'
+        },
         menuBar: {
           title: 'Barra dei menu',
           mode: 'Modalità di visualizzazione',
@@ -497,6 +504,19 @@ const it = {
           joinBtn: 'Connetti',
           confirmBtn: 'OK',
           cancelBtn: 'Annulla'
+        },
+        firewall: {
+          title: 'Firewall',
+          description: 'Aperto: tutte le porte sono raggiungibili. Drop: sono consentite solo le porte del servizio KVM.',
+          tip: 'Drop blocca le connessioni in ingresso verso tutte le porte tranne l\'interfaccia web KVM (HTTP/HTTPS), SSH, ping, DHCP, DNS (sulle reti USB e AP Wi-Fi) e mDNS. Gli altri servizi eseguiti sul dispositivo non saranno più raggiungibili dalla rete.',
+          open: 'Aperto',
+          drop: 'Drop',
+          confirmTitle: 'Passare il firewall a Drop?',
+          confirmContent: 'Solo le porte del servizio KVM resteranno raggiungibili. Tutto il resto in ascolto su questo dispositivo, ad esempio un servizio installato da te, non sarà più raggiungibile dalla rete. Se l\'interfaccia web usa una porta personalizzata, resta aperta. Continuare?',
+          confirmOk: 'Passa a Drop',
+          confirmCancel: 'Annulla',
+          applied: 'Modalità firewall applicata',
+          failed: 'Impossibile applicare la modalità firewall; viene mantenuta la modalità precedente'
         },
         tls: {
           description: 'Abilita protocollo HTTPS',

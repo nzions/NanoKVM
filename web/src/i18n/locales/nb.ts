@@ -378,6 +378,13 @@ const nb = {
         languageDesc: 'Velg språket for grensesnittet',
         webTitle: 'Netttittel',
         webTitleDesc: 'Tilpass nettsidetittelen',
+        theme: {
+          title: 'Tema',
+          desc: 'Mørk, lys eller følg systeminnstillingen',
+          dark: 'Mørk',
+          light: 'Lys',
+          system: 'System'
+        },
         menuBar: {
           title: 'Menylinje',
           mode: 'Visningsmodus',
@@ -491,6 +498,19 @@ const nb = {
           joinBtn: 'Koble til',
           confirmBtn: 'OK',
           cancelBtn: 'Avbryt'
+        },
+        firewall: {
+          title: 'Brannmur',
+          description: 'Åpen: alle porter er tilgjengelige. Drop: bare KVM-tjenestens porter er tillatt.',
+          tip: 'Drop blokkerer innkommende tilkoblinger til alle porter unntatt KVM-nettgrensesnittet (HTTP/HTTPS), SSH, ping, DHCP, DNS (på USB- og Wi-Fi AP-nettverkene) og mDNS. Andre tjenester du kjører på enheten blir utilgjengelige fra nettverket.',
+          open: 'Åpen',
+          drop: 'Drop',
+          confirmTitle: 'Bytte brannmuren til Drop?',
+          confirmContent: 'Bare KVM-tjenestens porter forblir tilgjengelige. Alt annet som lytter på denne enheten, for eksempel en tjeneste du har installert selv, blir utilgjengelig fra nettverket. Hvis nettgrensesnittet kjører på en egendefinert port, holdes den åpen. Fortsette?',
+          confirmOk: 'Bytt til Drop',
+          confirmCancel: 'Avbryt',
+          applied: 'Brannmurmodus er tatt i bruk',
+          failed: 'Kunne ikke ta i bruk brannmurmodus; forrige modus beholdes'
         },
         tls: {
           description: 'Aktiver HTTPS-protokoll',

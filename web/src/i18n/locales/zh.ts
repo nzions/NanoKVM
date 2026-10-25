@@ -364,6 +364,13 @@ const zh = {
         languageDesc: '选择界面语言',
         webTitle: '网页标题',
         webTitleDesc: '自定义网站页面标题',
+        theme: {
+          title: '主题',
+          desc: '深色、浅色或跟随系统设置',
+          dark: '深色',
+          light: '浅色',
+          system: '跟随系统'
+        },
         menuBar: {
           title: '菜单栏',
           mode: '显示方式',
@@ -476,6 +483,19 @@ const zh = {
           joinBtn: '加入',
           confirmBtn: '确定',
           cancelBtn: '取消'
+        },
+        firewall: {
+          title: '防火墙',
+          description: '开放：所有端口均可访问。丢弃：仅允许 KVM 服务端口。',
+          tip: '丢弃会阻止除 KVM Web 界面（HTTP/HTTPS）、SSH、ping、DHCP、DNS（USB 和 Wi-Fi AP 网络）以及 mDNS 之外所有端口的入站连接。您在设备上运行的其他服务将无法从网络访问。',
+          open: '开放',
+          drop: '丢弃',
+          confirmTitle: '将防火墙切换为丢弃模式？',
+          confirmContent: '仅 KVM 服务端口保持可访问。此设备上监听的其他任何内容，例如您自行安装的服务，将无法再从网络访问。如果 Web 界面运行在自定义端口上，该端口会保持开放。是否继续？',
+          confirmOk: '切换为丢弃',
+          confirmCancel: '取消',
+          applied: '防火墙模式已应用',
+          failed: '应用防火墙模式失败，已保留之前的模式'
         },
         tls: {
           description: '启用 HTTPS 协议',

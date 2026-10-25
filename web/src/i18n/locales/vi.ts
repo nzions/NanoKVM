@@ -376,6 +376,13 @@ const vi = {
         languageDesc: 'Chọn ngôn ngữ cho giao diện',
         webTitle: 'Tiêu đề trang web',
         webTitleDesc: 'Tùy chỉnh tiêu đề trang web',
+        theme: {
+          title: 'Giao diện',
+          desc: 'Tối, sáng hoặc theo cài đặt hệ thống',
+          dark: 'Tối',
+          light: 'Sáng',
+          system: 'Hệ thống'
+        },
         menuBar: {
           title: 'Thanh menu',
           mode: 'Chế độ hiển thị',
@@ -490,6 +497,19 @@ const vi = {
           joinBtn: 'Tham gia',
           confirmBtn: 'OK',
           cancelBtn: 'Hủy'
+        },
+        firewall: {
+          title: 'Tường lửa',
+          description: 'Mở: mọi cổng đều truy cập được. Drop: chỉ cho phép các cổng của dịch vụ KVM.',
+          tip: 'Drop chặn các kết nối đến mọi cổng ngoại trừ giao diện web KVM (HTTP/HTTPS), SSH, ping, DHCP, DNS (trên mạng USB và Wi-Fi AP) và mDNS. Các dịch vụ khác bạn chạy trên thiết bị sẽ không thể truy cập được từ mạng.',
+          open: 'Mở',
+          drop: 'Drop',
+          confirmTitle: 'Chuyển tường lửa sang Drop?',
+          confirmContent: 'Chỉ các cổng của dịch vụ KVM vẫn truy cập được. Mọi thứ khác đang lắng nghe trên thiết bị này, ví dụ dịch vụ do bạn tự cài đặt, sẽ không còn truy cập được từ mạng. Nếu giao diện web chạy trên cổng tùy chỉnh, cổng đó vẫn được giữ mở. Tiếp tục?',
+          confirmOk: 'Chuyển sang Drop',
+          confirmCancel: 'Hủy',
+          applied: 'Đã áp dụng chế độ tường lửa',
+          failed: 'Không thể áp dụng chế độ tường lửa; giữ nguyên chế độ trước đó'
         },
         tls: {
           description: 'Bật giao thức HTTPS',

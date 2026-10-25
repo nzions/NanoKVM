@@ -382,6 +382,13 @@ const nl = {
         languageDesc: 'Selecteer de taal voor de interface',
         webTitle: 'Webtitel',
         webTitleDesc: 'Pas de titel van de webpagina aan',
+        theme: {
+          title: 'Thema',
+          desc: 'Donker, licht of de systeeminstelling volgen',
+          dark: 'Donker',
+          light: 'Licht',
+          system: 'Systeem'
+        },
         menuBar: {
           title: 'Menubalk',
           mode: 'Weergavemodus',
@@ -499,6 +506,19 @@ const nl = {
           joinBtn: 'Verbinden',
           confirmBtn: 'OK',
           cancelBtn: 'Annuleren'
+        },
+        firewall: {
+          title: 'Firewall',
+          description: 'Open: alle poorten zijn bereikbaar. Drop: alleen de poorten van de KVM-service zijn toegestaan.',
+          tip: 'Drop blokkeert inkomende verbindingen naar alle poorten behalve de KVM-webinterface (HTTP/HTTPS), SSH, ping, DHCP, DNS (op de USB- en Wi-Fi AP-netwerken) en mDNS. Andere services die u op het apparaat draait, zijn niet meer bereikbaar vanaf het netwerk.',
+          open: 'Open',
+          drop: 'Drop',
+          confirmTitle: 'Firewall naar Drop zetten?',
+          confirmContent: 'Alleen de poorten van de KVM-service blijven bereikbaar. Al het andere dat op dit apparaat luistert, bijvoorbeeld een service die u zelf hebt geïnstalleerd, is niet meer bereikbaar vanaf het netwerk. Als de webinterface op een aangepaste poort draait, blijft die open. Doorgaan?',
+          confirmOk: 'Naar Drop schakelen',
+          confirmCancel: 'Annuleren',
+          applied: 'Firewallmodus toegepast',
+          failed: 'Firewallmodus toepassen mislukt; de vorige modus blijft behouden'
         },
         tls: {
           description: 'HTTPS-protocol inschakelen',

@@ -374,6 +374,13 @@ const ko = {
         languageDesc: '인터페이스 언어를 선택하세요',
         webTitle: '웹 제목',
         webTitleDesc: '웹 페이지 제목 사용자 지정',
+        theme: {
+          title: '테마',
+          desc: '다크, 라이트 또는 시스템 설정 따르기',
+          dark: '다크',
+          light: '라이트',
+          system: '시스템'
+        },
         menuBar: {
           title: '메뉴 바',
           mode: '표시 모드',
@@ -487,6 +494,19 @@ const ko = {
           joinBtn: '연결',
           confirmBtn: '확인',
           cancelBtn: '취소'
+        },
+        firewall: {
+          title: '방화벽',
+          description: '열림: 모든 포트에 접근할 수 있습니다. 차단: KVM 서비스 포트만 허용됩니다.',
+          tip: '차단은 KVM 웹 인터페이스(HTTP/HTTPS), SSH, ping, DHCP, DNS(USB 및 Wi-Fi AP 네트워크), mDNS를 제외한 모든 포트로의 인바운드 연결을 막습니다. 장치에서 실행 중인 다른 서비스는 네트워크에서 접근할 수 없게 됩니다.',
+          open: '열림',
+          drop: '차단',
+          confirmTitle: '방화벽을 차단으로 전환하시겠습니까?',
+          confirmContent: 'KVM 서비스 포트만 계속 접근할 수 있습니다. 이 장치에서 수신 대기 중인 그 밖의 모든 것(예: 직접 설치한 서비스)은 네트워크에서 접근할 수 없게 됩니다. 웹 인터페이스가 사용자 지정 포트에서 실행 중이면 해당 포트는 열린 상태로 유지됩니다. 계속하시겠습니까?',
+          confirmOk: '차단으로 전환',
+          confirmCancel: '취소',
+          applied: '방화벽 모드가 적용되었습니다',
+          failed: '방화벽 모드를 적용하지 못했습니다. 이전 모드가 유지됩니다'
         },
         tls: {
           description: 'HTTPS 프로토콜 활성화',

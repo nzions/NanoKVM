@@ -377,6 +377,13 @@ const da = {
         languageDesc: 'Vælg sproget til grænsefladen',
         webTitle: 'Webtitel',
         webTitleDesc: 'Tilpas websidens titel',
+        theme: {
+          title: 'Tema',
+          desc: 'Mørkt, lyst eller følg systemindstillingen',
+          dark: 'Mørkt',
+          light: 'Lyst',
+          system: 'System'
+        },
         menuBar: {
           title: 'Menulinje',
           mode: 'Visningstilstand',
@@ -491,6 +498,19 @@ const da = {
           joinBtn: 'Tilslut',
           confirmBtn: 'OK',
           cancelBtn: 'Annuller'
+        },
+        firewall: {
+          title: 'Firewall',
+          description: 'Åben: alle porte er tilgængelige. Drop: kun KVM-tjenestens porte er tilladt.',
+          tip: 'Drop blokerer indgående forbindelser til alle porte undtagen KVM\'s webgrænseflade (HTTP/HTTPS), SSH, ping, DHCP, DNS (på USB- og Wi-Fi AP-netværkene) og mDNS. Andre tjenester, du kører på enheden, kan ikke længere nås fra netværket.',
+          open: 'Åben',
+          drop: 'Drop',
+          confirmTitle: 'Skifte firewallen til Drop?',
+          confirmContent: 'Kun KVM-tjenestens porte forbliver tilgængelige. Alt andet, der lytter på denne enhed, for eksempel en tjeneste du selv har installeret, kan ikke længere nås fra netværket. Hvis webgrænsefladen kører på en brugerdefineret port, holdes den åben. Fortsæt?',
+          confirmOk: 'Skift til Drop',
+          confirmCancel: 'Annuller',
+          applied: 'Firewall-tilstand anvendt',
+          failed: 'Firewall-tilstanden kunne ikke anvendes; den forrige tilstand beholdes'
         },
         tls: {
           description: 'Aktiver HTTPS-protokol',

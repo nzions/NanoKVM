@@ -380,6 +380,13 @@ const ja = {
         languageDesc: 'インターフェース言語の選択',
         webTitle: 'ウェブページタイトル',
         webTitleDesc: 'ウェブページタイトルのカスタマイズ',
+        theme: {
+          title: 'テーマ',
+          desc: 'ダーク、ライト、またはシステム設定に従う',
+          dark: 'ダーク',
+          light: 'ライト',
+          system: 'システム'
+        },
         menuBar: {
           title: 'メニューバー',
           mode: '表示モード',
@@ -496,6 +503,19 @@ const ja = {
           joinBtn: '接続',
           confirmBtn: 'OK',
           cancelBtn: 'キャンセル'
+        },
+        firewall: {
+          title: 'ファイアウォール',
+          description: 'オープン：すべてのポートに到達できます。ドロップ：KVMサービスのポートのみ許可されます。',
+          tip: 'ドロップは、KVM Webインターフェース（HTTP/HTTPS）、SSH、ping、DHCP、DNS（USBおよびWi-Fi APネットワーク）、mDNS 以外のすべてのポートへの受信接続をブロックします。デバイス上で実行している他のサービスはネットワークから到達できなくなります。',
+          open: 'オープン',
+          drop: 'ドロップ',
+          confirmTitle: 'ファイアウォールをドロップに切り替えますか？',
+          confirmContent: 'KVMサービスのポートのみ到達可能なままになります。このデバイスで待ち受けているその他のもの（たとえば自分でインストールしたサービス）は、ネットワークから到達できなくなります。Webインターフェースがカスタムポートで動作している場合、そのポートは開いたままです。続行しますか？',
+          confirmOk: 'ドロップに切り替え',
+          confirmCancel: 'キャンセル',
+          applied: 'ファイアウォールモードを適用しました',
+          failed: 'ファイアウォールモードの適用に失敗しました。以前のモードが維持されます'
         },
         tls: {
           description: 'HTTPS プロトコルを有効にする',

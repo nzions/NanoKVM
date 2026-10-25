@@ -382,6 +382,13 @@ const fr = {
         languageDesc: "Sélectionnez la langue de l'interface",
         webTitle: 'Titre Web',
         webTitleDesc: 'Personnaliser le titre de la page Web',
+        theme: {
+          title: 'Thème',
+          desc: 'Sombre, clair ou selon le réglage du système',
+          dark: 'Sombre',
+          light: 'Clair',
+          system: 'Système'
+        },
         menuBar: {
           title: 'Barre de menus',
           mode: "Mode d'affichage",
@@ -498,6 +505,19 @@ const fr = {
           joinBtn: 'Rejoindre',
           confirmBtn: 'OK',
           cancelBtn: 'Annuler'
+        },
+        firewall: {
+          title: 'Pare-feu',
+          description: 'Ouvert : tous les ports sont accessibles. Rejet : seuls les ports du service KVM sont autorisés.',
+          tip: 'Rejet bloque les connexions entrantes vers tous les ports sauf l\'interface web KVM (HTTP/HTTPS), SSH, ping, DHCP, DNS (sur les réseaux USB et point d\'accès Wi-Fi) et mDNS. Les autres services exécutés sur l\'appareil ne seront plus accessibles depuis le réseau.',
+          open: 'Ouvert',
+          drop: 'Rejet',
+          confirmTitle: 'Passer le pare-feu en mode Rejet ?',
+          confirmContent: 'Seuls les ports du service KVM resteront accessibles. Tout le reste de ce qui écoute sur cet appareil, par exemple un service que vous avez installé vous-même, ne sera plus accessible depuis le réseau. Si l\'interface web utilise un port personnalisé, il reste ouvert. Continuer ?',
+          confirmOk: 'Passer en mode Rejet',
+          confirmCancel: 'Annuler',
+          applied: 'Mode du pare-feu appliqué',
+          failed: 'Échec de l\'application du mode du pare-feu ; le mode précédent est conservé'
         },
         tls: {
           description: 'Activer le protocole HTTPS',

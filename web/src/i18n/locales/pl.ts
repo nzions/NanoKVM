@@ -380,6 +380,13 @@ const pl = {
         languageDesc: 'Wybierz język interfejsu',
         webTitle: 'Tytuł strony internetowej',
         webTitleDesc: 'Dostosuj tytuł strony internetowej',
+        theme: {
+          title: 'Motyw',
+          desc: 'Ciemny, jasny lub zgodny z ustawieniem systemu',
+          dark: 'Ciemny',
+          light: 'Jasny',
+          system: 'System'
+        },
         menuBar: {
           title: 'Pasek menu',
           mode: 'Tryb wyświetlania',
@@ -495,6 +502,19 @@ const pl = {
           joinBtn: 'Połącz',
           confirmBtn: 'OK',
           cancelBtn: 'Anuluj'
+        },
+        firewall: {
+          title: 'Zapora',
+          description: 'Otwarta: wszystkie porty są dostępne. Drop: dozwolone są tylko porty usługi KVM.',
+          tip: 'Drop blokuje połączenia przychodzące do wszystkich portów poza interfejsem WWW KVM (HTTP/HTTPS), SSH, ping, DHCP, DNS (w sieciach USB i AP Wi-Fi) oraz mDNS. Inne usługi uruchomione na urządzeniu staną się niedostępne z sieci.',
+          open: 'Otwarta',
+          drop: 'Drop',
+          confirmTitle: 'Przełączyć zaporę na Drop?',
+          confirmContent: 'Dostępne pozostaną tylko porty usługi KVM. Wszystko inne, co nasłuchuje na tym urządzeniu, na przykład usługa zainstalowana przez Ciebie, przestanie być dostępne z sieci. Jeśli interfejs WWW działa na niestandardowym porcie, pozostaje on otwarty. Kontynuować?',
+          confirmOk: 'Przełącz na Drop',
+          confirmCancel: 'Anuluj',
+          applied: 'Tryb zapory zastosowany',
+          failed: 'Nie udało się zastosować trybu zapory; poprzedni tryb pozostaje'
         },
         tls: {
           description: 'Włącz protokół HTTPS',

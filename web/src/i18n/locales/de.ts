@@ -385,6 +385,13 @@ const de = {
         languageDesc: 'Wählen Sie die Sprache für die Benutzeroberfläche aus',
         webTitle: 'Web Titel',
         webTitleDesc: 'Passen Sie den Web-Seite Titel an',
+        theme: {
+          title: 'Design',
+          desc: 'Dunkel, hell oder der Systemeinstellung folgen',
+          dark: 'Dunkel',
+          light: 'Hell',
+          system: 'System'
+        },
         menuBar: {
           title: 'Menüleiste',
           mode: 'Anzeigemodus',
@@ -501,6 +508,19 @@ const de = {
           joinBtn: 'Verbinden',
           confirmBtn: 'OK',
           cancelBtn: 'Abbrechen'
+        },
+        firewall: {
+          title: 'Firewall',
+          description: 'Offen: Alle Ports sind erreichbar. Drop: Nur die Ports des KVM-Dienstes sind erlaubt.',
+          tip: 'Drop blockiert eingehende Verbindungen zu allen Ports außer der KVM-Weboberfläche (HTTP/HTTPS), SSH, Ping, DHCP, DNS (in den USB- und WLAN-AP-Netzwerken) und mDNS. Andere Dienste, die Sie auf dem Gerät betreiben, sind aus dem Netzwerk nicht mehr erreichbar.',
+          open: 'Offen',
+          drop: 'Drop',
+          confirmTitle: 'Firewall auf Drop umstellen?',
+          confirmContent: 'Nur die Ports des KVM-Dienstes bleiben erreichbar. Alles andere, was auf diesem Gerät lauscht, zum Beispiel ein von Ihnen selbst installierter Dienst, ist aus dem Netzwerk nicht mehr erreichbar. Läuft die Weboberfläche auf einem benutzerdefinierten Port, bleibt dieser offen. Fortfahren?',
+          confirmOk: 'Auf Drop umstellen',
+          confirmCancel: 'Abbrechen',
+          applied: 'Firewall-Modus angewendet',
+          failed: 'Firewall-Modus konnte nicht angewendet werden; der vorherige Modus bleibt erhalten'
         },
         tls: {
           description: 'HTTPS-Protokoll aktivieren',

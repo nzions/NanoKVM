@@ -379,6 +379,13 @@ const cs = {
         languageDesc: 'Vyberte jazyk rozhraní',
         webTitle: 'Název webu',
         webTitleDesc: 'Přizpůsobte název webové stránky',
+        theme: {
+          title: 'Motiv',
+          desc: 'Tmavý, světlý nebo podle nastavení systému',
+          dark: 'Tmavý',
+          light: 'Světlý',
+          system: 'Systém'
+        },
         menuBar: {
           title: 'Panel nabídek',
           mode: 'Režim zobrazení',
@@ -492,6 +499,19 @@ const cs = {
           joinBtn: 'Připojit',
           confirmBtn: 'OK',
           cancelBtn: 'Zrušit'
+        },
+        firewall: {
+          title: 'Firewall',
+          description: 'Otevřeno: všechny porty jsou dostupné. Zahazovat: povoleny jsou jen porty služby KVM.',
+          tip: 'Režim Zahazovat blokuje příchozí spojení na všechny porty kromě webového rozhraní KVM (HTTP/HTTPS), SSH, pingu, DHCP, DNS (v sítích USB a Wi-Fi AP) a mDNS. Ostatní služby spuštěné na zařízení nebudou ze sítě dostupné.',
+          open: 'Otevřeno',
+          drop: 'Zahazovat',
+          confirmTitle: 'Přepnout firewall na Zahazovat?',
+          confirmContent: 'Dostupné zůstanou pouze porty služby KVM. Cokoli dalšího, co na zařízení naslouchá, například služba, kterou jste si sami nainstalovali, již nebude ze sítě dostupné. Pokud webové rozhraní běží na vlastním portu, zůstane otevřený. Pokračovat?',
+          confirmOk: 'Přepnout na Zahazovat',
+          confirmCancel: 'Zrušit',
+          applied: 'Režim firewallu použit',
+          failed: 'Režim firewallu se nepodařilo použít; zůstává předchozí režim'
         },
         tls: {
           description: 'Povolit protokol HTTPS',

@@ -375,6 +375,13 @@ const sv = {
         languageDesc: 'Välj språk för gränssnittet',
         webTitle: 'Webbtitel',
         webTitleDesc: 'Anpassa webbsidans titel',
+        theme: {
+          title: 'Tema',
+          desc: 'Mörkt, ljust eller följ systeminställningen',
+          dark: 'Mörkt',
+          light: 'Ljust',
+          system: 'System'
+        },
         menuBar: {
           title: 'Menyrad',
           mode: 'Visningsläge',
@@ -490,6 +497,19 @@ const sv = {
           joinBtn: 'Anslut',
           confirmBtn: 'OK',
           cancelBtn: 'Avbryt'
+        },
+        firewall: {
+          title: 'Brandvägg',
+          description: 'Öppen: alla portar är nåbara. Drop: endast KVM-tjänstens portar är tillåtna.',
+          tip: 'Drop blockerar inkommande anslutningar till alla portar utom KVM:s webbgränssnitt (HTTP/HTTPS), SSH, ping, DHCP, DNS (på USB- och Wi-Fi AP-nätverken) och mDNS. Andra tjänster som du kör på enheten blir onåbara från nätverket.',
+          open: 'Öppen',
+          drop: 'Drop',
+          confirmTitle: 'Byta brandväggen till Drop?',
+          confirmContent: 'Endast KVM-tjänstens portar förblir nåbara. Allt annat som lyssnar på den här enheten, till exempel en tjänst du själv har installerat, blir onåbart från nätverket. Om webbgränssnittet körs på en anpassad port hålls den öppen. Fortsätta?',
+          confirmOk: 'Byt till Drop',
+          confirmCancel: 'Avbryt',
+          applied: 'Brandväggsläget har tillämpats',
+          failed: 'Det gick inte att tillämpa brandväggsläget; det tidigare läget behålls'
         },
         tls: {
           description: 'Aktivera HTTPS-protokoll',

@@ -380,6 +380,13 @@ const es = {
         languageDesc: 'Seleccionar el idioma de la interfaz',
         webTitle: 'Título web',
         webTitleDesc: 'Personaliza el título de la página web',
+        theme: {
+          title: 'Tema',
+          desc: 'Oscuro, claro o según la configuración del sistema',
+          dark: 'Oscuro',
+          light: 'Claro',
+          system: 'Sistema'
+        },
         menuBar: {
           title: 'Barra de menú',
           mode: 'Modo de visualización',
@@ -496,6 +503,19 @@ const es = {
           joinBtn: 'Unirse',
           confirmBtn: 'Aceptar',
           cancelBtn: 'Cancelar'
+        },
+        firewall: {
+          title: 'Cortafuegos',
+          description: 'Abierto: todos los puertos son accesibles. Descartar: solo se permiten los puertos del servicio KVM.',
+          tip: 'Descartar bloquea las conexiones entrantes a todos los puertos excepto la interfaz web de KVM (HTTP/HTTPS), SSH, ping, DHCP, DNS (en las redes USB y AP Wi-Fi) y mDNS. Los demás servicios que ejecute en el dispositivo dejarán de ser accesibles desde la red.',
+          open: 'Abierto',
+          drop: 'Descartar',
+          confirmTitle: '¿Cambiar el cortafuegos a Descartar?',
+          confirmContent: 'Solo los puertos del servicio KVM seguirán siendo accesibles. Cualquier otra cosa que escuche en este dispositivo, por ejemplo un servicio instalado por usted, dejará de ser accesible desde la red. Si la interfaz web usa un puerto personalizado, se mantiene abierto. ¿Continuar?',
+          confirmOk: 'Cambiar a Descartar',
+          confirmCancel: 'Cancelar',
+          applied: 'Modo de cortafuegos aplicado',
+          failed: 'No se pudo aplicar el modo de cortafuegos; se mantiene el modo anterior'
         },
         tls: {
           description: 'Habilitar protocolo HTTPS',

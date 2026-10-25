@@ -364,6 +364,13 @@ const zh_tw = {
         languageDesc: '選擇介面語言',
         webTitle: '網頁標題',
         webTitleDesc: '自訂網頁標題',
+        theme: {
+          title: '主題',
+          desc: '深色、淺色或跟隨系統設定',
+          dark: '深色',
+          light: '淺色',
+          system: '跟隨系統'
+        },
         menuBar: {
           title: '選單列',
           mode: '顯示方式',
@@ -476,6 +483,19 @@ const zh_tw = {
           joinBtn: '加入',
           confirmBtn: '確定',
           cancelBtn: '取消'
+        },
+        firewall: {
+          title: '防火牆',
+          description: '開放：所有連接埠均可存取。丟棄：僅允許 KVM 服務連接埠。',
+          tip: '丟棄會阻擋除 KVM 網頁介面（HTTP/HTTPS）、SSH、ping、DHCP、DNS（USB 和 Wi-Fi AP 網路）以及 mDNS 之外所有連接埠的入站連線。您在裝置上執行的其他服務將無法從網路存取。',
+          open: '開放',
+          drop: '丟棄',
+          confirmTitle: '將防火牆切換為丟棄模式？',
+          confirmContent: '僅 KVM 服務連接埠保持可存取。此裝置上監聽的其他任何內容，例如您自行安裝的服務，將無法再從網路存取。如果網頁介面執行在自訂連接埠上，該連接埠會保持開放。是否繼續？',
+          confirmOk: '切換為丟棄',
+          confirmCancel: '取消',
+          applied: '防火牆模式已套用',
+          failed: '套用防火牆模式失敗，已保留先前的模式'
         },
         tls: {
           description: '啟用 HTTPS 協議',

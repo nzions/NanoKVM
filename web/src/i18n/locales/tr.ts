@@ -378,6 +378,13 @@ const tr = {
         languageDesc: 'Arayüz için dili seçin',
         webTitle: 'Site başlığı',
         webTitleDesc: 'Görünen site başlığını güncelleyin',
+        theme: {
+          title: 'Tema',
+          desc: 'Koyu, açık veya sistem ayarını izle',
+          dark: 'Koyu',
+          light: 'Açık',
+          system: 'Sistem'
+        },
         menuBar: {
           title: 'Menü Çubuğu',
           mode: 'Görüntüleme Modu',
@@ -494,6 +501,19 @@ const tr = {
           joinBtn: 'Katıl',
           confirmBtn: 'Tamam',
           cancelBtn: 'İptal'
+        },
+        firewall: {
+          title: 'Güvenlik duvarı',
+          description: 'Açık: tüm bağlantı noktalarına erişilebilir. Drop: yalnızca KVM hizmetinin bağlantı noktalarına izin verilir.',
+          tip: 'Drop, KVM web arayüzü (HTTP/HTTPS), SSH, ping, DHCP, DNS (USB ve Wi-Fi AP ağlarında) ve mDNS dışındaki tüm bağlantı noktalarına gelen bağlantıları engeller. Cihazda çalıştırdığınız diğer hizmetlere ağdan erişilemez.',
+          open: 'Açık',
+          drop: 'Drop',
+          confirmTitle: 'Güvenlik duvarı Drop\'a geçirilsin mi?',
+          confirmContent: 'Yalnızca KVM hizmetinin bağlantı noktalarına erişilebilir kalır. Bu cihazda dinleyen diğer her şeye, örneğin kendi kurduğunuz bir hizmete, ağdan artık erişilemez. Web arayüzü özel bir bağlantı noktasında çalışıyorsa o açık tutulur. Devam edilsin mi?',
+          confirmOk: 'Drop\'a geç',
+          confirmCancel: 'İptal',
+          applied: 'Güvenlik duvarı modu uygulandı',
+          failed: 'Güvenlik duvarı modu uygulanamadı; önceki mod korundu'
         },
         tls: {
           description: 'HTTPS protokolünü etkinleştir',

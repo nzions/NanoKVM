@@ -379,6 +379,13 @@ const id = {
         languageDesc: 'Pilih bahasa untuk antarmuka',
         webTitle: 'Judul Web',
         webTitleDesc: 'Menyesuaikan judul halaman web',
+        theme: {
+          title: 'Tema',
+          desc: 'Gelap, terang, atau ikuti pengaturan sistem',
+          dark: 'Gelap',
+          light: 'Terang',
+          system: 'Sistem'
+        },
         menuBar: {
           title: 'Bilah Menu',
           mode: 'Mode Tampilan',
@@ -492,6 +499,19 @@ const id = {
           joinBtn: 'Gabung',
           confirmBtn: 'OK',
           cancelBtn: 'Batal'
+        },
+        firewall: {
+          title: 'Firewall',
+          description: 'Terbuka: semua port dapat diakses. Drop: hanya port layanan KVM yang diizinkan.',
+          tip: 'Drop memblokir koneksi masuk ke semua port kecuali antarmuka web KVM (HTTP/HTTPS), SSH, ping, DHCP, DNS (pada jaringan USB dan AP Wi-Fi), dan mDNS. Layanan lain yang Anda jalankan di perangkat tidak dapat lagi diakses dari jaringan.',
+          open: 'Terbuka',
+          drop: 'Drop',
+          confirmTitle: 'Ubah firewall ke Drop?',
+          confirmContent: 'Hanya port layanan KVM yang tetap dapat diakses. Apa pun yang mendengarkan di perangkat ini, misalnya layanan yang Anda pasang sendiri, tidak lagi dapat diakses dari jaringan. Jika antarmuka web berjalan pada port khusus, port tersebut tetap dibuka. Lanjutkan?',
+          confirmOk: 'Ubah ke Drop',
+          confirmCancel: 'Batal',
+          applied: 'Mode firewall diterapkan',
+          failed: 'Gagal menerapkan mode firewall; mode sebelumnya dipertahankan'
         },
         tls: {
           description: 'Aktifkan protokol HTTPS',
