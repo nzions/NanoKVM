@@ -294,7 +294,7 @@ static int _create_vb_pool(char *name, mmf_mod_type_t mod, uint32_t size, uint32
 
 	mmf_vb_pool_t *info = (mmf_vb_pool_t *)&priv.vb_pool[pool_id];
 	info->pool_id = pool_id;
-	strncpy(info->name, name, sizeof(info->name));
+	snprintf(info->name, sizeof(info->name), "%s", name);
 	info->mod = mod;
 	info->size = size;
 	info->max_num = max_num;
@@ -341,6 +341,7 @@ static int _free_leak_memory_of_ion(void)
     FILE *fp;
     char line[MAX_LINE_LENGTH];
     char alloc_buf_size_str[20], phy_addr_str[20], buffer_name[20];
+    #define MMF_SCAN_FIELD	"%19s"	/* sizeof the three buffers above, less the NUL */
     int alloc_buf_size;
 	uint64_t phy_addr;
 
@@ -351,7 +352,7 @@ static int _free_leak_memory_of_ion(void)
     }
 
     while (fgets(line, MAX_LINE_LENGTH, fp) != NULL) {
-        if (sscanf(line, "%*d %s %s %*d %s", alloc_buf_size_str, phy_addr_str, buffer_name) == 3) {
+        if (sscanf(line, "%*d " MMF_SCAN_FIELD " " MMF_SCAN_FIELD " %*d " MMF_SCAN_FIELD, alloc_buf_size_str, phy_addr_str, buffer_name) == 3) {
 			printf("[ION] %s  %s  %s\r\n", alloc_buf_size_str, phy_addr_str, buffer_name);
 			// ISP_SHARED_BUFFER_0 may still be owned by kvm_system while the
 			// server starts. Releasing it here makes SAMPLE_PLAT_VI_INIT fail.
@@ -368,7 +369,7 @@ static int _free_leak_memory_of_ion(void)
 			ion_data.size = alloc_buf_size;
 			ion_data.addr_p = phy_addr;
 			memset(ion_data.name, 0, sizeof(ion_data.name));
-			strcpy((char *)ion_data.name, buffer_name);
+			snprintf((char *)ion_data.name, sizeof(ion_data.name), "%s", buffer_name);
 
             printf("alloc_buf_size(%s): %d, phy_addr(%s): %#lx, buffer_name: %s\n",
 						alloc_buf_size_str, alloc_buf_size, phy_addr_str, phy_addr, buffer_name);
@@ -589,9 +590,47 @@ static int cvi_ive_deinit(void)
 	return 0;
 }
 
+/*
+ * Frame dimensions come from the capture chip (HDMI source), so they are
+ * untrusted. Bound them before any size arithmetic: 4096x4096 caps either
+ * side and the area cap is 4096x2160, so w * h * 3 stays far inside int.
+ */
+#define MMF_MAX_FRAME_DIM	4096
+#define MMF_MAX_FRAME_AREA	(4096 * 2160)
+
+static int _mmf_dims_ok(int w, int h)
+{
+	if (w <= 0 || h <= 0 || w > MMF_MAX_FRAME_DIM || h > MMF_MAX_FRAME_DIM) {
+		return 0;
+	}
+	return (int64_t)w * h <= MMF_MAX_FRAME_AREA;
+}
+
+/*
+ * True when a w x h frame whose rows are bpp bytes per pixel can be copied
+ * into f: dims sane, f is exactly that wide/tall (it is allocated from the
+ * same w/h, and the copy loops walk f's height over the source) and its stride
+ * holds a source row. A mismatch means the dims changed under us.
+ */
+static int _mmf_frame_fits(const VIDEO_FRAME_INFO_S *f, int w, int h, int bpp)
+{
+	if (!_mmf_dims_ok(w, h) || f == NULL || f->stVFrame.pu8VirAddr[0] == NULL) {
+		return 0;
+	}
+	if (f->stVFrame.u32Width != (CVI_U32)w || f->stVFrame.u32Height != (CVI_U32)h) {
+		return 0;
+	}
+	return f->stVFrame.u32Stride[0] >= (CVI_U32)w * bpp;
+}
+
 static int cvi_rgb2nv21(uint8_t *src, int input_w, int input_h)
 {
 	CVI_S32 s32Ret;
+
+	if (src == NULL || !_mmf_dims_ok(input_w, input_h)) {
+		printf("rgb2nv21: bad dims %dx%d\n", input_w, input_h);
+		return -1;
+	}
 
 	int width = ALIGN(input_w, DEFAULT_ALIGN);
 	int height = input_h;
@@ -1852,6 +1891,11 @@ int mmf_enc_jpg_push_with_quality(int ch, uint8_t *data, int w, int h, int forma
 		format = PIXEL_FORMAT_NV21;
 	}
 
+	if (data == NULL || !_mmf_dims_ok(w, h)) {
+		printf("Invalid frame %dx%d\r\n", w, h);
+		return -1;
+	}
+
 	SIZE_S stSize = {(CVI_U32)w, (CVI_U32)h};
 	if (priv.enc_jpg_frame == NULL || priv.enc_jpg_frame_w != w || priv.enc_jpg_frame_h != h || priv.enc_jpg_frame_fmt != format
 	|| priv.enc_jpg_quality != quality) {
@@ -1870,6 +1914,11 @@ int mmf_enc_jpg_push_with_quality(int ch, uint8_t *data, int w, int h, int forma
 			printf("Alloc frame failed!\r\n");
 			return -1;
 		}
+	}
+
+	if (!_mmf_frame_fits(priv.enc_jpg_frame, w, h, real_format == PIXEL_FORMAT_RGB_888 ? 3 : 1)) {
+		printf("Frame %dx%d does not fit the encode buffer\r\n", w, h);
+		return -1;
 	}
 
 	switch (real_format) {
@@ -1946,6 +1995,11 @@ int mmf_enc_jpg_push(int ch, uint8_t *data, int w, int h, int format)
 		return s32Ret;
 	}
 
+	if (data == NULL || !_mmf_dims_ok(w, h)) {
+		printf("Invalid frame %dx%d\r\n", w, h);
+		return -1;
+	}
+
 	SIZE_S stSize = {(CVI_U32)w, (CVI_U32)h};
 	if (priv.enc_jpg_frame == NULL || priv.enc_jpg_frame_w != w || priv.enc_jpg_frame_h != h || priv.enc_jpg_frame_fmt != format) {
 		mmf_enc_jpg_deinit(ch);
@@ -1962,6 +2016,11 @@ int mmf_enc_jpg_push(int ch, uint8_t *data, int w, int h, int format)
 			printf("Alloc frame failed!\r\n");
 			return -1;
 		}
+	}
+
+	if (!_mmf_frame_fits(priv.enc_jpg_frame, w, h, format == PIXEL_FORMAT_RGB_888 ? 3 : 1)) {
+		printf("Frame %dx%d does not fit the encode buffer\r\n", w, h);
+		return -1;
 	}
 
 	switch (format) {
@@ -2317,12 +2376,17 @@ int mmf_venc_push(int ch, uint8_t *data, int w, int h, int format) {
 		}
 	}
 
+	if (!_mmf_frame_fits(frame_info, w, h, 1)) {
+		printf("Frame %dx%d does not fit the venc buffer\r\n", w, h);
+		return -1;
+	}
+
 	switch (format) {
 		case PIXEL_FORMAT_NV21:
 		{
 			if (frame_info->stVFrame.u32Stride[0] != (CVI_U32)w) {
 				for (int h0 = 0; h0 < h * 3 / 2; h0 ++) {
-					memcpy((uint8_t *)frame_info->stVFrame.pu8VirAddr[0] + frame_info->stVFrame.u32Stride[0] * h,
+					memcpy((uint8_t *)frame_info->stVFrame.pu8VirAddr[0] + frame_info->stVFrame.u32Stride[0] * h0,
 							((uint8_t *)data) + w * h0, w);
 				}
 			} else {

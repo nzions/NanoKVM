@@ -94,10 +94,34 @@ init_beta_pcie_hw(){
   insmod /mnt/system/ko/i2c-gpio.ko
 }
 
+# write_state FILE VALUE: replace FILE with VALUE atomically. The file either
+# holds the old value or the whole new one, never a torn write, so a power cut
+# mid-boot cannot leave a state file that looks complete but is not.
+write_state(){
+  printf '%s\n' "$2" > "$1.tmp" && mv "$1.tmp" "$1"
+}
+
+# gpio_export PIN: export a gpio once; a re-run finds it already exported.
+gpio_export(){
+  [ -d /sys/class/gpio/gpio$1 ] || echo $1 > /sys/class/gpio/export
+}
+
+# Detection runs once per device: /etc/kvm/hw is the "detection finished"
+# marker and is written LAST, after every other result is stored and synced.
+# A boot that dies half way finds no marker and simply detects again; a boot
+# that finds the marker does nothing here. Safe to re-run.
+#
+# PCIe boards reboot once after detection (the original behaviour; the board
+# variant is only known after the I2C probes above, and the PCIe board needs a
+# boot that starts with that variant recorded, which the later init scripts
+# and kvm_system rely on). The reboot is the very last step of detection
+# (nothing is left half done), and is guarded by
+# /etc/kvm/hw_rebooted so a missing/unwritable marker can never loop reboots.
 kvm_hw_detect(){
+  need_reboot=0
   if [ ! -e /etc/kvm/hdmi_version ]
   then
-    rm /etc/kvm/hw
+    rm -f /etc/kvm/hw
   fi
   if [ -e /etc/kvm/hw ]
   then
@@ -111,7 +135,7 @@ kvm_hw_detect(){
       mkdir /etc/kvm/
     fi
     devmem 0x0300104C 32 0x3  # GPIOA26 / WiFi_EN
-    echo ${WiFi_EN_Pin} > /sys/class/gpio/export  # WiFi_EN
+    gpio_export ${WiFi_EN_Pin}  # WiFi_EN
     echo out > /sys/class/gpio/gpio${WiFi_EN_Pin}/direction
     echo 0 > /sys/class/gpio/gpio${WiFi_EN_Pin}/value
 
@@ -125,7 +149,7 @@ kvm_hw_detect(){
     devmem 0x030010D0 32 0x2  # I2C1_SCL
     devmem 0x030010DC 32 0x2  # I2C1_SDA
     devmem 0x030010D4 32 0x3  # OLED_RST
-    echo ${Alpha_OLED_RST_Pin} > /sys/class/gpio/export  # OLED_RST
+    gpio_export ${Alpha_OLED_RST_Pin}  # OLED_RST
     echo out > /sys/class/gpio/gpio${Alpha_OLED_RST_Pin}/direction
     echo 1 > /sys/class/gpio/gpio${Alpha_OLED_RST_Pin}/value
 
@@ -133,11 +157,11 @@ kvm_hw_detect(){
     if [ -n "$kvm_tmp" ]
     then
       # alpha hw
-      echo "alpha" > /etc/kvm/hw
+      write_state /etc/kvm/hw "alpha"
     else
       # beta/pcie hw
       echo ${Alpha_OLED_RST_Pin} > /sys/class/gpio/unexport  # OLED_RST
-      echo ${Beta_OLED_RST_Pin} > /sys/class/gpio/export  # Beta_OLED_RST_Pin
+      gpio_export ${Beta_OLED_RST_Pin}  # Beta_OLED_RST_Pin
       echo out > /sys/class/gpio/gpio${Beta_OLED_RST_Pin}/direction
       echo 1 > /sys/class/gpio/gpio${Beta_OLED_RST_Pin}/value
 
@@ -149,23 +173,37 @@ kvm_hw_detect(){
       kvm_hdmi_version_detect
 
       kvm_tmp=$(i2cdetect -ry 5 0x3c 0x3c | grep 3c)
-      if [ -n "$kvm_tmp" ]
-      then
-        echo "pcie" > /etc/kvm/hw
-        sync
-        reboot
-      else
-        echo "beta" > /etc/kvm/hw
-        # rm /etc/init.d/S25wifimod
-        # rm /etc/init.d/S30wifi
-        sync
-      fi
-
+      # finish the shared work first, record the result last
       echo 1 > /sys/class/gpio/gpio${WiFi_EN_Pin}/value
       echo ${WiFi_EN_Pin} > /sys/class/gpio/unexport  # WiFi_EN
+
+      if [ -n "$kvm_tmp" ]
+      then
+        write_state /etc/kvm/hw "pcie"
+        if [ ! -e /etc/kvm/hw_rebooted ]
+        then
+          need_reboot=1
+        fi
+      else
+        write_state /etc/kvm/hw "beta"
+        # rm /etc/init.d/S25wifimod
+        # rm /etc/init.d/S30wifi
+      fi
     fi
   fi
   sync
+
+  if [ "$need_reboot" = 1 ]
+  then
+    # marker first (synced), then reboot: this boot reboots at most once
+    write_state /etc/kvm/hw_rebooted "1" && sync
+    echo "pcie hw detected: rebooting once to apply it"
+    reboot
+    # reboot only signals init and returns. Hold here so the later init
+    # scripts do not start against hardware that is about to be reset; the
+    # sleep is bounded so a reboot that fails does not hang the boot forever.
+    sleep 60
+  fi
 }
 
 kvm_hw_init(){
@@ -190,15 +228,15 @@ kvm_hw_init(){
 kvm_hdmi_version_detect()
 {
     if i2cdetect -ry 4 0x2c 0x2c | grep -qw "2c"; then
-        echo "c" > /etc/kvm/hdmi_version
+        write_state /etc/kvm/hdmi_version "c"
     elif i2cdetect -ry 4 0x2b 0x2b | grep -qw "2b"; then
         if i2cdetect -ry 4 0x44 0x44 | grep -qw "44"; then
-            echo "ux" > /etc/kvm/hdmi_version
+            write_state /etc/kvm/hdmi_version "ux"
         else
-            echo "d" > /etc/kvm/hdmi_version
+            write_state /etc/kvm/hdmi_version "d"
         fi
     else
-        echo "ue" > /etc/kvm/hdmi_version
+        write_state /etc/kvm/hdmi_version "ue"
     fi
 }
 
@@ -208,7 +246,8 @@ case "$1" in
     kvm_hw_init
   ;;
   re-detect)
-    rm /etc/kvm/hw
+    # an explicit re-detect may reboot again, so clear the once-only marker too
+    rm -f /etc/kvm/hw /etc/kvm/hw_rebooted
     kvm_hw_detect
     kvm_hw_init
   ;;

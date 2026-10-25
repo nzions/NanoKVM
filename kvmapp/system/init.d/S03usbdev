@@ -1,21 +1,59 @@
 #!/bin/sh
 # kvmhwd Rev2.2
 
-# usb_serial prints a 16 character serial number that is stable for this
-# device: the hash of the chip UID, else of the eth0 MAC. It prints nothing when
-# neither can be read.
+USB_SERIAL_FILE=/etc/kvm/usb_serial
+
+# usb_serial prints a 16 hex character serial number (USB iSerial, never the
+# same on two devices) that is stable for this device. Sources, in order:
+#   1. the hash of the SoC unique id (/sys/class/cvi-base/base_uid)
+#   2. the hash of the Serial line of /proc/cpuinfo
+#   3. the hash of the eth0 MAC (kept from the earlier version so a device
+#      that already had a MAC-derived serial keeps it)
+#   4. a random id generated once and persisted in $USB_SERIAL_FILE (0600)
+# It prints nothing only if even the random id cannot be made or stored.
 usb_serial() {
     serial_src=""
     if [ -r /sys/class/cvi-base/base_uid ]
     then
         serial_src=$(cat /sys/class/cvi-base/base_uid)
     fi
+    if [ -z "$serial_src" ] && [ -r /proc/cpuinfo ]
+    then
+        serial_src=$(sed -n 's/^Serial[ \t]*:[ \t]*//p' /proc/cpuinfo | head -n 1)
+        # an all-zero serial is a placeholder, not an identity
+        case "$serial_src" in
+            *[!0[:space:]]*) ;;
+            *) serial_src="" ;;
+        esac
+    fi
     if [ -z "$serial_src" ] && [ -r /sys/class/net/eth0/address ]
     then
         serial_src=$(cat /sys/class/net/eth0/address)
     fi
-    [ -n "$serial_src" ] || return 0
-    printf '%s' "$serial_src" | sha256sum | cut -c1-16 | tr 'a-f' 'A-F'
+    if [ -n "$serial_src" ]
+    then
+        printf '%s' "$serial_src" | sha256sum | cut -c1-16 | tr 'a-f' 'A-F'
+        return 0
+    fi
+
+    # no hardware id: one random id, made once, then reused on every boot
+    if [ -r "$USB_SERIAL_FILE" ]
+    then
+        serial_src=$(cat "$USB_SERIAL_FILE")
+    fi
+    case "$serial_src" in
+        [0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]*) ;;
+        *)
+            serial_src=$(head -c 8 /dev/urandom | od -An -tx1 | tr -d ' \n' | tr 'a-f' 'A-F')
+            [ ${#serial_src} -eq 16 ] || return 0
+            mkdir -p /etc/kvm
+            # write to a temp name then rename, so a power cut never leaves a
+            # half-written serial behind
+            ( umask 077 && printf '%s\n' "$serial_src" > "$USB_SERIAL_FILE.tmp" ) &&
+                mv "$USB_SERIAL_FILE.tmp" "$USB_SERIAL_FILE" && sync
+            ;;
+    esac
+    printf '%s' "$serial_src"
 }
 
 # usb_hex_id FILE succeeds when FILE holds one 16 bit hex id such as 0x3346
@@ -56,11 +94,11 @@ start_usb_dev(){
     mkdir strings/0x409
     # per device serial, so two KVMs on one host are not the same USB device
     usb_serial_number=$(usb_serial)
-    if [ -z "$usb_serial_number" ]
+    # never present a shared fixed serial: with no id at all, leave it unset
+    if [ -n "$usb_serial_number" ]
     then
-        usb_serial_number='0123456789ABCDEF'
+        echo "$usb_serial_number" > strings/0x409/serialnumber
     fi
-    echo "$usb_serial_number" > strings/0x409/serialnumber
     echo 'sipeed' > strings/0x409/manufacturer
     echo 'NanoKVM' > strings/0x409/product
 

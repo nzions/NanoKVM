@@ -1577,6 +1577,10 @@ int h264_stream_dump(kvmv_data_t* dump_to, mmf_stream_t* dump_from)
     if (dump_from->count == 3) {
 
         dump_to->p_img_data = (uint8_t *)malloc(dump_from->data_size[0]+dump_from->data_size[1]+dump_from->data_size[2]);
+        if (dump_to->p_img_data == NULL) {
+            dump_to->img_data_size = 0;
+            return IMG_VENC_ERROR;
+        }
         dump_to->img_data_size = dump_from->data_size[0]+dump_from->data_size[1]+dump_from->data_size[2];
         dump_to->img_data_type = IMG_H264_TYPE_IF;
         memcpy(dump_to->p_img_data, dump_from->data[0], dump_from->data_size[0]);
@@ -1593,6 +1597,10 @@ int h264_stream_dump(kvmv_data_t* dump_to, mmf_stream_t* dump_from)
         // debug("[kvmv]dump P-Frame\r\n");
         I_Frame_index = -1;
         dump_to->p_img_data = (uint8_t *)malloc(dump_from->data_size[0]);
+        if (dump_to->p_img_data == NULL) {
+            dump_to->img_data_size = 0;
+            return IMG_VENC_ERROR;
+        }
         dump_to->img_data_size = dump_from->data_size[0];
         dump_to->img_data_type = IMG_H264_TYPE_PF;
         memcpy(dump_to->p_img_data, dump_from->data[0], dump_from->data_size[0]);
