@@ -79,3 +79,54 @@ export function getDNS() {
 export function setDNS(mode: DNSMode, servers: string[]) {
   return http.post('/api/network/dns', { mode, servers });
 }
+
+export type InterfaceName = 'eth0' | 'wlan0';
+export type InterfaceKind = 'ethernet' | 'wifi';
+export type IPMode = 'dhcp' | 'static';
+
+export type InterfaceCurrent = {
+  addresses: string[];
+  gateway: string;
+  mac: string;
+};
+
+export type InterfacePending = {
+  deadline_unix: number;
+  now_unix: number;
+  mode: IPMode;
+  address: string;
+  gateway: string;
+};
+
+export type NetworkInterface = {
+  name: InterfaceName;
+  kind: InterfaceKind;
+  present: boolean;
+  mode: IPMode;
+  address: string;
+  gateway: string;
+  current: InterfaceCurrent;
+  ssid?: string;
+  pending: InterfacePending | null;
+};
+
+export type SetInterfaceReq = {
+  mode: IPMode;
+  address: string;
+  gateway: string;
+};
+
+// list eth0 and wlan0 with their IP settings
+export function getInterfaces() {
+  return http.get('/api/network/interfaces');
+}
+
+// change one interface; it reverts after 120 s unless confirmed
+export function setInterface(name: InterfaceName, req: SetInterfaceReq) {
+  return http.post(`/api/network/interfaces/${name}`, req);
+}
+
+// keep the pending change
+export function confirmInterface(name: InterfaceName) {
+  return http.post(`/api/network/interfaces/${name}/confirm`);
+}

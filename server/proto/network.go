@@ -50,3 +50,39 @@ type DNSInfo struct {
 	Gateway       string   `json:"gateway"`
 	SearchDomains []string `json:"searchDomains"`
 }
+
+type SetInterfaceReq struct {
+	Mode    string `json:"mode"`
+	Address string `json:"address"`
+	Gateway string `json:"gateway"`
+}
+
+type InterfaceCurrent struct {
+	Addresses []string `json:"addresses"`
+	Gateway   string   `json:"gateway"`
+	Mac       string   `json:"mac"`
+}
+
+type InterfacePending struct {
+	DeadlineUnix int64  `json:"deadline_unix"`
+	NowUnix      int64  `json:"now_unix"` // the device clock when this was sent, so the page need not trust its own
+	Mode         string `json:"mode"`
+	Address      string `json:"address"`
+	Gateway      string `json:"gateway"`
+}
+
+type InterfaceInfo struct {
+	Name    string            `json:"name"`
+	Kind    string            `json:"kind"`
+	Present bool              `json:"present"`
+	Mode    string            `json:"mode"`
+	Address string            `json:"address"`
+	Gateway string            `json:"gateway"`
+	Current InterfaceCurrent  `json:"current"`
+	Ssid    string            `json:"ssid,omitempty"`
+	Pending *InterfacePending `json:"pending"`
+}
+
+type GetInterfacesRsp struct {
+	Interfaces []InterfaceInfo `json:"interfaces"`
+}

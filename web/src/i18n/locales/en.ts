@@ -508,6 +508,33 @@ const en = {
           subnetMask: 'Subnet Mask',
           router: 'Router',
           none: 'None'
+        },
+        interfaces: {
+          ethernet: 'Ethernet',
+          wifi: 'Wi-Fi',
+          notPresent: '{{name}}: not present on this device',
+          noAddress: 'No address',
+          dhcp: 'DHCP',
+          static: 'Static',
+          address: 'IP address',
+          netmask: 'Netmask',
+          gateway: 'Gateway',
+          optional: 'Optional',
+          save: 'Save',
+          invalidIp: 'Enter a valid IPv4 address, for example 192.168.1.50',
+          invalidMask: 'Enter a netmask such as 255.255.255.0 or /24 (prefix 1 to 30)',
+          invalidGateway: 'Enter a valid IPv4 gateway, or leave it empty',
+          saveFailed: 'Failed to change the network settings',
+          confirmFailed: 'Failed to confirm the change',
+          changedTitle: 'Network changed',
+          changedDesc:
+            'Network changed. If this page is still reachable, confirm within 120 s or the old settings come back.',
+          countdown: 'Reverting in {{count}} s unless confirmed',
+          reverted: 'Time is up, the old settings are being restored',
+          newAddress: 'New address:',
+          confirmFromNew: 'The change must be confirmed from the new address.',
+          confirm: 'Confirm',
+          close: 'Close'
         }
       },
       tailscale: {

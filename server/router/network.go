@@ -10,6 +10,7 @@ import (
 
 func networkRouter(r *gin.Engine) {
 	service := network.NewService()
+	network.RecoverInterfaces() // undo a change that was never confirmed
 
 	r.POST("/api/network/wifi", service.ConnectWifiNoAuth)    // connect Wi-Fi without auth (only available in ap mode)
 	r.POST("/api/network/wifi/verify", service.VerifyApLogin) // verify ap login
@@ -31,4 +32,8 @@ func networkRouter(r *gin.Engine) {
 	admin.POST("/network/wifi/disconnect", service.DisconnectWifi) // disconnect Wi-Fi
 	admin.GET("/network/dns", service.GetDNS)                      // get DNS configuration
 	admin.POST("/network/dns", service.SetDNS)                     // set DNS configuration
+
+	admin.GET("/network/interfaces", service.GetInterfaces)                   // list eth0/wlan0 with their IP settings
+	admin.POST("/network/interfaces/:name", service.SetInterface)             // set one interface (reverts unless confirmed)
+	admin.POST("/network/interfaces/:name/confirm", service.ConfirmInterface) // keep the pending change
 }

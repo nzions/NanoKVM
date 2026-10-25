@@ -76,6 +76,120 @@ gen_dnsmasq_conf() {
     echo "dhcp-authoritative"
 }
 
+# The static-address helpers below mirror S30eth (the init scripts are installed
+# one by one, so they cannot share a file). /boot/wlan.nodhcp holds the same one
+# line as /boot/eth.nodhcp: <ipv4>[/<cidr>] [gateway]
+
+clean_line() {
+    echo "$1" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//;s/\r//g'
+}
+
+# valid_ipv4 ADDR succeeds only for a dotted quad with decimal octets of 0-255
+# and no leading zeros (the shell would read those as octal)
+valid_ipv4() {
+    case "$1" in
+        ''|*[!0-9.]*) return 1 ;;
+    esac
+    IFS=. read -r _a _b _c _d _rest <<EOF
+$1
+EOF
+    [ -z "$_rest" ] || return 1
+    for _o in "$_a" "$_b" "$_c" "$_d"; do
+        case "$_o" in
+            ''|0?*) return 1 ;;
+        esac
+        [ "${#_o}" -le 3 ] && [ "$_o" -le 255 ] || return 1
+    done
+}
+
+calc_gw() {
+    addr="$1"
+    netid="$2"
+    IFS=. read -r a b c d <<EOF
+$addr
+EOF
+    ipnum=$(( (a<<24) + (b<<16) + (c<<8) + d ))
+    mask=$(( 0xFFFFFFFF << (32-netid) & 0xFFFFFFFF ))
+    gwnum=$(( (ipnum & mask) | 1 ))
+    if [ "$gwnum" -eq "$ipnum" ]; then
+        broadcast=$(( (ipnum & mask) | (0xFFFFFFFF & ~mask) ))
+        gwnum=$(( broadcast - 1 ))
+    fi
+    echo "$(( (gwnum>>24)&255 )).$(( (gwnum>>16)&255 )).$(( (gwnum>>8)&255 )).$(( gwnum&255 ))"
+}
+
+# static_wlan applies the first usable line of /boot/wlan.nodhcp to wlan0 and
+# succeeds only when one was applied
+static_wlan() {
+    while IFS= read -r line || [ -n "$line" ]; do
+        line=$(clean_line "$line")
+        [ -z "$line" ] && continue
+        IFS=' ' read -r inet gw _extra <<EOF
+$line
+EOF
+        [ -z "$inet" ] && continue
+        case "$inet" in
+            */*)
+                netid_check=${inet#*/}
+                case "$netid_check" in
+                    ''|*[!0-9]*) inet="${inet%/*}/16" ;;
+                    *) if [ "${#netid_check}" -gt 2 ] || [ "$netid_check" -lt 1 ] || [ "$netid_check" -gt 32 ]; then
+                           inet="${inet%/*}/16"
+                       fi ;;
+                esac
+                ;;
+            *)
+                inet="$inet/16"
+                ;;
+        esac
+        addr=${inet%/*}
+        netid=${inet#*/}
+        if ! valid_ipv4 "$addr"; then
+            echo "wlan.nodhcp: ignoring invalid address" >&2
+            continue
+        fi
+        if [ -n "$gw" ] && ! valid_ipv4 "$gw"; then
+            echo "wlan.nodhcp: ignoring invalid gateway" >&2
+            continue
+        fi
+        [ -z "$gw" ] && gw=$(calc_gw "$addr" "$netid")
+        arping -Dqc2 -Iwlan0 "$addr" || continue
+        ip a add "$inet" brd + dev wlan0
+        ip r add default via "$gw" dev wlan0
+        printf 'nameserver %s\n' "$gw" >> /etc/resolv.conf
+        return 0
+    done < /boot/wlan.nodhcp
+    return 1
+}
+
+# ip_config gives wlan0 its station-mode address: static from /boot/wlan.nodhcp
+# when that has a usable line, otherwise DHCP. The older /boot/wifi.nodhcp flag
+# (no DHCP, no address) still applies when there is no wlan.nodhcp.
+ip_config() {
+    if [ -e /boot/wlan.nodhcp ]; then
+        static_wlan && return 0
+    elif [ -e /boot/wifi.nodhcp ]; then
+        return 0
+    fi
+    (udhcpc -i wlan0 -t 10 -T 1 -A 5 -b -p /run/udhcpc.wlan0.pid) &
+}
+
+# ip_apply re-applies the address of a running station without touching
+# wpa_supplicant, so the Wi-Fi join stays up. The AP keeps its fixed address.
+ip_apply() {
+    if [ -f "$APFLAG_FILE" ]; then
+        echo "wifi: access-point mode keeps its own address" >&2
+        return 0
+    fi
+    if [ -e /run/udhcpc.wlan0.pid ]; then
+        stop_pidfile /run/udhcpc.wlan0.pid
+        rm -f /run/udhcpc.wlan0.pid
+    fi
+    ip addr flush dev wlan0
+    ip route del default dev wlan0 2>/dev/null || true
+    ip_config
+}
+
 start() {
     echo "wifi mode: sta"
     ssid=""
@@ -108,9 +222,7 @@ start() {
     )
     chmod 600 /etc/wpa_supplicant.conf
     wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant.conf
-    if [ ! -e /boot/wifi.nodhcp ]; then
-        (udhcpc -i wlan0 -t 10 -T 1 -A 5 -b -p /run/udhcpc.wlan0.pid) &
-    fi
+    ip_config
 }
 
 ap_start() {
@@ -208,4 +320,6 @@ elif [ "${1}" = "ap" ]; then
     ap_start
 elif [ "${1}" = "restart" ]; then
     restart
+elif [ "${1}" = "ip" ]; then
+    ip_apply
 fi
