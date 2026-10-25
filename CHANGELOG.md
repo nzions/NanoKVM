@@ -1,4 +1,4 @@
-## Unreleased
+## 2.5.11 (2026-10-25)
 
 ### Bug Fixes
 
