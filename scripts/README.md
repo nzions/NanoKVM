@@ -140,3 +140,60 @@ Because a symbol the binary imports could in principle be absent from the
 shipped library, and that would only surface as a crash on a real device,
 `build-in-container.sh` checks the shipped `libkvm.so` still exports every
 symbol `NanoKVM-Server` actually imports from it, and fails the build otherwise.
+
+## emu-image.sh: a QEMU-bootable emulator image
+
+`emu-image.sh` turns Sipeed's stock NanoKVM SD image into an image that boots
+under `qemu-system-riscv64 -M virt -cpu thead-c906` and serves the web UI, so
+the server can be exercised without hardware. It needs `debugfs`, `e2fsck`
+(e2fsprogs) and `sfdisk` (util-linux); no root and no loop mount.
+
+```sh
+# server: CGO_ENABLED=0 GOOS=linux GOARCH=riscv64 go build -tags nokvm   (from server/)
+scripts/emu-image.sh [--sha256 <hex>] <stock.img> <NanoKVM-Server> <out.img>
+```
+
+`<out.img>` must not exist; the stock image is only read. The script finds
+partition 2 (the ext4 rootfs) in the partition table, cuts it out, runs
+`e2fsck -fy` (a booted image carries `needs_recovery`, and a journal replay
+would silently revert the edits), edits it with `debugfs -w`, checks it again,
+splices it back into a copy and prints the output's sha256. Every edit is read
+back and the script fails if one did not land:
+
+1. The `/lib/ld-musl-riscv64*xthead*` loaders become symlinks to
+   `/lib/ld-musl-riscv64.so.1`. Sipeed's xthead loaders use RVV 0.7 vector
+   instructions that QEMU's thead-c906 lacks.
+2. The server is written to `/kvmapp/server/NanoKVM-Server` (0755).
+3. `/etc/init.d/S95nanokvm` loses its `kvm_system` start line (the hardware
+   daemon dies without `/dev/cvi-*`); the original is kept as
+   `/etc/S95nanokvm.orig`, outside `init.d` because rcS runs every `S??*`
+   there. The diff is printed.
+4. `/etc/inittab` becomes a busybox inittab (original kept as `inittab.orig`),
+   because sysvinit's `/sbin/init` stalls under QEMU after its first sysinit
+   job. It carries the stock inittab's mount/mkdir sysinit lines ahead of rcS:
+   without `/proc` the server's `os.Executable` fails and it panics.
+5. `/usr/bin/init` becomes a symlink to `/bin/busybox` (the kernel is booted
+   with `init=/usr/bin/init`).
+6. `/etc/kvm/ssh_stop` is removed so sshd starts.
+
+Boot it:
+
+```sh
+qemu-system-riscv64 -M virt -cpu thead-c906 -smp 1 -m 512 -bios default \
+  -kernel <Image-c906> \
+  -append 'root=/dev/vda2 rw console=ttyS0 init=/usr/bin/init' \
+  -drive file=<out.img>,format=raw,if=virtio \
+  -netdev user,id=n0,hostfwd=tcp::18443-:443,hostfwd=tcp::18080-:80 \
+  -device virtio-net-device,netdev=n0 -nographic
+```
+
+The web UI is then on `https://localhost:18443` and `http://localhost:18080`.
+
+### The kernel (prototype)
+
+The kernel is currently Ubuntu noble `linux-riscv` 6.8.0-60 `vmlinuz` with a
+4-byte patch at file offset `0x1B7BC` (`f3 27 00 5c` to `81 47 01 00`). It
+disables the T-Head errata probe `csrr a5,sxstatus`, which QEMU 8.2 traps on.
+`emu-image.sh --patch-kernel <in> <out>` applies exactly that patch, after
+checking the four original bytes, and prints the output sha256. This is a
+prototype; the clean fix is a kernel built with `CONFIG_ERRATA_THEAD=n`.
