@@ -80,10 +80,14 @@ func create() {
 
 	_ = os.MkdirAll("/etc/kvm", 0o644)
 
-	file, err = os.OpenFile("/etc/kvm/server.yaml", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	file, err = os.OpenFile("/etc/kvm/server.yaml", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		log.Printf("open config failed: %s", err)
 		return
+	}
+	// the file may already exist with a looser mode
+	if err = file.Chmod(0o600); err != nil {
+		log.Printf("chmod config failed: %s", err)
 	}
 	defer func() {
 		_ = file.Close()

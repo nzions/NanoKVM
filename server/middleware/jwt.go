@@ -21,9 +21,21 @@ const (
 	sessionRecheckDelay = 5 * time.Second
 )
 
+// ErrPasswordChangeRequired is the 403 body sent to a user who must change the
+// password before using any other route; the web client redirects on it.
+const ErrPasswordChangeRequired = "password_change_required"
+
+// passwordChangeRoutes are the only routes open to a user with MustChangePassword.
+var passwordChangeRoutes = map[string]struct{}{
+	"/api/auth/password": {}, // is-password-updated check and change password
+	"/api/auth/logout":   {},
+	"/api/auth/account":  {},
+}
+
 type Principal struct {
-	Username string
-	Role     authn.Role
+	Username           string
+	Role               authn.Role
+	MustChangePassword bool
 }
 
 type Token struct {
@@ -37,6 +49,9 @@ func CheckToken() gin.HandlerFunc {
 		principal, token, ok := authenticate(c)
 		if !ok {
 			abortUnauthorized(c)
+			return
+		}
+		if abortPasswordChangeRequired(c, principal) {
 			return
 		}
 
@@ -60,6 +75,18 @@ func CheckToken() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+func abortPasswordChangeRequired(c *gin.Context, principal Principal) bool {
+	if !principal.MustChangePassword {
+		return false
+	}
+	if _, ok := passwordChangeRoutes[c.FullPath()]; ok {
+		return false
+	}
+	c.JSON(http.StatusForbidden, ErrPasswordChangeRequired)
+	c.Abort()
+	return true
 }
 
 func watchSessionState(ctx context.Context, cancel context.CancelFunc, username string, tokenVersion uint64, interval time.Duration) {
@@ -129,6 +156,9 @@ func CheckTokenOrLoopbackInternalToken() gin.HandlerFunc {
 			abortUnauthorized(c)
 			return
 		}
+		if abortPasswordChangeRequired(c, principal) {
+			return
+		}
 		c.Set(principalContextKey, principal)
 		c.Set(tokenContextKey, token)
 		c.Next()
@@ -154,7 +184,7 @@ func authenticate(c *gin.Context) (Principal, *Token, bool) {
 		log.Debugf("validate session for %q: %s", token.Username, err)
 		return Principal{}, nil, false
 	}
-	return Principal{Username: user.Username, Role: user.Role}, token, true
+	return Principal{Username: user.Username, Role: user.Role, MustChangePassword: user.MustChangePassword}, token, true
 }
 
 func abortUnauthorized(c *gin.Context) {

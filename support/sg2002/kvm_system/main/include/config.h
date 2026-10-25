@@ -38,9 +38,13 @@
 #define OLED_SLEEP_DELAY_DEFAULT 	30
 #define KVM_WD_COUNT_MAX			10
 #define RM_Watchdog_times			60
+#define WIFI_AP_PASS_LEN			10
+#define WIFI_AP_TIMEOUT_MS			600000	// stop the config AP after 10 min without a result
+#define RESET_PASS_LEN				12
+#define SEED_PASS_FILE				"/etc/kvm/initial.pass"	// 0600; first-boot / reset password, shown on the OLED
 
 typedef struct {
-	int8_t page = 0;
+	int8_t page = 0;				// 0:main; 1:wifi config; 2:password
 	int8_t sub_page = 0;
 	uint8_t eth_route[16] = {0};	// route ip
 	uint8_t wifi_route[16] = {0};	// route ip
@@ -66,7 +70,7 @@ typedef struct {
 	int8_t key_thread_running = 0;
 	int8_t sys_thread_running = 0;
 	int8_t wifi_config_process = -1;	// 1:QR;2:Test;3:IP;
-	char wifi_ap_pass[9] = {0};
+	char wifi_ap_pass[WIFI_AP_PASS_LEN + 1] = {0};
     uint8_t oled_sleep_state = 0;	// 0:wakeup; 1:sleep;
 	int8_t reconvery_update = 0;	// 0:Undetected; 1:Needs Update; 2:Update finish; -1:not need to update
 	uint8_t ping_allow = 1;

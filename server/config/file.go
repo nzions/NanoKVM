@@ -34,7 +34,11 @@ func Write(conf *Config) error {
 		return err
 	}
 
-	err = os.WriteFile(ConfigurationFile, data, 0644)
+	err = os.WriteFile(ConfigurationFile, data, 0o600)
+	if err == nil {
+		// the file may already exist with a looser mode
+		err = os.Chmod(ConfigurationFile, 0o600)
+	}
 	if err != nil {
 		log.Errorf("failed to write config: %v", err)
 		return err

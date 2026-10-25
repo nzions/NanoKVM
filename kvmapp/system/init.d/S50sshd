@@ -11,12 +11,26 @@ PIDFILE="/var/run/sshd.pid"
 
 umask 077
 
+# Key-only login. Each option is probed first: sshd refuses to start on a
+# keyword its version does not know (KbdInteractiveAuthentication is newer
+# than ChallengeResponseAuthentication).
+sshd_opts() {
+    for opt in PasswordAuthentication=no KbdInteractiveAuthentication=no \
+        ChallengeResponseAuthentication=no PermitRootLogin=prohibit-password \
+        PermitEmptyPasswords=no; do
+        if /usr/sbin/sshd -t -o "$opt" >/dev/null 2>&1; then
+            printf '%s\n' "-o" "$opt"
+        fi
+    done
+}
+
 startssh() {
     # Generate SSH keys if they do not exist
     [ ! -f /etc/ssh/ssh_host_rsa_key ] && /usr/bin/ssh-keygen -A
 
         printf "Starting sshd: "
-        /usr/sbin/sshd
+        # shellcheck disable=SC2046
+        /usr/sbin/sshd $(sshd_opts | tr '\n' ' ')
         touch /var/lock/sshd
         echo "OK"
 }

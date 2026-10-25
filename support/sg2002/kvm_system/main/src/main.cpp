@@ -54,6 +54,9 @@ void* thread_oled_handle(void * arg)
 			case 1 : // wifi config page
 				kvm_wifi_config_ui_disp(page_changed, subpage_changed);
 				break;
+			case 2 : // password page
+				kvm_password_ui_disp(page_changed, subpage_changed);
+				break;
 			default:
 				OLED_Clear();
 		}
@@ -86,6 +89,10 @@ void* thread_key_handle(void * arg)
 				press_cycle = time::time_ms() - press_time;
 				if(press_cycle >= KEY_LONGLONG_PRESS){
 					kvm_reset_password();
+				} else if (kvm_sys_state.page == 2){
+					// any key closes the password page
+					kvm_sys_state.page = 0;
+					kvm_sys_state.sub_page = 0;
 				} else if (press_cycle >= KEY_LONG_PRESS && press_cycle < KEY_LONGLONG_PRESS){
 					// long
 					// printf ("[kvmk]按键长按\n");
@@ -147,6 +154,7 @@ void* thread_sys_handle(void * arg)
 	get_ping_allow_state();
     while(kvm_sys_state.sys_thread_running)
     {
+		kvm_show_seed_password();
 		// net
 		if(kvm_sys_state.page == 0){
 			kvm_update_eth_state();

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -20,9 +21,27 @@ import (
 	"github.com/mervick/aes-everywhere/go/aes256"
 )
 
+const testSeedPassword = "seed-password"
+
+// newTestStore returns a store whose owner password is testSeedPassword and
+// is already changed (MustChangePassword cleared).
+func newTestStore(t *testing.T) *authn.Store {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "pwd")
+	seedPath := filepath.Join(filepath.Dir(path), "initial.pass")
+	if err := os.WriteFile(seedPath, []byte(testSeedPassword+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := authn.NewStore(path)
+	if _, err := store.SetPassword("admin", testSeedPassword); err != nil {
+		t.Fatal(err)
+	}
+	return store
+}
+
 func TestLoginCookieAndUserAuthorizationLifecycle(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	store := authn.NewStore(filepath.Join(t.TempDir(), "pwd"))
+	store := newTestStore(t)
 	restore := useTestStore(store)
 	defer restore()
 
@@ -37,7 +56,7 @@ func TestLoginCookieAndUserAuthorizationLifecycle(t *testing.T) {
 	admin.POST("/users", service.CreateUser)
 	admin.PUT("/users/:username", service.UpdateUser)
 
-	adminCookie := loginCookie(t, router, "admin", "admin")
+	adminCookie := loginCookie(t, router, "admin", testSeedPassword)
 	if !adminCookie.HttpOnly || adminCookie.SameSite != http.SameSiteStrictMode || adminCookie.Path != "/" {
 		t.Fatalf("unsafe session cookie: %+v", adminCookie)
 	}
@@ -66,10 +85,10 @@ func TestLoginCookieAndUserAuthorizationLifecycle(t *testing.T) {
 
 func TestLogoutDoesNotInvalidateAnotherUser(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	store := authn.NewStore(filepath.Join(t.TempDir(), "pwd"))
+	store := newTestStore(t)
 	restore := useTestStore(store)
 	defer restore()
-	if _, ok, err := store.Authenticate("admin", "admin"); err != nil || !ok {
+	if _, ok, err := store.Authenticate("admin", testSeedPassword); err != nil || !ok {
 		t.Fatalf("default login: ok=%v err=%v", ok, err)
 	}
 	if err := store.Create("alice", "alice-password", authn.RoleUser); err != nil {
@@ -100,10 +119,10 @@ func TestLogoutDoesNotInvalidateAnotherUser(t *testing.T) {
 }
 
 func TestNormalUserPasswordNeverChangesSystemPassword(t *testing.T) {
-	store := authn.NewStore(filepath.Join(t.TempDir(), "pwd"))
+	store := newTestStore(t)
 	restore := useTestStore(store)
 	defer restore()
-	if _, ok, err := store.Authenticate("admin", "admin"); err != nil || !ok {
+	if _, ok, err := store.Authenticate("admin", testSeedPassword); err != nil || !ok {
 		t.Fatalf("default login: ok=%v err=%v", ok, err)
 	}
 	if err := store.Create("alice", "alice-password", authn.RoleUser); err != nil {
@@ -131,10 +150,10 @@ func TestNormalUserPasswordNeverChangesSystemPassword(t *testing.T) {
 
 func TestSelfPasswordChangeRequiresCurrentPassword(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	store := authn.NewStore(filepath.Join(t.TempDir(), "pwd"))
+	store := newTestStore(t)
 	restore := useTestStore(store)
 	defer restore()
-	if _, ok, err := store.Authenticate("admin", "admin"); err != nil || !ok {
+	if _, ok, err := store.Authenticate("admin", testSeedPassword); err != nil || !ok {
 		t.Fatalf("default login: ok=%v err=%v", ok, err)
 	}
 	if err := store.Create("alice", "alice-password", authn.RoleUser); err != nil {
@@ -174,10 +193,10 @@ func TestSelfPasswordChangeRequiresCurrentPassword(t *testing.T) {
 
 func TestAdministratorCannotResetDeviceOwnerPassword(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	store := authn.NewStore(filepath.Join(t.TempDir(), "pwd"))
+	store := newTestStore(t)
 	restore := useTestStore(store)
 	defer restore()
-	if _, ok, err := store.Authenticate("admin", "admin"); err != nil || !ok {
+	if _, ok, err := store.Authenticate("admin", testSeedPassword); err != nil || !ok {
 		t.Fatalf("default login: ok=%v err=%v", ok, err)
 	}
 	if err := store.Create("second-admin", "second-password", authn.RoleAdmin); err != nil {
@@ -205,7 +224,7 @@ func TestAdministratorCannotResetDeviceOwnerPassword(t *testing.T) {
 	if updates != 0 {
 		t.Fatalf("administrator changed the device owner's system password %d times", updates)
 	}
-	if _, ok, err := store.Authenticate("admin", "admin"); err != nil || !ok {
+	if _, ok, err := store.Authenticate("admin", testSeedPassword); err != nil || !ok {
 		t.Fatalf("device owner password changed: ok=%v err=%v", ok, err)
 	}
 	if _, ok, err := store.Authenticate("admin", "new-password"); err != nil || ok {
@@ -214,10 +233,10 @@ func TestAdministratorCannotResetDeviceOwnerPassword(t *testing.T) {
 }
 
 func TestSystemPasswordFailureRollsBackWebPassword(t *testing.T) {
-	store := authn.NewStore(filepath.Join(t.TempDir(), "pwd"))
+	store := newTestStore(t)
 	restore := useTestStore(store)
 	defer restore()
-	if _, ok, err := store.Authenticate("admin", "admin"); err != nil || !ok {
+	if _, ok, err := store.Authenticate("admin", testSeedPassword); err != nil || !ok {
 		t.Fatalf("default login: ok=%v err=%v", ok, err)
 	}
 
@@ -228,7 +247,7 @@ func TestSystemPasswordFailureRollsBackWebPassword(t *testing.T) {
 	if err := changeUserPassword("admin", encryptForRequest("new-password")); err == nil {
 		t.Fatal("system password failure was ignored")
 	}
-	if _, ok, err := store.Authenticate("admin", "admin"); err != nil || !ok {
+	if _, ok, err := store.Authenticate("admin", testSeedPassword); err != nil || !ok {
 		t.Fatalf("old web password was not restored: ok=%v err=%v", ok, err)
 	}
 	if _, ok, err := store.Authenticate("admin", "new-password"); err != nil || ok {

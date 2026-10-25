@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"sync"
 
 	"NanoKVM-Server/utils"
@@ -17,10 +19,19 @@ import (
 )
 
 const (
-	AccountFile        = "/etc/kvm/pwd"
+	AccountFile = "/etc/kvm/pwd"
+	// SeedPasswordFile holds the first-boot (or button-reset) password of the
+	// device owner. It is 0600 and shown on the device's own screen by
+	// kvm_system; it is removed once the owner changes the password.
+	SeedPasswordFile   = "/etc/kvm/initial.pass"
 	currentFileVersion = 1
 	defaultUsername    = "admin"
-	defaultPassword    = "admin"
+	// legacyDefaultPassword is the password older releases shipped with. It is
+	// no longer used for seeding; an account still holding it must change it.
+	legacyDefaultPassword = "admin"
+	seedPasswordLength    = 12
+	// seedPasswordAlphabet has no look-alike characters (0/O, 1/l/I).
+	seedPasswordAlphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 )
 
 type Role string
@@ -76,14 +87,16 @@ type legacyAccount struct {
 }
 
 type Store struct {
-	path  string
-	mutex sync.RWMutex
+	path     string
+	seedPath string
+	mutex    sync.RWMutex
 }
 
 var DefaultStore = NewStore(AccountFile)
 
+// NewStore keeps the seed password file next to the account file.
 func NewStore(path string) *Store {
-	return &Store{path: path}
+	return &Store{path: path, seedPath: filepath.Join(filepath.Dir(path), filepath.Base(SeedPasswordFile))}
 }
 
 func IsValidRole(role Role) bool {
@@ -103,6 +116,15 @@ func ValidatePassword(password string) error {
 		return errors.New("password must be between 8 and 72 bytes")
 	}
 	return nil
+}
+
+// Init creates the account file (and the seed password file) when missing.
+func (s *Store) Init() error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	_, err := s.loadLocked(true)
+	return err
 }
 
 func (s *Store) List() ([]UserInfo, error) {
@@ -350,6 +372,10 @@ func (s *Store) SetPasswordAndRun(username, password string, afterCommit func() 
 			return nil, err
 		}
 	}
+	if db.Users[index].SystemAccount {
+		// the owner chose a password: stop showing the seed one on the screen
+		_ = os.Remove(s.seedPath)
+	}
 	return cloneUser(&db.Users[index]), nil
 }
 
@@ -374,7 +400,7 @@ func (s *Store) Revoke(username string) (*User, error) {
 func (s *Store) loadLocked(migrate bool) (*database, error) {
 	data, err := os.ReadFile(s.path)
 	if errors.Is(err, os.ErrNotExist) {
-		db, defaultErr := defaultDatabase()
+		db, defaultErr := s.defaultDatabase(migrate)
 		if defaultErr != nil {
 			return nil, defaultErr
 		}
@@ -416,7 +442,7 @@ func (s *Store) loadLocked(migrate bool) (*database, error) {
 			Role:               RoleAdmin,
 			Enabled:            true,
 			TokenVersion:       tokenVersion,
-			MustChangePassword: passwordMatches(legacy.Password, defaultPassword),
+			MustChangePassword: passwordMatches(legacy.Password, legacyDefaultPassword),
 			SystemAccount:      true,
 		}},
 	}
@@ -475,8 +501,15 @@ func (s *Store) saveLocked(db *database) error {
 	return dir.Sync()
 }
 
-func defaultDatabase() (*database, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(defaultPassword), bcrypt.DefaultCost)
+// defaultDatabase seeds the device owner. The password is the one already in
+// the seed file (written by the button reset) or a fresh random one; when
+// persist is set it is written 0600 so the device screen can show it.
+func (s *Store) defaultDatabase(persist bool) (*database, error) {
+	password, err := s.seedPassword(persist)
+	if err != nil {
+		return nil, err
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
 	}
@@ -496,6 +529,49 @@ func defaultDatabase() (*database, error) {
 			SystemAccount:      true,
 		}},
 	}, nil
+}
+
+func (s *Store) seedPassword(persist bool) (string, error) {
+	if data, err := os.ReadFile(s.seedPath); err == nil {
+		if password := strings.TrimSpace(string(data)); ValidatePassword(password) == nil {
+			return password, nil
+		}
+	}
+	password, err := randomPassword(seedPasswordLength)
+	if err != nil {
+		return "", err
+	}
+	if persist {
+		if err = writeFile0600(s.seedPath, []byte(password+"\n")); err != nil {
+			return "", err
+		}
+	}
+	return password, nil
+}
+
+// writeFile0600 creates the file with 0600 from the start and fixes the mode of
+// one that already exists.
+func writeFile0600(path string, data []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return err
+	}
+	return os.Chmod(path, 0o600)
+}
+
+func randomPassword(length int) (string, error) {
+	limit := big.NewInt(int64(len(seedPasswordAlphabet)))
+	password := make([]byte, length)
+	for index := range password {
+		n, err := rand.Int(rand.Reader, limit)
+		if err != nil {
+			return "", err
+		}
+		password[index] = seedPasswordAlphabet[n.Int64()]
+	}
+	return string(password), nil
 }
 
 func newTokenVersion() (uint64, error) {

@@ -1,5 +1,9 @@
 package config
 
+// defaultLoginLockoutDuration is the lockout in seconds. 0 (or unset) means
+// this default; a negative value disables the lockout.
+const defaultLoginLockoutDuration = 300
+
 var defaultConfig = &Config{
 	Proto: "http",
 	Host:  "",
@@ -28,7 +32,7 @@ var defaultConfig = &Config{
 	},
 	Authentication: "enable",
 	Security: Security{
-		LoginLockoutDuration: 0,
+		LoginLockoutDuration: defaultLoginLockoutDuration,
 		LoginMaxFailures:     5,
 	},
 }
@@ -49,6 +53,16 @@ func checkDefaultValue() {
 
 	if instance.Authentication == "" {
 		instance.Authentication = "enable"
+	}
+
+	// Configs written by older releases carry an explicit 0 (then "off"); 0
+	// now means the default so those devices get the lockout too.
+	if instance.Security.LoginLockoutDuration == 0 {
+		instance.Security.LoginLockoutDuration = defaultLoginLockoutDuration
+	}
+
+	if instance.Security.LoginMaxFailures <= 0 {
+		instance.Security.LoginMaxFailures = 5
 	}
 
 	instance.Hardware = getHardware()

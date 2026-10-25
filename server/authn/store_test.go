@@ -6,11 +6,70 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
 	"golang.org/x/crypto/bcrypt"
 )
+
+const testSeedPassword = "seed-password"
+
+// seededStore returns a store whose first-boot password is testSeedPassword.
+func seededStore(t *testing.T, path string) *Store {
+	t.Helper()
+	store := NewStore(path)
+	if err := os.WriteFile(store.seedPath, []byte(testSeedPassword+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return store
+}
+
+func TestFreshSeedIsRandomPrivateAndMustChange(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "pwd")
+	store := NewStore(path)
+	if _, ok, err := store.Authenticate("admin", "admin"); err != nil || ok {
+		t.Fatalf("known default must not work: ok=%v err=%v", ok, err)
+	}
+	data, err := os.ReadFile(store.seedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	password := strings.TrimSpace(string(data))
+	if len(password) < seedPasswordLength {
+		t.Fatalf("seed password too short: %q", password)
+	}
+	info, err := os.Stat(store.seedPath)
+	if err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("seed file mode: %v, %v", info, err)
+	}
+	user, ok, err := store.Authenticate("admin", password)
+	if err != nil || !ok || !user.MustChangePassword {
+		t.Fatalf("seed login: user=%+v ok=%v err=%v", user, ok, err)
+	}
+	if _, err = store.SetPassword("admin", "a-new-password"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = os.Stat(store.seedPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("seed file must be removed after the owner changes the password: %v", err)
+	}
+}
+
+func TestLegacyDefaultPasswordMustChange(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "pwd")
+	hash, err := bcrypt.GenerateFromPassword([]byte(legacyDefaultPassword), bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy, _ := json.Marshal(legacyAccount{Username: "admin", Password: string(hash)})
+	if err = os.WriteFile(path, legacy, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	user, ok, err := NewStore(path).Authenticate("admin", legacyDefaultPassword)
+	if err != nil || !ok || !user.MustChangePassword {
+		t.Fatalf("legacy default must be forced to change: user=%+v ok=%v err=%v", user, ok, err)
+	}
+}
 
 func TestLegacyAccountMigratesInPlace(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "pwd")
@@ -61,15 +120,15 @@ func TestCorruptAccountFileFailsClosed(t *testing.T) {
 	if err := os.WriteFile(path, []byte("not json"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	_, ok, err := NewStore(path).Authenticate("admin", "admin")
+	_, ok, err := NewStore(path).Authenticate("admin", testSeedPassword)
 	if err == nil || ok {
 		t.Fatalf("corrupt file must fail closed: ok=%v err=%v", ok, err)
 	}
 }
 
 func TestUserLifecycleAndTokenRevocation(t *testing.T) {
-	store := NewStore(filepath.Join(t.TempDir(), "pwd"))
-	if _, ok, err := store.Authenticate("admin", "admin"); err != nil || !ok {
+	store := seededStore(t, filepath.Join(t.TempDir(), "pwd"))
+	if _, ok, err := store.Authenticate("admin", testSeedPassword); err != nil || !ok {
 		t.Fatalf("default login: ok=%v err=%v", ok, err)
 	}
 	if err := store.Create("alice", "correct-horse", RoleUser); err != nil {
@@ -115,8 +174,8 @@ func TestUserLifecycleAndTokenRevocation(t *testing.T) {
 }
 
 func TestLastAdminAndSelfProtection(t *testing.T) {
-	store := NewStore(filepath.Join(t.TempDir(), "pwd"))
-	if _, ok, err := store.Authenticate("admin", "admin"); err != nil || !ok {
+	store := seededStore(t, filepath.Join(t.TempDir(), "pwd"))
+	if _, ok, err := store.Authenticate("admin", testSeedPassword); err != nil || !ok {
 		t.Fatalf("default login: ok=%v err=%v", ok, err)
 	}
 	userRole := RoleUser
@@ -146,8 +205,8 @@ func TestLastAdminAndSelfProtection(t *testing.T) {
 
 func TestRemovedAccountFileAndRecreatedUserInvalidateOldVersions(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "pwd")
-	store := NewStore(path)
-	admin, ok, err := store.Authenticate("admin", "admin")
+	store := seededStore(t, path)
+	admin, ok, err := store.Authenticate("admin", testSeedPassword)
 	if err != nil || !ok {
 		t.Fatalf("default login: ok=%v err=%v", ok, err)
 	}
@@ -158,7 +217,7 @@ func TestRemovedAccountFileAndRecreatedUserInvalidateOldVersions(t *testing.T) {
 		t.Fatal("old admin token survived account-file reset")
 	}
 
-	if _, ok, err = store.Authenticate("admin", "admin"); err != nil || !ok {
+	if _, ok, err = store.Authenticate("admin", testSeedPassword); err != nil || !ok {
 		t.Fatalf("login after reset: ok=%v err=%v", ok, err)
 	}
 	if err = store.Create("alice", "alice-password", RoleUser); err != nil {
@@ -180,8 +239,8 @@ func TestRemovedAccountFileAndRecreatedUserInvalidateOldVersions(t *testing.T) {
 }
 
 func TestConcurrentCreatesDoNotLoseUsers(t *testing.T) {
-	store := NewStore(filepath.Join(t.TempDir(), "pwd"))
-	if _, ok, err := store.Authenticate("admin", "admin"); err != nil || !ok {
+	store := seededStore(t, filepath.Join(t.TempDir(), "pwd"))
+	if _, ok, err := store.Authenticate("admin", testSeedPassword); err != nil || !ok {
 		t.Fatalf("default login: ok=%v err=%v", ok, err)
 	}
 

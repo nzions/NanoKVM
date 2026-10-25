@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,10 +18,84 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+const testSeedPassword = "seed-password"
+
+// newTestStore returns a store whose owner password is testSeedPassword and
+// is already changed (MustChangePassword cleared).
+func newTestStore(t *testing.T) *authn.Store {
+	t.Helper()
+	return newTestStoreAt(t, filepath.Join(t.TempDir(), "pwd"))
+}
+
+func newTestStoreAt(t *testing.T, path string) *authn.Store {
+	t.Helper()
+	seedPath := filepath.Join(filepath.Dir(path), "initial.pass")
+	if err := os.WriteFile(seedPath, []byte(testSeedPassword+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := authn.NewStore(path)
+	if _, err := store.SetPassword("admin", testSeedPassword); err != nil {
+		t.Fatal(err)
+	}
+	return store
+}
+
+func TestCheckTokenBlocksUntilPasswordChanged(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	path := filepath.Join(t.TempDir(), "pwd")
+	store := authn.NewStore(path)
+	seed, err := os.ReadFile(filepath.Join(filepath.Dir(path), "initial.pass"))
+	if err == nil {
+		t.Fatalf("seed file exists before first use: %q", seed)
+	}
+	// first use seeds the account and writes the seed password
+	if _, _, err = store.Authenticate("admin", ""); err != nil {
+		t.Fatal(err)
+	}
+	seed, err = os.ReadFile(filepath.Join(filepath.Dir(path), "initial.pass"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner, ok, err := store.Authenticate("admin", strings.TrimSpace(string(seed)))
+	if err != nil || !ok {
+		t.Fatalf("seed login: ok=%v err=%v", ok, err)
+	}
+	restore := useTestAuthStore(t, store)
+	defer restore()
+	token, err := GenerateJWT(owner.Username, owner.TokenVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	router := gin.New()
+	ok200 := func(c *gin.Context) { c.Status(http.StatusNoContent) }
+	router.GET("/api/auth/password", CheckToken(), ok200)
+	router.POST("/api/auth/logout", CheckToken(), ok200)
+	router.GET("/api/vm/info", CheckToken(), ok200)
+	if status := requestWithToken(router, "/api/auth/password", token); status != http.StatusNoContent {
+		t.Fatalf("password check status = %d", status)
+	}
+	if status := requestWithToken(router, "/api/vm/info", token); status != http.StatusForbidden {
+		t.Fatalf("other route status = %d, want 403", status)
+	}
+
+	updated, err := store.SetPassword("admin", "a-new-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, err = GenerateJWT(updated.Username, updated.TokenVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status := requestWithToken(router, "/api/vm/info", token); status != http.StatusNoContent {
+		t.Fatalf("after change status = %d", status)
+	}
+}
+
 func TestCheckTokenUsesLiveRoleAndVersion(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	store := authn.NewStore(filepath.Join(t.TempDir(), "pwd"))
-	admin, ok, err := store.Authenticate("admin", "admin")
+	store := newTestStore(t)
+	admin, ok, err := store.Authenticate("admin", testSeedPassword)
 	if err != nil || !ok {
 		t.Fatalf("default login: ok=%v err=%v", ok, err)
 	}
@@ -127,8 +202,8 @@ func TestRevokeUserSessionsCancelsActiveRequests(t *testing.T) {
 
 func TestAccountFileResetCancelsActiveSession(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "pwd")
-	store := authn.NewStore(path)
-	user, ok, err := store.Authenticate("admin", "admin")
+	store := newTestStoreAt(t, path)
+	user, ok, err := store.Authenticate("admin", testSeedPassword)
 	if err != nil || !ok {
 		t.Fatalf("default login: ok=%v err=%v", ok, err)
 	}

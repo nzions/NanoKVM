@@ -171,8 +171,13 @@ func connect(ssid string, password string) error {
 		return err
 	}
 
-	if err := os.WriteFile(WiFiPasswd, []byte(password), 0o644); err != nil {
+	if err := os.WriteFile(WiFiPasswd, []byte(password), 0o600); err != nil {
 		log.Errorf("failed to save wifi password: %s", err)
+		return err
+	}
+	// the file may already exist with a looser mode
+	if err := os.Chmod(WiFiPasswd, 0o600); err != nil {
+		log.Errorf("failed to restrict wifi password file: %s", err)
 		return err
 	}
 

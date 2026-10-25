@@ -1,10 +1,78 @@
 #include "system_ctrl.h"
+#include <errno.h>
 
 using namespace maix;
 using namespace maix::sys;
 
 extern kvm_sys_state_t kvm_sys_state;
 extern kvm_oled_state_t kvm_oled_state;
+
+// no look-alike characters (0/O, 1/l/I); the AP one is lowercase for typing on a phone
+#define AP_PASS_ALPHABET	"abcdefghjkmnpqrstuvwxyz23456789"
+#define RESET_PASS_ALPHABET	"23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+
+static uint64_t wifi_ap_start_ms = 0;
+static uint8_t seed_pass_shown = 0;
+
+// Fill out with len characters of alphabet from /dev/urandom (rejection
+// sampling, no modulo bias) and terminate it. Returns 1 on success.
+static uint8_t random_string(char *out, size_t len, const char *alphabet)
+{
+	size_t n = strlen(alphabet);
+	size_t limit = 256 - (256 % n);
+	size_t i = 0;
+	uint8_t buf[32];
+	int fd = open("/dev/urandom", O_RDONLY);
+	if(fd < 0) return 0;
+	while(i < len){
+		ssize_t got = read(fd, buf, sizeof(buf));
+		if(got < 0 && errno == EINTR) continue;
+		if(got <= 0){
+			close(fd);
+			return 0;
+		}
+		for(ssize_t j = 0; j < got && i < len; j++){
+			if(buf[j] < limit) out[i++] = alphabet[buf[j] % n];
+		}
+	}
+	close(fd);
+	out[len] = '\0';
+	return 1;
+}
+
+// Write text to path, created 0600 (an existing file is tightened too).
+static uint8_t write_secret_file(const char *path, const char *text)
+{
+	size_t len = strlen(text);
+	int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+	if(fd < 0) return 0;
+	if(fchmod(fd, 0600) != 0){
+		close(fd);
+		return 0;
+	}
+	ssize_t written = write(fd, text, len);
+	if(close(fd) != 0) return 0;
+	return written == (ssize_t)len;
+}
+
+// Show the first-boot / reset password on the OLED while its file exists.
+void kvm_show_seed_password(void)
+{
+	if(access(SEED_PASS_FILE, F_OK) != 0){
+		// the owner changed the password: the file is gone, leave the page
+		seed_pass_shown = 0;
+		if(kvm_sys_state.page == 2){
+			kvm_sys_state.page = 0;
+			kvm_sys_state.sub_page = 0;
+		}
+		return;
+	}
+	if(!seed_pass_shown && kvm_sys_state.page == 0){
+		seed_pass_shown = 1;
+		kvm_sys_state.page = 2;
+		kvm_sys_state.sub_page = 0;
+	}
+}
 
 void gen_hostapd_conf(char* ap_ssid)
 {
@@ -96,29 +164,35 @@ void kvm_wifi_web_config_process()
 
 void kvm_wifi_config_process()
 {	
-	int temp;
-	char ran_num;
-	static char cmd[70];
+	if((kvm_sys_state.wifi_config_process == 1 || kvm_sys_state.wifi_config_process == 2) &&
+		time::time_ms() - wifi_ap_start_ms >= WIFI_AP_TIMEOUT_MS){
+		// nobody configured the device in time: stop the AP, back to idle
+		system("/etc/init.d/S30wifi restart");
+		unlink("/kvmapp/kvm/ap.pass");
+		memset(kvm_sys_state.wifi_ap_pass, 0, sizeof(kvm_sys_state.wifi_ap_pass));
+		kvm_sys_state.wifi_config_process = -1;
+		kvm_sys_state.page = 0;
+		kvm_sys_state.sub_page = 0;
+		return;
+	}
 	switch(kvm_sys_state.wifi_config_process){
 		case -1:
 			// printf("[kvms]Not in the process of configuring WiFi\n");
 			break;
 		case 0: // 启动wifi
-			srand((unsigned)time::time_ms());
-			for(temp = 0; temp < 4; temp++){
-				do{
-					ran_num = (char)rand()%10 + '0';
-					if(temp == 0) break;
-				} while (ran_num == kvm_sys_state.wifi_ap_pass[(temp-1)*2]);
-				kvm_sys_state.wifi_ap_pass[temp*2] = ran_num;
-				kvm_sys_state.wifi_ap_pass[temp*2+1] = ran_num;
+			if(!random_string(kvm_sys_state.wifi_ap_pass, WIFI_AP_PASS_LEN, AP_PASS_ALPHABET) ||
+				!write_secret_file("/kvmapp/kvm/ap.pass", kvm_sys_state.wifi_ap_pass)){
+				// no password, no AP
+				memset(kvm_sys_state.wifi_ap_pass, 0, sizeof(kvm_sys_state.wifi_ap_pass));
+				kvm_sys_state.wifi_config_process = -1;
+				kvm_sys_state.page = 0;
+				kvm_sys_state.sub_page = 0;
+				break;
 			}
-			kvm_sys_state.wifi_ap_pass[8] = '\0';
 
-			sprintf(cmd, "echo %s > /kvmapp/kvm/ap.pass", kvm_sys_state.wifi_ap_pass);
 			system("echo NanoKVM > /kvmapp/kvm/ap.ssid");
-			system(cmd);
 			system("/etc/init.d/S30wifi ap");
+			wifi_ap_start_ms = time::time_ms();
 
 			kvm_sys_state.wifi_config_process = 1;
 			kvm_sys_state.sub_page = 1;
@@ -153,29 +227,40 @@ void kvm_wifi_config_process()
 	}
 }
 
+// Set a fresh random root password, make the web store reseed from it, and show
+// it on the OLED. Returns 0 on success.
 uint8_t kvm_reset_password(void)
 {
-	FILE *fp = popen("bash", "w");
-    if (fp == NULL) {
-        perror("popen");
-        return 0;
-    }
+	char pass[RESET_PASS_LEN + 1] = {0};
+	char line[RESET_PASS_LEN + 8];
 
-    fputs("passwd root\n", fp);
-	time::sleep_ms(10);
-    fputs("root\n", fp);
-	time::sleep_ms(10);
-    fputs("root\n", fp);
-	time::sleep_ms(10);
-    fputs("rm /etc/kvm/pwd\n", fp);
-	time::sleep_ms(10);
-    fputs("sync\n", fp);
-	time::sleep_ms(10);
-    fputs("exit\n", fp); // 退出 bash
+	if(!random_string(pass, RESET_PASS_LEN, RESET_PASS_ALPHABET)){
+		perror("urandom");
+		return 1;
+	}
 
-    if (pclose(fp) == -1) {
-        perror("pclose");
-        return 1;
-    }
-    return 0;
+	FILE *fp = popen("chpasswd", "w");
+	if (fp == NULL) {
+		perror("popen");
+		return 1;
+	}
+	fprintf(fp, "root:%s\n", pass);
+	if (pclose(fp) != 0) {
+		perror("pclose");
+		return 1;
+	}
+
+	// the web store seeds the admin account from this file once /etc/kvm/pwd is gone
+	snprintf(line, sizeof(line), "%s\n", pass);
+	if(!write_secret_file(SEED_PASS_FILE, line)){
+		perror("write seed password");
+		return 1;
+	}
+	unlink("/etc/kvm/pwd");
+	sync();
+
+	seed_pass_shown = 1;
+	kvm_sys_state.page = 2;
+	kvm_sys_state.sub_page = 0;
+	return 0;
 }

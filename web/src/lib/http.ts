@@ -44,6 +44,12 @@ class Http {
         if (code === 401) {
           notifyAuthExpired();
         }
+        // the server refuses every route but the change-password ones until the password is changed
+        if (code === 403 && error.response?.data === 'password_change_required') {
+          if (!window.location.hash.startsWith('#/auth/password')) {
+            window.location.hash = '#/auth/password';
+          }
+        }
         return Promise.reject(error);
       }
     );

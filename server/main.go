@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"NanoKVM-Server/authn"
 	"NanoKVM-Server/common"
 	"NanoKVM-Server/config"
 	"NanoKVM-Server/logger"
@@ -34,6 +35,13 @@ func initialize() {
 	}
 
 	logger.Init()
+
+	// seed the device owner now so its first-boot password is on the device screen
+	if config.GetInstance().Authentication != "disable" {
+		if err := authn.DefaultStore.Init(); err != nil {
+			log.Printf("failed to initialize accounts: %v", err)
+		}
+	}
 
 	// init screen parameters
 	_ = common.GetScreen()

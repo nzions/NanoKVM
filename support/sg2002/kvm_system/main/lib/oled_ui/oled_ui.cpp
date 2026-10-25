@@ -426,8 +426,9 @@ void show_wifi_config_ip(void)
 	static char wifi_addr_with_key[30];
 	sprintf(wifi_addr_with_path, "%s/#/", kvm_sys_state.wifi_addr);
 	sprintf(wifi_addr_with_key, "WIFI?P=%s", kvm_sys_state.wifi_ap_pass);
-	OLED_ShowString_AlignRight(63, 2, wifi_addr_with_path, 4);
-	OLED_ShowString_AlignRight(63, 3, wifi_addr_with_key, 4);
+	// 127: "WIFI?P=" plus the 10 character password is wider than 63 pixels
+	OLED_ShowString_AlignRight(127, 2, wifi_addr_with_path, 4);
+	OLED_ShowString_AlignRight(127, 3, wifi_addr_with_key, 4);
 }
 
 void show_wifi_config_QR(void)
@@ -483,6 +484,26 @@ void kvm_wifi_config_ui_disp(uint8_t first_disp, uint8_t subpage_changed)
 		}
 	}
 	// switch(show_which_page())
+}
+
+// Show the first-boot / reset password (SEED_PASS_FILE) until a key is pressed
+// or the owner changes it.
+void kvm_password_ui_disp(uint8_t first_disp, uint8_t subpage_changed)
+{
+	char pass[22] = {0};	// one 6x8 line is 21 characters
+	FILE *fp;
+	if(!(first_disp || subpage_changed)) return;
+	fp = fopen(SEED_PASS_FILE, "r");
+	if(fp != NULL){
+		if(fgets(pass, sizeof(pass), fp) == NULL) pass[0] = '\0';
+		fclose(fp);
+	}
+	pass[strcspn(pass, "\r\n")] = '\0';
+	OLED_Clear();
+	OLED_ShowString(0, 0, "Web login: admin", 8);
+	OLED_ShowString(0, 1, "Password:", 8);
+	OLED_ShowString(0, 2, pass, 8);
+	OLED_ShowString(0, 3, "Key: close", 8);
 }
 
 void oled_auto_sleep_time_update(void)
