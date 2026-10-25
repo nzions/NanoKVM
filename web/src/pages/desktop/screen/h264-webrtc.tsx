@@ -16,6 +16,7 @@ type SignalingMessage = {
 };
 
 const WEBRTC_CONNECTION_FAILED_NOTIFICATION_KEY = 'webrtc_connection_failed';
+const WEBRTC_NOTIFICATION_DURATION = 8;
 const WEBRTC_CONNECTION_TIMEOUT = 10 * 1000;
 const WEBRTC_RECONNECT_DELAY = 3 * 1000;
 
@@ -31,6 +32,9 @@ export const H264Webrtc = () => {
   const { t } = useTranslation();
   const mouseStyle = useAtomValue(mouseStyleAtom);
   const [isLoading, setIsLoading] = useState(true);
+  const [streamState, setStreamState] = useState<'connecting' | 'connected' | 'failed'>(
+    'connecting'
+  );
   const [connectionAttempt, setConnectionAttempt] = useState(0);
   const [notificationApi, contextHolder] = notification.useNotification();
 
@@ -54,13 +58,14 @@ export const H264Webrtc = () => {
     let disposed = false;
 
     const showConnectionFailureNotification = () => {
+      setStreamState((state) => (state === 'connected' ? state : 'failed'));
       notificationApi.error({
         key: WEBRTC_CONNECTION_FAILED_NOTIFICATION_KEY,
         message: translationRef.current('screen.webrtcConnectionFailed.title'),
         description: translationRef.current('screen.webrtcConnectionFailed.description'),
-        placement: 'topRight',
+        placement: 'bottomRight',
         closable: false,
-        duration: null
+        duration: WEBRTC_NOTIFICATION_DURATION
       });
     };
 
@@ -147,6 +152,7 @@ export const H264Webrtc = () => {
           scheduleReconnect('peer connection state is failed');
         } else if (peer.connectionState === 'connected') {
           cancelReconnect();
+          setStreamState('connected');
           notificationApi.destroy(WEBRTC_CONNECTION_FAILED_NOTIFICATION_KEY);
         }
       };
@@ -330,9 +336,25 @@ export const H264Webrtc = () => {
           }}
           onPlaying={() => {
             setIsLoading(false);
+            setStreamState('connected');
           }}
         />
       </ScreenViewport>
+
+      {streamState !== 'connected' && (
+        <div className="pointer-events-none absolute inset-0 z-40 flex flex-col items-center justify-center gap-1 px-4 text-center text-sm text-neutral-400">
+          {streamState === 'failed' ? (
+            <>
+              <span>{t('screen.webrtcConnectionFailed.title')}</span>
+              <span className="text-xs text-neutral-500">
+                {t('screen.webrtcConnectionFailed.description')}
+              </span>
+            </>
+          ) : (
+            <span>{t('screen.connecting')}</span>
+          )}
+        </div>
+      )}
 
       {isLoading && (
         <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-[2px] transition-all duration-300">

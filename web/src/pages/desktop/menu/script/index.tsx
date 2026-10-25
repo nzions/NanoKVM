@@ -133,6 +133,12 @@ export const Script = () => {
       </div>
       <Divider style={{ margin: '10px 0 15px 0' }} />
 
+      {scripts.length === 0 && (
+        <div className="max-w-[260px] pb-1 text-center text-xs text-neutral-500">
+          {t('script.emptyHint')}
+        </div>
+      )}
+
       {scripts.map((script) => (
         <div
           key={script}

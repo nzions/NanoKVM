@@ -141,7 +141,7 @@ export const Users = () => {
                 )}
               </span>
               <Select<UserRole>
-                className="w-28"
+                className="w-36 shrink-0"
                 value={user.role}
                 disabled={isLoading || isProtected}
                 options={[

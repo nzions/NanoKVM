@@ -15,6 +15,15 @@ const renderApp = () => {
   const themeConfig = {
     algorithm: theme.darkAlgorithm,
     components: {
+      Slider: {
+        railBg: 'rgba(255, 255, 255, 0.28)',
+        railHoverBg: 'rgba(255, 255, 255, 0.4)',
+        trackBg: '#4096ff',
+        trackHoverBg: '#69b1ff',
+        handleColor: '#91caff',
+        handleActiveColor: '#e6f4ff',
+        dotBorderColor: 'rgba(255, 255, 255, 0.4)'
+      },
       Collapse: {
         headerPadding: 0,
         contentPadding: 0

@@ -1,5 +1,21 @@
 ## Unreleased
 
+### Bug Fixes
+
+* Web: the top menubar fits a phone-width screen (it scrolls sideways when wider than the viewport) so the drag grip and the collapse button stay reachable
+* Web: the "WebRTC connection failed" notification closes after 8 seconds, updates one notification on every retry instead of stacking, and sits at the bottom right so it no longer covers the menubar, Settings close button or popover buttons
+* Web: the screen shows a muted "Connecting…" or connection-failure message with a hint to switch the video mode, instead of plain black, while there is no H.264 WebRTC stream
+* Web: non-antd text (Change Password heading, keyboard lock status) uses the sans-serif font instead of the browser's serif default, and the keyboard lock labels are 10px instead of 8px
+* Web: the Delete shortcut key reads "Del" instead of the backspace symbol, and the Scale submenu shows "%" instead of a stray icon
+* Web: the Power long-click and Wheel-speed sliders have a visible track and handle on the dark theme, and the Fast/Slow labels have spacing
+* Web: the HID-Only dialog shows a translated error and disables the action while the current mode is unknown; the Image Downloader error text has padding; the OLED setting says "Not detected" when there is no OLED
+* Web: About no longer shows a dangling "kvm-" / "kvm-.local" hostname when the suffix is empty, and shows "—" for an empty image version
+* Web: the virtual keyboard dialog has a hidden title and description (no more Radix accessibility warnings)
+* Web: the Cursor submenu marks the selected item with the same blue check as the other submenus
+* Web: the empty Images list and Scripts popover say where to put images and how to add a script
+* Web: the Ethernet panel validates the address and gateway as you type with a message under the field, keeps Save disabled while the input is invalid or unchanged, aligns the Address and Gateway labels, and wraps the summary line below the DHCP/Static control on narrow screens
+* Web: the Users role select is wide enough to show "Administrator"
+
 ### Security
 
 * The inbound firewall is open by default: INPUT policy ACCEPT and none of our rules, and a device that already had the default-DROP allowlist is opened on the next `S95nanokvm firewall` or boot. `firewall: drop` in /etc/kvm/server.yaml turns the allowlist back on (then run `/etc/init.d/S95nanokvm firewall`); an unknown value is logged and treated as open

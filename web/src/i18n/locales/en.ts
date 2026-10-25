@@ -115,6 +115,7 @@ const en = {
         description:
           'H.264 Direct and H.264 WebRTC are being used at the same time. This may cause screen tearing or corrupted video. Please use only one H.264 mode.'
       },
+      connecting: 'Connecting…',
       webrtcConnectionFailed: {
         title: 'WebRTC connection failed',
         description: 'Check the network connection or switch the video mode.'
@@ -137,6 +138,7 @@ const en = {
       placeholder: 'Please input',
       submit: 'Submit',
       virtual: 'Keyboard',
+      virtualDescription: 'On-screen keyboard that sends key presses to the remote host',
       readClipboard: 'Read from Clipboard',
       clipboardPermissionDenied:
         'Clipboard permission denied. Please allow clipboard access in your browser.',
@@ -211,13 +213,16 @@ const en = {
         tip2: 'In HID-Only mode, image mounting is disabled',
         tip3: 'NanoKVM will automatically reboot after switching modes',
         enable: 'Enable HID-Only mode',
-        disable: 'Disable HID-Only mode'
+        disable: 'Disable HID-Only mode',
+        getFailed: 'Could not read the current HID mode. Try again later.',
+        setFailed: 'Could not change the HID mode. Try again later.'
       }
     },
     image: {
       title: 'Images',
       loading: 'Loading...',
       empty: 'Nothing Found',
+      emptyHint: 'Put .iso or .img files in /data on the device, or use the Image Downloader.',
       mountMode: 'Mount mode',
       mountFailed: 'Mount failed',
       mountDesc:
@@ -255,6 +260,7 @@ const en = {
     script: {
       title: 'Scripts',
       upload: 'Upload',
+      emptyHint: 'No scripts yet. Upload a .sh or .py file with the Upload button.',
       run: 'Run',
       runBackground: 'Run Background',
       runFailed: 'Run failed',
@@ -400,6 +406,7 @@ const en = {
         oled: {
           title: 'OLED',
           description: 'Turn off OLED screen after',
+          notDetected: 'Not detected',
           0: 'Never',
           15: '15 sec',
           30: '30 sec',

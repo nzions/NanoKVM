@@ -6,6 +6,12 @@ import { useTranslation } from 'react-i18next';
 
 import * as api from '@/api/vm.ts';
 
+// A device without a serial suffix reports "kvm-" (or "kvm-.local"): drop the dangling dash.
+export function displayHostname(value?: string): string {
+  const shown = (value ?? '').replace(/-(\.local)?$/, '$1');
+  return shown || '—';
+}
+
 export const Hostname = ({ editable = false }: { editable?: boolean }) => {
   const { t } = useTranslation();
 
@@ -82,7 +88,7 @@ export const Hostname = ({ editable = false }: { editable?: boolean }) => {
           </div>
         ) : (
           <div className="flex items-center space-x-2">
-            <span>{hostname}</span>
+            <span>{displayHostname(hostname)}</span>
             {editable && (
               <div
                 className="size-[16px] cursor-pointer text-neutral-500 hover:text-blue-500"

@@ -43,8 +43,8 @@ export const Speed = () => {
       <Slider
         vertical
         marks={{
-          0: <span>{t('mouse.slow')}</span>,
-          100: <span>{t('mouse.fast')}</span>
+          0: <span className="whitespace-nowrap pl-2">{t('mouse.slow')}</span>,
+          100: <span className="whitespace-nowrap pl-2">{t('mouse.fast')}</span>
         }}
         range={false}
         included={false}

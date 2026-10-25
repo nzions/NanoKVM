@@ -72,27 +72,41 @@ const InterfacePanel = ({ info, onChanged }: PanelProps) => {
     ? Math.max(0, pending.deadline_unix - Math.floor((now + skew) / 1000))
     : 0;
 
-  function validate(): string {
-    if (mode === 'dhcp') return '';
+  function validateFields(): { address: string; gateway: string } {
+    if (mode === 'dhcp') return { address: '', gateway: '' };
 
     // the server accepts /1 to /32: /31 is point-to-point, /32 a lone host (server/service/network/interfaces.go)
     const cidr = parseCidr(address);
-    if (!cidr || cidr.prefix > maxPrefix) return t('settings.network.interfaces.invalidAddress');
+    if (!cidr || cidr.prefix > maxPrefix) {
+      return { address: t('settings.network.interfaces.invalidAddress'), gateway: '' };
+    }
     if (isNetworkOrBroadcast(cidr.ip, cidr.prefix)) {
-      return t('settings.network.interfaces.hostNotAllowed');
+      return { address: t('settings.network.interfaces.hostNotAllowed'), gateway: '' };
     }
 
     const gw = gateway.trim();
     if (gw) {
-      if (ipv4ToInt(gw) === null) return t('settings.network.interfaces.invalidGateway');
+      if (ipv4ToInt(gw) === null) {
+        return { address: '', gateway: t('settings.network.interfaces.invalidGateway') };
+      }
       // a /32's gateway is always outside it
       if (cidr.prefix < 32 && !sameSubnet(gw, cidr.ip, cidr.prefix)) {
-        return t('settings.network.interfaces.gatewayOutsideSubnet');
+        return { address: '', gateway: t('settings.network.interfaces.gatewayOutsideSubnet') };
       }
     }
 
-    return '';
+    return { address: '', gateway: '' };
   }
+
+  function validate(): string {
+    const problems = validateFields();
+    return problems.address || problems.gateway;
+  }
+
+  // inline messages appear once a field has text, not before the user types
+  const fieldErrors = validateFields();
+  const addressError = address.trim() ? fieldErrors.address : '';
+  const gatewayError = gateway.trim() ? fieldErrors.gateway : '';
 
   async function save() {
     const problem = validate();
@@ -160,10 +174,10 @@ const InterfacePanel = ({ info, onChanged }: PanelProps) => {
   return (
     <>
       <div className="flex flex-col space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex flex-col space-y-1">
+        <div className="flex flex-col-reverse items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 flex-col space-y-1">
             <span>{label}</span>
-            <span className="text-xs text-neutral-500">
+            <span className="break-words text-xs text-neutral-500">
               {[
                 info.ssid,
                 currentAddress,
@@ -192,22 +206,32 @@ const InterfacePanel = ({ info, onChanged }: PanelProps) => {
 
         {mode === 'static' && (
           <div className="flex flex-col space-y-2">
-            <Input
-              addonBefore={t('settings.network.interfaces.address')}
-              placeholder="192.168.1.20/24"
-              value={address}
-              disabled={isSaving || !!pending}
-              status={address && !parseCidr(address) ? 'error' : undefined}
-              onChange={(e) => setAddress(e.target.value)}
-            />
-            <Input
-              addonBefore={t('settings.network.interfaces.gateway')}
-              placeholder={t('settings.network.interfaces.optional')}
-              value={gateway}
-              disabled={isSaving || !!pending}
-              status={gateway && ipv4ToInt(gateway.trim()) === null ? 'error' : undefined}
-              onChange={(e) => setGateway(e.target.value)}
-            />
+            <div className="flex flex-col space-y-1">
+              <Input
+                addonBefore={
+                  <span className="inline-block w-20">{t('settings.network.interfaces.address')}</span>
+                }
+                placeholder="192.168.1.20/24"
+                value={address}
+                disabled={isSaving || !!pending}
+                status={addressError ? 'error' : undefined}
+                onChange={(e) => setAddress(e.target.value)}
+              />
+              {addressError && <span className="text-xs text-red-400">{addressError}</span>}
+            </div>
+            <div className="flex flex-col space-y-1">
+              <Input
+                addonBefore={
+                  <span className="inline-block w-20">{t('settings.network.interfaces.gateway')}</span>
+                }
+                placeholder={t('settings.network.interfaces.optional')}
+                value={gateway}
+                disabled={isSaving || !!pending}
+                status={gatewayError ? 'error' : undefined}
+                onChange={(e) => setGateway(e.target.value)}
+              />
+              {gatewayError && <span className="text-xs text-red-400">{gatewayError}</span>}
+            </div>
           </div>
         )}
 
@@ -217,7 +241,7 @@ const InterfacePanel = ({ info, onChanged }: PanelProps) => {
             type="primary"
             size="small"
             loading={isSaving}
-            disabled={!hasChanges || !!pending}
+            disabled={!hasChanges || !!pending || !!validate()}
             onClick={save}
           >
             {t('settings.network.interfaces.save')}

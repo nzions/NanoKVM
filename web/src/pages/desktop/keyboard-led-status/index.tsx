@@ -27,7 +27,7 @@ function LockIndicator({ labelKey, active, known }: LockIndicatorProps) {
       mouseEnterDelay={0.6}
     >
       <div
-        className="flex h-[8px] items-center gap-1 px-1 text-[8px] font-medium leading-[8px] text-neutral-400"
+        className="flex h-[11px] items-center gap-1 px-1 font-sans text-[10px] font-medium leading-[11px] text-neutral-400"
         aria-label={indicatorLabel}
         role="img"
       >

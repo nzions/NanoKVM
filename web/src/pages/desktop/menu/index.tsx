@@ -75,7 +75,7 @@ export const Menu = () => {
       <div
         ref={nodeRef}
         className={clsx(
-          'fixed left-1/2 top-[10px] z-[1000] -translate-x-1/2 transition-opacity duration-300',
+          'fixed left-1/2 top-[10px] z-[1000] w-max max-w-[100vw] -translate-x-1/2 transition-opacity duration-300',
           isInitialized ? 'opacity-100' : 'opacity-0'
         )}
         onMouseEnter={() => handleHovered(true)}
@@ -91,7 +91,7 @@ export const Menu = () => {
         <div className="sticky top-[10px] flex w-full justify-center">
           <div
             className={clsx(
-              'relative h-[36px] items-center rounded bg-neutral-800/80 pl-1 pr-2 transition-all duration-300',
+              'relative h-[36px] max-w-full items-center overflow-x-auto rounded bg-neutral-800/80 pl-1 pr-2 transition-all duration-300 sm:overflow-visible [&>*]:shrink-0 [&::-webkit-scrollbar]:hidden',
               isMenuExpanded ? 'flex' : 'hidden',
               isMenuHidden ? '-translate-y-[110%] opacity-80' : 'translate-y-0 opacity-100'
             )}

@@ -457,7 +457,7 @@ export const DownloadImage = () => {
         {status && (
           <div
             className={clsx(
-              'max-w-[300px] break-words text-sm',
+              'max-w-[300px] break-words px-2 pb-1 text-sm',
               status === 'failed' || status === 'checksum_failed'
                 ? 'text-red-500'
                 : 'text-green-500'

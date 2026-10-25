@@ -15,6 +15,7 @@ export const HidMode = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [errMsg, setErrMsg] = useState('');
+  const [isModeKnown, setIsModeKnown] = useState(false);
 
   useEffect(() => {
     getHidMode();
@@ -27,11 +28,16 @@ export const HidMode = () => {
       .getHidMode()
       .then((rsp) => {
         if (rsp.code !== 0) {
-          setErrMsg(rsp.msg);
+          setErrMsg(t('mouse.hidOnly.getFailed'));
           return;
         }
 
+        setErrMsg('');
         setHidMode(rsp.data.mode);
+        setIsModeKnown(true);
+      })
+      .catch(() => {
+        setErrMsg(t('mouse.hidOnly.getFailed'));
       })
       .finally(() => {
         setIsLoading(false);
@@ -39,7 +45,7 @@ export const HidMode = () => {
   }
 
   function updateHidMode() {
-    if (isLoading) return;
+    if (isLoading || !isModeKnown) return;
     setIsLoading(true);
 
     const timeoutId = setTimeout(() => {
@@ -52,7 +58,7 @@ export const HidMode = () => {
       .setHidMode(mode)
       .then((rsp) => {
         if (rsp.code !== 0) {
-          setErrMsg(rsp.msg);
+          setErrMsg(t('mouse.hidOnly.setFailed'));
           setIsLoading(false);
           clearTimeout(timeoutId);
         }
@@ -100,7 +106,13 @@ export const HidMode = () => {
         {errMsg && <div className="pt-1 text-sm text-red-500">{errMsg}</div>}
 
         <div className="flex justify-center pt-5">
-          <Button danger type="primary" loading={isLoading} onClick={updateHidMode}>
+          <Button
+            danger
+            type="primary"
+            loading={isLoading}
+            disabled={!isModeKnown}
+            onClick={updateHidMode}
+          >
             {hidMode === 'normal' ? t('mouse.hidOnly.enable') : t('mouse.hidOnly.disable')}
           </Button>
         </div>

@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import * as api from '@/api/vm.ts';
 
-import { Hostname } from './hostname.tsx';
+import { displayHostname, Hostname } from './hostname.tsx';
 
 type IP = {
   name: string;
@@ -72,7 +72,7 @@ export const Information = () => {
         {!!information?.mdns && (
           <div className="flex w-full items-center justify-between">
             <span>{t('settings.about.mdns')}</span>
-            <span>{information.mdns}</span>
+            <span>{displayHostname(information.mdns)}</span>
           </div>
         )}
 
@@ -89,7 +89,7 @@ export const Information = () => {
             </Tooltip>
           </div>
 
-          <span>{information ? information.image : '-'}</span>
+          <span>{information?.image || '—'}</span>
         </div>
 
         {/* application version */}

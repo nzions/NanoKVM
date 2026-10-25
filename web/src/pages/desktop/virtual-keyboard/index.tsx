@@ -11,6 +11,7 @@ import 'react-simple-keyboard/build/css/index.css';
 import '@/assets/styles/keyboard.css';
 
 import { ConfigProvider, Segmented, Select, theme } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { useMediaQuery } from 'react-responsive';
 
 import { getKeycode, getModifierBit } from '@/lib/keymap.ts';
@@ -28,6 +29,7 @@ import {
 } from './virtual-keys.ts';
 
 export const VirtualKeyboard = () => {
+  const { t } = useTranslation();
   const isBigScreen = useMediaQuery({ minWidth: 850 });
 
   const [isKeyboardOpen, setIsKeyboardOpen] = useAtom(isKeyboardOpenAtom);
@@ -232,6 +234,11 @@ export const VirtualKeyboard = () => {
             isBigScreen ? 'w-[820px]' : 'w-[650px]'
           )}
         >
+          <Drawer.Title className="sr-only">{t('keyboard.virtual')}</Drawer.Title>
+          <Drawer.Description className="sr-only">
+            {t('keyboard.virtualDescription')}
+          </Drawer.Description>
+
           {/* header */}
           <div className="flex items-center justify-between px-3 py-1">
             <ConfigProvider

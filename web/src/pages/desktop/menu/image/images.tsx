@@ -242,9 +242,12 @@ export const Images = ({ isOpen, cdrom, setIsMounted }: ImagesProps) => {
   // empty image
   if (images.length === 0) {
     return (
-      <div className="flex items-center justify-center space-x-2 py-5 text-neutral-500">
-        <PackageSearchIcon size={18} />
-        <span className="text-sm">{t('image.empty')}</span>
+      <div className="flex flex-col items-center space-y-1 py-5 text-neutral-500">
+        <div className="flex items-center justify-center space-x-2">
+          <PackageSearchIcon size={18} />
+          <span className="text-sm">{t('image.empty')}</span>
+        </div>
+        <span className="max-w-[260px] text-center text-xs">{t('image.emptyHint')}</span>
       </div>
     );
   }

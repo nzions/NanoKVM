@@ -68,8 +68,9 @@ export const Oled = () => {
           onChange={update}
         />
       ) : (
-        <span className="text-neutral-500">
+        <span className="flex items-center space-x-1 text-neutral-500">
           <ScreenShareOff size={16} />
+          <span>{t('settings.device.oled.notDetected')}</span>
         </span>
       )}
     </div>

@@ -1,7 +1,7 @@
 import { ReactElement, useEffect } from 'react';
 import { Popover } from 'antd';
 import { useAtom } from 'jotai';
-import { CheckIcon, PercentIcon, ScalingIcon } from 'lucide-react';
+import { CheckIcon, ScalingIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import * as storage from '@/lib/localstorage.ts';
@@ -43,10 +43,7 @@ export const Scale = (): ReactElement => {
           <div className="flex h-[14px] w-[20px] items-end text-blue-500">
             {scale.value === videoScale && <CheckIcon size={14} />}
           </div>
-          <div className="flex items-center space-x-0.5">
-            <span>{scale.label}</span>
-            <PercentIcon size={12} />
-          </div>
+          <span>{scale.label}%</span>
         </div>
       ))}
     </>
