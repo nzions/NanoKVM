@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import * as api from '@/api/auth.ts';
-import { encrypt } from '@/lib/encrypt.ts';
 import { Head } from '@/components/head.tsx';
 
 import { Tips } from './tips.tsx';
@@ -39,7 +38,7 @@ export const Login = (): ReactElement => {
     setIsloading(true);
 
     const username = values.username;
-    const password = encrypt(values.password);
+    const password = values.password;
 
     api
       .login(username, password)

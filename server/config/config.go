@@ -43,7 +43,9 @@ func initialize() {
 		log.Fatalf("Failed to parse configuration: %s", err)
 	}
 
-	checkDefaultValue()
+	if err := checkDefaultValue(); err != nil {
+		log.Fatalf("Failed to finalize configuration: %s", err)
+	}
 
 	if instance.Authentication == "disable" {
 		log.Println("NOTICE: Authentication is disabled! Please ensure your service is secure!")

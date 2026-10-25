@@ -84,8 +84,8 @@ func CheckWebSocketOrigin(request *http.Request) bool {
 	if request.TLS != nil {
 		requestScheme = "https"
 	}
-	if forwarded := strings.TrimSpace(strings.Split(request.Header.Get("X-Forwarded-Proto"), ",")[0]); forwarded != "" {
-		requestScheme = strings.ToLower(forwarded)
+	if forwarded := ForwardedProto(request); forwarded != "" {
+		requestScheme = forwarded
 	}
 	return equalOrigin(parsed, request.Host, requestScheme)
 }

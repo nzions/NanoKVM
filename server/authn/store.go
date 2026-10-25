@@ -13,8 +13,7 @@ import (
 	"strings"
 	"sync"
 
-	"NanoKVM-Server/utils"
-
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -176,31 +175,7 @@ func (s *Store) Authenticate(username, password string) (*User, bool, error) {
 		return user, true, nil
 	}
 
-	// Older releases stored a reversibly encrypted password. Upgrade it after
-	// the first successful login so the compatibility path is not permanent.
-	legacyPassword, decodeErr := utils.DecodeDecrypt(user.PasswordHash)
-	if decodeErr != nil || legacyPassword != password {
-		return nil, false, nil
-	}
-
-	hash, hashErr := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if hashErr != nil {
-		return nil, false, hashErr
-	}
-	for index := range db.Users {
-		if db.Users[index].Username == username {
-			db.Users[index].PasswordHash = string(hash)
-			if db.Users[index].TokenVersion == 0 {
-				db.Users[index].TokenVersion = 1
-			}
-			user = cloneUser(&db.Users[index])
-			break
-		}
-	}
-	if err = s.saveLocked(db); err != nil {
-		return nil, false, err
-	}
-	return user, true, nil
+	return nil, false, nil
 }
 
 func (s *Store) ValidateToken(username string, tokenVersion uint64) (*User, error) {
@@ -420,6 +395,15 @@ func (s *Store) loadLocked(migrate bool) (*database, error) {
 		if err = validateDatabase(&db); err != nil {
 			return nil, err
 		}
+		retired, retireErr := s.retireLegacyHashes(&db, migrate)
+		if retireErr != nil {
+			return nil, retireErr
+		}
+		if retired && migrate {
+			if err = s.saveLocked(&db); err != nil {
+				return nil, err
+			}
+		}
 		return &db, nil
 	}
 
@@ -445,6 +429,9 @@ func (s *Store) loadLocked(migrate bool) (*database, error) {
 			MustChangePassword: passwordMatches(legacy.Password, legacyDefaultPassword),
 			SystemAccount:      true,
 		}},
+	}
+	if _, err = s.retireLegacyHashes(&db, migrate); err != nil {
+		return nil, err
 	}
 	if migrate {
 		if err = s.saveLocked(&db); err != nil {
@@ -660,11 +647,55 @@ func cloneUser(user *User) *User {
 }
 
 func passwordMatches(hash, password string) bool {
-	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil {
-		return true
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
+}
+
+// isBcryptHash reports whether the stored value is a well-formed bcrypt hash.
+func isBcryptHash(hash string) bool {
+	_, err := bcrypt.Cost([]byte(hash))
+	return err == nil
+}
+
+// retireLegacyHashes replaces every stored password that is not a bcrypt hash.
+// Older releases kept a reversibly AES-encrypted password under a key that is
+// public in the source, so such a value is as good as plaintext and is no
+// longer accepted. The device owner gets the seed password (the one the device
+// screen shows); every other account gets a random password nobody knows and an
+// admin must reset it. Both must change it at the next login and every session
+// is revoked. It reports whether anything changed; the caller saves it.
+func (s *Store) retireLegacyHashes(db *database, persist bool) (bool, error) {
+	changed := false
+	for index := range db.Users {
+		user := &db.Users[index]
+		if isBcryptHash(user.PasswordHash) {
+			continue
+		}
+
+		var password string
+		var err error
+		if user.SystemAccount {
+			password, err = s.seedPassword(persist)
+		} else {
+			password, err = randomPassword(seedPasswordLength)
+		}
+		if err != nil {
+			return false, err
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if err != nil {
+			return false, err
+		}
+		tokenVersion, err := newTokenVersion()
+		if err != nil {
+			return false, err
+		}
+		user.PasswordHash = string(hash)
+		user.MustChangePassword = true
+		user.TokenVersion = tokenVersion
+		changed = true
+		log.Warnf("account %q held a legacy reversible password: replaced, it must be reset", user.Username)
 	}
-	legacyPassword, err := utils.DecodeDecrypt(hash)
-	return err == nil && legacyPassword == password
+	return changed, nil
 }
 
 // Keep a legacy top-level account mirror so downgrading to a single-user

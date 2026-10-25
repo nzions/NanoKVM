@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -74,8 +75,14 @@ func run() {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(gin.Recovery())
-	if conf.Authentication == "disable" {
-		r.Use(cors.AllowAll())
+	// same-origin only unless an allowlist is configured
+	if origins := conf.Security.CORSOrigins; len(origins) > 0 {
+		r.Use(cors.New(cors.Options{
+			AllowedOrigins:   origins,
+			AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowedHeaders:   []string{"*"},
+			AllowCredentials: true,
+		}))
 	}
 
 	router.Init(r)
@@ -84,50 +91,59 @@ func run() {
 	loopbackHTTPAddr := utils.ListenAddr("127.0.0.1", strconv.Itoa(conf.Port.Http))
 	needsLoopbackHTTP := utils.NeedsDedicatedLoopbackListener(conf.Host)
 
+	// every listener reports here; the first to stop is fatal
+	failed := make(chan error, 3)
+	serve := func(name string, listen func() error) {
+		go func() {
+			failed <- fmt.Errorf("%s server stopped: %w", name, listen())
+		}()
+	}
+
 	if conf.Proto == "https" {
+		if err := utils.EnsureCert(conf.Cert.Crt, conf.Cert.Key); err != nil {
+			log.Fatalf("prepare https certificate failed: %v", err)
+		}
+
 		httpsPortStr := strconv.Itoa(conf.Port.Https)
 
-		go func() {
-			err := r.RunTLS(utils.ListenAddr(conf.Host, httpsPortStr), conf.Cert.Crt, conf.Cert.Key)
-			if err != nil {
-				panic("start https server failed")
-			}
-		}()
+		serve("https", func() error {
+			server := middleware.NewServer(utils.ListenAddr(conf.Host, httpsPortStr), r)
+			return server.ListenAndServeTLS(conf.Cert.Crt, conf.Cert.Key)
+		})
 
 		if needsLoopbackHTTP {
-			go func() {
-				if err := middleware.ListenAndServeLoopbackHTTPRedirect(
+			serve("loopback http", func() error {
+				return middleware.ListenAndServeLoopbackHTTPRedirect(
 					loopbackHTTPAddr,
 					httpsPortStr,
 					r,
 					router.LoopbackHTTPAllowedPaths()...,
-				); err != nil {
-					panic("start loopback http server failed")
-				}
-			}()
+				)
+			})
 		}
 
-		if err := middleware.ListenAndServeLoopbackHTTPRedirect(
-			httpAddr,
-			httpsPortStr,
-			r,
-			router.LoopbackHTTPAllowedPaths()...,
-		); err != nil {
-			panic("start http server failed")
-		}
+		// plain http only redirects to https
+		serve("http", func() error {
+			return middleware.ListenAndServeLoopbackHTTPRedirect(
+				httpAddr,
+				httpsPortStr,
+				r,
+				router.LoopbackHTTPAllowedPaths()...,
+			)
+		})
 	} else {
 		if needsLoopbackHTTP {
-			go func() {
-				if err := r.Run(loopbackHTTPAddr); err != nil {
-					panic("start loopback http server failed")
-				}
-			}()
+			serve("loopback http", func() error {
+				return middleware.NewServer(loopbackHTTPAddr, r).ListenAndServe()
+			})
 		}
 
-		if err := r.Run(httpAddr); err != nil {
-			panic("start http server failed")
-		}
+		serve("http", func() error {
+			return middleware.NewServer(httpAddr, r).ListenAndServe()
+		})
 	}
+
+	log.Fatalf("%v", <-failed)
 }
 
 func dispose() {

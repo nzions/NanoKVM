@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"NanoKVM-Server/config"
 )
@@ -23,7 +24,7 @@ func ListenAndServeLoopbackHTTPRedirect(
 		allowlist[path] = struct{}{}
 	}
 
-	return http.ListenAndServe(httpAddr, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	return NewServer(httpAddr, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if isLoopbackAllowedPath(req, allowlist) {
 			if hasValidLoopbackHTTPToken(req) {
 				handler.ServeHTTP(w, req)
@@ -35,7 +36,7 @@ func ListenAndServeLoopbackHTTPRedirect(
 		}
 
 		http.Redirect(w, req, "https://"+redirectHost(req.Host, httpsPort)+req.URL.RequestURI(), http.StatusTemporaryRedirect)
-	}))
+	})).ListenAndServe()
 }
 
 func redirectHost(requestHost string, httpsPort string) string {
@@ -91,4 +92,18 @@ func isLoopbackRemote(remoteAddr string) bool {
 
 	ip := net.ParseIP(strings.Trim(host, "[]"))
 	return ip != nil && ip.IsLoopback()
+}
+
+// NewServer returns an http.Server with the timeouts every listener shares.
+// There is deliberately no ReadTimeout or WriteTimeout: they cover the whole
+// request and response and would cut the long-lived video streams and
+// websockets. ReadHeaderTimeout stops slowloris and IdleTimeout reaps idle
+// keep-alive connections.
+func NewServer(addr string, handler http.Handler) *http.Server {
+	return &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
 }

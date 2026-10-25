@@ -34,7 +34,10 @@ func GetPicoclawInternalToken() (string, error) {
 		return "", err
 	}
 
-	token := generateRandomSecretKey()
+	token, err := generateRandomSecretKey()
+	if err != nil {
+		return "", err
+	}
 	if err := os.MkdirAll(filepath.Dir(picoclawInternalTokenFile), 0o755); err != nil {
 		return "", err
 	}

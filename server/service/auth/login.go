@@ -2,14 +2,12 @@ package auth
 
 import (
 	"net/http"
-	"strings"
 	"time"
 
 	"NanoKVM-Server/authn"
 	"NanoKVM-Server/config"
 	"NanoKVM-Server/middleware"
 	"NanoKVM-Server/proto"
-	"NanoKVM-Server/utils"
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
@@ -36,8 +34,8 @@ func (s *Service) Login(c *gin.Context) {
 		rsp.ErrRsp(c, -1, "invalid parameters")
 		return
 	}
-	password, err := utils.DecodeDecrypt(req.Password)
-	if err != nil || password == "" {
+	password := req.Password
+	if password == "" {
 		s.loginFailed(c, clientIP, &rsp)
 		return
 	}
@@ -106,7 +104,7 @@ func (s *Service) GetAccount(c *gin.Context) {
 func setSessionCookie(c *gin.Context, token string) {
 	conf := config.GetInstance()
 	secure := conf.Proto == "https" || c.Request.TLS != nil ||
-		strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https")
+		middleware.ForwardedProto(c.Request) == "https"
 	c.SetSameSite(http.SameSiteStrictMode)
 	c.SetCookie(
 		middleware.CookieName,
@@ -122,7 +120,7 @@ func setSessionCookie(c *gin.Context, token string) {
 func clearSessionCookie(c *gin.Context) {
 	conf := config.GetInstance()
 	secure := conf.Proto == "https" || c.Request.TLS != nil ||
-		strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https")
+		middleware.ForwardedProto(c.Request) == "https"
 	c.SetSameSite(http.SameSiteStrictMode)
 	c.SetCookie(middleware.CookieName, "", -1, "/", "", secure, true)
 }

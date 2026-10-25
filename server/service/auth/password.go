@@ -10,7 +10,6 @@ import (
 	"NanoKVM-Server/config"
 	"NanoKVM-Server/middleware"
 	"NanoKVM-Server/proto"
-	"NanoKVM-Server/utils"
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
@@ -30,8 +29,8 @@ func (s *Service) ChangePassword(c *gin.Context) {
 		rsp.ErrRsp(c, -2, "invalid session")
 		return
 	}
-	currentPassword, err := utils.DecodeDecrypt(req.CurrentPassword)
-	if err != nil || currentPassword == "" {
+	currentPassword := req.CurrentPassword
+	if currentPassword == "" {
 		rsp.ErrRsp(c, -3, "current password is required")
 		return
 	}
@@ -72,12 +71,9 @@ func (s *Service) IsPasswordUpdated(c *gin.Context) {
 	rsp.OkRspWithData(c, &proto.IsPasswordUpdatedRsp{IsUpdated: !user.MustChangePassword})
 }
 
-func changeUserPassword(username, encryptedPassword string) error {
-	password, err := utils.DecodeDecrypt(encryptedPassword)
-	if err != nil || password == "" {
-		return errInvalidPassword
-	}
-	if err = authn.ValidatePassword(password); err != nil {
+func changeUserPassword(username, password string) error {
+	password, err := validatePassword(password)
+	if err != nil {
 		return err
 	}
 	user, err := authn.DefaultStore.Get(username)

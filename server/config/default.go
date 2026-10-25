@@ -1,19 +1,21 @@
 package config
 
+import "fmt"
+
 // defaultLoginLockoutDuration is the lockout in seconds. 0 (or unset) means
 // this default; a negative value disables the lockout.
 const defaultLoginLockoutDuration = 300
 
 var defaultConfig = &Config{
-	Proto: "http",
+	Proto: "https",
 	Host:  "",
 	Port: Port{
 		Http:  80,
 		Https: 443,
 	},
 	Cert: Cert{
-		Crt: "server.crt",
-		Key: "server.key",
+		Crt: "/etc/kvm/server.crt",
+		Key: "/etc/kvm/server.key",
 	},
 	Logger: Logger{
 		Level: "info",
@@ -37,9 +39,13 @@ var defaultConfig = &Config{
 	},
 }
 
-func checkDefaultValue() {
+func checkDefaultValue() error {
 	if instance.JWT.SecretKey == "" {
-		instance.JWT.SecretKey = generateRandomSecretKey()
+		secret, err := loadOrCreateJWTSecret(jwtSecretFile)
+		if err != nil {
+			return fmt.Errorf("jwt secret: %w", err)
+		}
+		instance.JWT.SecretKey = secret
 		instance.JWT.RevokeTokensOnLogout = true
 	}
 
@@ -66,4 +72,6 @@ func checkDefaultValue() {
 	}
 
 	instance.Hardware = getHardware()
+
+	return nil
 }

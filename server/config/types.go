@@ -45,6 +45,12 @@ type Turn struct {
 type Security struct {
 	LoginLockoutDuration int `yaml:"loginLockoutDuration"`
 	LoginMaxFailures     int `yaml:"loginMaxFailures"`
+	// TrustedProxies are the IPs/CIDRs of reverse proxies whose X-Forwarded-Proto
+	// is believed. Empty (the default) trusts nobody.
+	TrustedProxies []string `yaml:"trustedProxies"`
+	// CORSOrigins are the origins allowed cross-origin access. Empty (the
+	// default) means same-origin only.
+	CORSOrigins []string `yaml:"corsOrigins"`
 }
 
 type Hardware struct {

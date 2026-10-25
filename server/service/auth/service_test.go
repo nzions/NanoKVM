@@ -6,7 +6,6 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,10 +14,8 @@ import (
 	"NanoKVM-Server/config"
 	"NanoKVM-Server/middleware"
 	"NanoKVM-Server/proto"
-	"NanoKVM-Server/utils"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mervick/aes-everywhere/go/aes256"
 )
 
 const testSeedPassword = "seed-password"
@@ -63,7 +60,7 @@ func TestLoginCookieAndUserAuthorizationLifecycle(t *testing.T) {
 
 	createBody := map[string]any{
 		"username": "alice",
-		"password": encryptForRequest("valid-password"),
+		"password": "valid-password",
 		"role":     "user",
 	}
 	if code := requestJSON(router, http.MethodPost, "/users", createBody, adminCookie); code != http.StatusOK {
@@ -137,7 +134,7 @@ func TestNormalUserPasswordNeverChangesSystemPassword(t *testing.T) {
 	}
 	defer func() { systemPasswordUpdater = originalUpdater }()
 
-	if err := changeUserPassword("alice", encryptForRequest("new-password")); err != nil {
+	if err := changeUserPassword("alice", "new-password"); err != nil {
 		t.Fatal(err)
 	}
 	if updates != 0 {
@@ -168,8 +165,8 @@ func TestSelfPasswordChangeRequiresCurrentPassword(t *testing.T) {
 	cookie := loginCookie(t, router, "alice", "alice-password")
 
 	recorder := requestJSONRecorder(router, http.MethodPost, "/password", map[string]any{
-		"currentPassword": encryptForRequest("wrong-password"),
-		"password":        encryptForRequest("new-password"),
+		"currentPassword": "wrong-password",
+		"password":        "new-password",
 	}, cookie)
 	var response proto.Response
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
@@ -183,8 +180,8 @@ func TestSelfPasswordChangeRequiresCurrentPassword(t *testing.T) {
 	}
 
 	requestJSON(router, http.MethodPost, "/password", map[string]any{
-		"currentPassword": encryptForRequest("alice-password"),
-		"password":        encryptForRequest("new-password"),
+		"currentPassword": "alice-password",
+		"password":        "new-password",
 	}, cookie)
 	if _, ok, err := store.Authenticate("alice", "new-password"); err != nil || !ok {
 		t.Fatalf("valid password change failed: ok=%v err=%v", ok, err)
@@ -218,7 +215,7 @@ func TestAdministratorCannotResetDeviceOwnerPassword(t *testing.T) {
 	admin.POST("/users/:username/password", service.ChangeUserPassword)
 	cookie := loginCookie(t, router, "second-admin", "second-password")
 	requestJSON(router, http.MethodPost, "/users/admin/password", map[string]any{
-		"password": encryptForRequest("new-password"),
+		"password": "new-password",
 	}, cookie)
 
 	if updates != 0 {
@@ -244,7 +241,7 @@ func TestSystemPasswordFailureRollsBackWebPassword(t *testing.T) {
 	systemPasswordUpdater = func(string) error { return errors.New("passwd failed") }
 	defer func() { systemPasswordUpdater = originalUpdater }()
 
-	if err := changeUserPassword("admin", encryptForRequest("new-password")); err == nil {
+	if err := changeUserPassword("admin", "new-password"); err == nil {
 		t.Fatal("system password failure was ignored")
 	}
 	if _, ok, err := store.Authenticate("admin", testSeedPassword); err != nil || !ok {
@@ -257,7 +254,7 @@ func TestSystemPasswordFailureRollsBackWebPassword(t *testing.T) {
 
 func loginCookie(t *testing.T, handler http.Handler, username, password string) *http.Cookie {
 	t.Helper()
-	body := map[string]any{"username": username, "password": encryptForRequest(password)}
+	body := map[string]any{"username": username, "password": password}
 	recorder := httptest.NewRecorder()
 	request := jsonRequest(http.MethodPost, "/login", body)
 	handler.ServeHTTP(recorder, request)
@@ -300,10 +297,6 @@ func jsonRequest(method, path string, body any) *http.Request {
 	return request
 }
 
-func encryptForRequest(password string) string {
-	return url.QueryEscape(aes256.Encrypt(password, utils.SecretKey))
-}
-
 func useTestStore(store *authn.Store) func() {
 	originalStore := authn.DefaultStore
 	conf := config.GetInstance()
@@ -322,5 +315,38 @@ func useTestStore(store *authn.Store) func() {
 		conf.JWT.SecretKey = originalSecret
 		conf.JWT.RefreshTokenDuration = originalDuration
 		conf.JWT.RevokeTokensOnLogout = originalRevokeOnLogout
+	}
+}
+
+func TestLoginTakesPlainPasswordOnly(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	store := newTestStore(t)
+	restore := useTestStore(store)
+	defer restore()
+
+	service := NewService()
+	router := gin.New()
+	router.POST("/login", service.Login)
+
+	// the plain password logs in
+	loginCookie(t, router, "admin", testSeedPassword)
+
+	// an empty password and a password sent through the retired
+	// fixed-key encoding (not the stored one) are both refused
+	for _, password := range []string{"", "U2FsdGVkX1+not-the-password"} {
+		recorder := requestJSONRecorder(router, http.MethodPost, "/login",
+			map[string]any{"username": "admin", "password": password}, nil)
+		var rsp proto.Response
+		if err := json.Unmarshal(recorder.Body.Bytes(), &rsp); err != nil {
+			t.Fatal(err)
+		}
+		if rsp.Code == 0 {
+			t.Fatalf("login with password %q succeeded", password)
+		}
+		for _, cookie := range recorder.Result().Cookies() {
+			if cookie.Name == middleware.CookieName {
+				t.Fatalf("login with password %q set a session cookie", password)
+			}
+		}
 	}
 }

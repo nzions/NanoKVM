@@ -269,3 +269,32 @@ func TestConcurrentCreatesDoNotLoseUsers(t *testing.T) {
 		t.Fatalf("got %d users, want %d", len(users), count+1)
 	}
 }
+
+func TestLegacyReversiblePasswordIsRetired(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "pwd")
+	// what older releases stored: a reversibly encrypted password, not bcrypt
+	legacy, _ := json.Marshal(legacyAccount{Username: "owner", Password: "U2FsdGVkX1+ZmFrZQ=="})
+	if err := os.WriteFile(path, legacy, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	store := NewStore(path)
+	if _, ok, err := store.Authenticate("owner", "U2FsdGVkX1+ZmFrZQ=="); err != nil || ok {
+		t.Fatalf("the legacy value must not log in: ok=%v err=%v", ok, err)
+	}
+	user, err := store.Get("owner")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !user.MustChangePassword || !isBcryptHash(user.PasswordHash) {
+		t.Fatalf("legacy account must be re-seeded and forced to change: %+v", user)
+	}
+	// the owner can recover with the password on the device screen
+	seed, err := os.ReadFile(store.seedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, err := store.Authenticate("owner", strings.TrimSpace(string(seed))); err != nil || !ok {
+		t.Fatalf("seed password must log in: ok=%v err=%v", ok, err)
+	}
+}

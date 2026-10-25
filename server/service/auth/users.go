@@ -6,7 +6,6 @@ import (
 	"NanoKVM-Server/authn"
 	"NanoKVM-Server/middleware"
 	"NanoKVM-Server/proto"
-	"NanoKVM-Server/utils"
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
@@ -40,7 +39,7 @@ func (s *Service) CreateUser(c *gin.Context) {
 		rsp.ErrRsp(c, -1, "invalid parameters")
 		return
 	}
-	password, err := decodePassword(req.Password)
+	password, err := validatePassword(req.Password)
 	if err != nil {
 		rsp.ErrRsp(c, -2, err.Error())
 		return
@@ -115,12 +114,11 @@ func (s *Service) ChangeUserPassword(c *gin.Context) {
 	log.Infof("password reset for user: %s", username)
 }
 
-func decodePassword(encrypted string) (string, error) {
-	password, err := utils.DecodeDecrypt(encrypted)
-	if err != nil || password == "" {
+func validatePassword(password string) (string, error) {
+	if password == "" {
 		return "", errInvalidPassword
 	}
-	if err = authn.ValidatePassword(password); err != nil {
+	if err := authn.ValidatePassword(password); err != nil {
 		return "", err
 	}
 	return password, nil

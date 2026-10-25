@@ -118,9 +118,6 @@ github.com/magiconair/properties
 # github.com/mattn/go-isatty v0.0.20
 ## explicit; go 1.15
 github.com/mattn/go-isatty
-# github.com/mervick/aes-everywhere/go/aes256 v0.0.0-20240803013625-6759956693c0
-## explicit; go 1.12
-github.com/mervick/aes-everywhere/go/aes256
 # github.com/mitchellh/mapstructure v1.5.0
 ## explicit; go 1.14
 github.com/mitchellh/mapstructure
