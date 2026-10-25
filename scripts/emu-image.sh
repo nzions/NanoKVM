@@ -16,6 +16,9 @@
 #   4. /etc/inittab becomes a busybox inittab (original kept as inittab.orig)
 #   5. /usr/bin/init becomes a symlink to /bin/busybox
 #   6. /etc/kvm/ssh_stop is removed so sshd starts
+#   7. /etc/kvm/emulator is written: our S95nanokvm (the supervised one an OTA
+#      brings) then does not start kvm_system, which the step-3 edit cannot
+#      remove from it
 #
 # No root and no loop mount: the rootfs is cut out with dd, edited with
 # debugfs -w, checked with e2fsck and spliced back with dd conv=notrunc.
@@ -315,6 +318,17 @@ strip_kvm_system() { # <fs path> <allow_none 0|1>
     diff -u "$T/s95.in" "$T/s95.out" || true
 }
 
+# Write /etc/kvm/emulator (shared by step 7 and --refresh): our supervised
+# S95nanokvm starts kvm_system through a function strip_kvm_system cannot see,
+# and skips it when this marker exists.
+mark_emulator() {
+    exists /etc/kvm || die "/etc/kvm does not exist in the image"
+    : >"$T/emulator"
+    put_file "$T/emulator" /etc/kvm/emulator 644
+    exists /etc/kvm/emulator || die "/etc/kvm/emulator missing after write"
+    info "wrote /etc/kvm/emulator"
+}
+
 # Splice the edited rootfs ($FS) into <target image> over partition 2 and verify:
 # same size, bytes before p2 untouched, p2 reads back equal to $FS.
 splice_back() { # <target image>
@@ -353,6 +367,7 @@ if [ "$MODE" = refresh ]; then
     # /kvmapp/system/init.d/S95nanokvm for the `restart` an OTA issues.
     strip_kvm_system /etc/init.d/S95nanokvm 1
     strip_kvm_system /kvmapp/system/init.d/S95nanokvm 1
+    mark_emulator
     fsck "after edits"
     exists /kvmapp/server/NanoKVM-Server || die "server vanished during the final e2fsck"
     splice_back "$STOCK"
@@ -462,6 +477,10 @@ if exists /etc/kvm/ssh_stop; then
 else
     info "/etc/kvm/ssh_stop not present (nothing to remove)"
 fi
+
+# ------------------------------------------------------------ 7. emulator mark
+
+mark_emulator
 
 # ------------------------------------------------- check, splice back, verify
 

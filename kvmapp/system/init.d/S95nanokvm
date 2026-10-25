@@ -141,6 +141,19 @@ recover_interrupted_update() {
     fi
 }
 
+# The qemu emulator (scripts/emu-image.sh) has no KVM hardware, and kvm_system
+# crashes there; emu-image.sh writes this marker so neither copy of this script
+# starts it. A device never has it.
+EMULATOR_MARK=/etc/kvm/emulator
+
+start_kvm_system() {
+    if [ -e "$EMULATOR_MARK" ]; then
+        echo "S95nanokvm: $EMULATOR_MARK present: not starting kvm_system" >&2
+        return 0
+    fi
+    start_watched kvm_system "$SYSTEM_PID" "$SYSTEM_BIN"
+}
+
 stop_services() {
     # The server owns VI/VPSS. Let it release MMF before stopping kvm_system.
     stop_watched NanoKVM-Server "$SERVER_PID"
@@ -152,7 +165,7 @@ stop_services() {
 start_services() {
     if [ -f /kvmapp/kvm_new_app ]; then
         touch /tmp/.nanokvm_migrating
-        start_watched kvm_system "$SYSTEM_PID" "$SYSTEM_BIN"
+        start_kvm_system
 
         # The legacy migration invokes this init script recursively and starts
         # the server itself. Wait for that single migration path to finish.
@@ -167,7 +180,7 @@ start_services() {
         done
         rm -f /tmp/.nanokvm_migrating
     else
-        start_watched kvm_system "$SYSTEM_PID" "$SYSTEM_BIN"
+        start_kvm_system
     fi
 
     if ! pidof NanoKVM-Server >/dev/null 2>&1; then

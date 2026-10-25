@@ -1,3 +1,9 @@
+## 2.5.10 (2026-10-25)
+
+### Build
+
+* The qemu emulator no longer starts `kvm_system`, which crashes there: `emu-image.sh` writes `/etc/kvm/emulator` and `S95nanokvm` does not start `kvm_system` when that file exists. Since the supervised `S95nanokvm` (2.5.2), the emulator's line strip could not remove the start from it. A device never has the marker, so nothing changes on hardware
+
 ## 2.5.9 (2026-10-25)
 
 ### Bug Fixes
