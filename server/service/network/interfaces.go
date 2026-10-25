@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"net/netip"
 	"os"
 	"os/exec"
@@ -86,6 +87,21 @@ var (
 	ifaceAPMode = isAPMode
 	// applyIfaceScript runs the init script; tests replace it.
 	applyIfaceScript = runIfaceScript
+
+	// ifaceLocalAddrAssigned reports whether a is assigned to an interface now:
+	// a confirm that arrives on such an address reached the box after the change.
+	ifaceLocalAddrAssigned = func(a netip.Addr) bool {
+		addrs, err := net.InterfaceAddrs()
+		if err != nil {
+			return false
+		}
+		for _, addr := range addrs {
+			if p, err := netip.ParsePrefix(addr.String()); err == nil && p.Addr().Unmap() == a {
+				return true
+			}
+		}
+		return false
+	}
 )
 
 // ifaceSnapshot is the previous config file, kept on disk so the revert
@@ -99,6 +115,9 @@ type ifaceState struct {
 	mu      sync.Mutex
 	timer   *time.Timer
 	pending *proto.InterfacePending
+	// applied: the init script has run for the pending change, so a confirm
+	// can prove the new settings work; before that it proves nothing
+	applied bool
 }
 
 var (
@@ -194,7 +213,14 @@ func (s *Service) ConfirmInterface(c *gin.Context) {
 		return
 	}
 
-	if err := confirmIfaceChange(spec); err != nil {
+	var local netip.Addr
+	if la, ok := c.Request.Context().Value(http.LocalAddrContextKey).(net.Addr); ok {
+		if ap, err := netip.ParseAddrPort(la.String()); err == nil {
+			local = ap.Addr().Unmap()
+		}
+	}
+
+	if err := confirmIfaceChange(spec, local); err != nil {
 		rsp.ErrRsp(c, -1, err.Error())
 		return
 	}
@@ -389,6 +415,7 @@ func startIfaceChange(spec ifaceSpec, req proto.SetInterfaceReq, data []byte) (*
 		pending.Gateway = strings.TrimSpace(req.Gateway)
 	}
 	st.pending = pending
+	st.applied = false
 	st.timer = time.AfterFunc(ifaceConfirmWindow, func() { revertIface(spec) })
 
 	log.Infof("%s: change written mode=%s address=%s gateway=%s, revert at %s unless confirmed",
@@ -397,13 +424,23 @@ func startIfaceChange(spec ifaceSpec, req proto.SetInterfaceReq, data []byte) (*
 	return pending, gatewayOf(snap.Content), nil
 }
 
-func confirmIfaceChange(spec ifaceSpec) error {
+// confirmIfaceChange keeps a pending change. It is accepted only once the
+// change has been applied, and only on a connection whose local address is
+// assigned now: a confirm sent before the apply, or over a connection to an
+// address the change removed, proves nothing about the new settings.
+func confirmIfaceChange(spec ifaceSpec, local netip.Addr) error {
 	st := stateFor(spec.Name)
 	st.mu.Lock()
 	defer st.mu.Unlock()
 
 	if st.pending == nil {
 		return errors.New("no network change is waiting for confirmation")
+	}
+	if !st.applied {
+		return errors.New("the change is still being applied; confirm once the page is reachable on the new settings")
+	}
+	if !local.IsValid() || !ifaceLocalAddrAssigned(local) {
+		return errors.New("confirm from the device's current address")
 	}
 
 	if st.timer != nil {
@@ -480,6 +517,15 @@ func applyIface(spec ifaceSpec, why, replacedGw string) {
 		log.Errorf("%s: %s: apply failed: %s", spec.Name, why, err)
 	}
 	dedupeResolvNameservers()
+
+	if why == "apply" {
+		st := stateFor(spec.Name)
+		st.mu.Lock()
+		if st.pending != nil {
+			st.applied = true
+		}
+		st.mu.Unlock()
+	}
 }
 
 func runIfaceScript(spec ifaceSpec) error {

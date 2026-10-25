@@ -1,6 +1,7 @@
 package network
 
 import (
+	"net/netip"
 	"os"
 	"path/filepath"
 	"testing"
@@ -166,13 +167,25 @@ func TestIfaceChangeRevertRoundTrip(t *testing.T) {
 		if _, err := os.Stat(spec.ConfigFile); !os.IsNotExist(err) {
 			t.Errorf("%s: dhcp left the file", kind.name)
 		}
-		if err := confirmIfaceChange(spec); err != nil {
+		local := netip.MustParseAddr("192.168.9.10")
+		if err := confirmIfaceChange(spec, local); err == nil {
+			t.Errorf("%s: confirm before the apply succeeded", kind.name)
+		}
+		applyIface(spec, "apply", "")
+		oldAssigned := ifaceLocalAddrAssigned
+		ifaceLocalAddrAssigned = func(a netip.Addr) bool { return false }
+		if err := confirmIfaceChange(spec, local); err == nil {
+			t.Errorf("%s: confirm on an unassigned address succeeded", kind.name)
+		}
+		ifaceLocalAddrAssigned = func(a netip.Addr) bool { return a == local }
+		if err := confirmIfaceChange(spec, local); err != nil {
 			t.Fatal(err)
 		}
+		ifaceLocalAddrAssigned = oldAssigned
 		if _, err := os.Stat(spec.PrevFile); !os.IsNotExist(err) {
 			t.Errorf("%s: confirm left the prev file", kind.name)
 		}
-		if err := confirmIfaceChange(spec); err == nil {
+		if err := confirmIfaceChange(spec, local); err == nil {
 			t.Errorf("%s: confirm without a pending change succeeded", kind.name)
 		}
 	}
