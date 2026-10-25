@@ -38,10 +38,10 @@ stop_process() {
 }
 
 # Run from /kvmapp, not from a copy in /tmp. Why that is safe: the OTA
-# (server/service/application/install.go) moves /kvmapp to /root/old and the new
-# tree in with rename(2), and its cross-filesystem fallback writes "<file>.tmp"
-# and renames over the target. Either way the running binary's old inode lives on
-# untouched, never rewritten in place, so no ETXTBSY and no corruption. After the
+# (server/service/application/install.go) renames /kvmapp to /root/old and the
+# staged /kvmapp.new to /kvmapp, whole directories at a time. Rename never
+# rewrites a file in place, so the running binary's old inode lives on untouched
+# (now under /root/old): no ETXTBSY and no corruption. After the
 # OTA it calls `S95nanokvm restart`, which restarts the supervised programs from
 # the new files. Running in place also keeps os.Executable() under /kvmapp/server,
 # where the web files and the picoclaw profile paths are resolved.
@@ -118,6 +118,29 @@ start_watchdog() {
     watchdog -t 5 -T 30 /dev/watchdog || echo "S95nanokvm: watchdog applet failed to start" >&2
 }
 
+# install.go swaps an update in by renaming whole directories: /kvmapp -> /root/old,
+# then /kvmapp.new -> /kvmapp. Power lost between the two renames leaves /kvmapp
+# missing with a complete tree in /kvmapp.new (synced before the swap began) or in
+# /root/old. This file runs from /etc/init.d (kvm_system's system_init copies it
+# there), so it works with /kvmapp missing: it depends on nothing under /kvmapp.
+recover_interrupted_update() {
+    if [ ! -d /kvmapp ]; then
+        if [ -d /kvmapp.new ]; then
+            echo "S95nanokvm: interrupted update: completing it from /kvmapp.new" >&2
+            mv /kvmapp.new /kvmapp
+        elif [ -d /root/old ]; then
+            echo "S95nanokvm: interrupted update: rolling back to /root/old" >&2
+            mv /root/old /kvmapp
+        else
+            echo "S95nanokvm: /kvmapp is missing and nothing can restore it" >&2
+        fi
+        sync
+    elif [ -d /kvmapp.new ]; then
+        echo "S95nanokvm: removing stale /kvmapp.new from an interrupted update" >&2
+        rm -rf /kvmapp.new
+    fi
+}
+
 stop_services() {
     # The server owns VI/VPSS. Let it release MMF before stopping kvm_system.
     stop_watched NanoKVM-Server "$SERVER_PID"
@@ -154,6 +177,7 @@ start_services() {
 
 case "$1" in
   start)
+    recover_interrupted_update
     echo -n kvm > /boot/hostname.prefix
     [ -e /root/.profile ] || printf '%s\n' 'export PS1="\u@\h:\w# "' > /root/.profile
 
@@ -209,6 +233,7 @@ case "$1" in
     if [ -f /tmp/.nanokvm_migrating ]; then
         exit 0
     fi
+    recover_interrupted_update
     stop_services
     start_services
 

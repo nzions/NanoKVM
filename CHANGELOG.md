@@ -1,3 +1,13 @@
+## 2.5.9 (2026-10-25)
+
+### Bug Fixes
+
+* An update is installed by whole-directory renames: the new tree is staged as `/kvmapp.new` and synced, then swapped in. Power lost at any point leaves either the old or the new version, and at boot `S95nanokvm` completes or rolls back an interrupted swap. Previously files were moved one by one, so a power cut could leave `/kvmapp` half old, half new
+
+### Build
+
+* `emu-image.sh --refresh` also installs `/kvmapp/system/init.d/S95nanokvm` as `/etc/init.d/S95nanokvm`, as `kvm_system` does on a device
+
 ## 2.5.8 (2026-10-25)
 
 ### Bug Fixes

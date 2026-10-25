@@ -32,46 +32,52 @@ func releaseUpdateLock() {
 	isUpdating = false
 }
 
+// installPreparedPackage swaps the staged tree in as /kvmapp.
+//
+// Invariant: at every instant either /kvmapp is a whole tree, or it is missing and
+// /kvmapp.new (complete, synced) or /root/old is whole; S95nanokvm's boot recovery
+// renames whichever exists back to /kvmapp.
 func installPreparedPackage(sourceDir string) error {
-	if err := backupCurrentApp(); err != nil {
-		return err
+	return installTree(sourceDir, AppDir, StagingDir, BackupDir)
+}
+
+func installTree(sourceDir, appDir, stagingDir, backupDir string) error {
+	// A stale staging dir comes from an earlier, interrupted attempt.
+	if err := os.RemoveAll(stagingDir); err != nil {
+		return fmt.Errorf("failed to remove stale staging dir: %w", err)
 	}
 
-	if err := applyUpdate(sourceDir); err != nil {
-		return err
+	if err := os.Rename(sourceDir, stagingDir); err != nil {
+		return fmt.Errorf("failed to stage update: %w", err)
 	}
 
-	if err := utils.ChmodRecursively(AppDir, 0o755); err != nil {
+	// ChmodRecursively sets files only; the staged root becomes /kvmapp itself.
+	if err := os.Chmod(stagingDir, 0o755); err != nil {
+		return fmt.Errorf("failed to chmod staging dir: %w", err)
+	}
+	if err := utils.ChmodRecursively(stagingDir, 0o755); err != nil {
 		return fmt.Errorf("failed to chmod: %w", err)
 	}
 
-	// The moves above are renames the kernel may hold in memory for many seconds; power lost
-	// before writeback leaves /kvmapp with empty files (an empty version file among them).
-	// Flush before reporting success.
+	// The staged tree must be complete on disk before the app dir is touched.
 	syscall.Sync()
 
-	return nil
-}
-
-func backupCurrentApp() error {
-	if err := os.RemoveAll(BackupDir); err != nil {
+	if err := os.RemoveAll(backupDir); err != nil {
 		return fmt.Errorf("failed to remove backup: %w", err)
 	}
 
-	if err := utils.MoveFilesRecursively(AppDir, BackupDir); err != nil {
-		return fmt.Errorf("failed to backup app: %w", err)
+	if err := os.Rename(appDir, backupDir); err != nil {
+		return fmt.Errorf("failed to back up app: %w", err)
 	}
+	syscall.Sync()
 
-	return nil
-}
-
-func applyUpdate(sourceDir string) error {
-	if err := utils.MoveFilesRecursively(sourceDir, AppDir); err != nil {
-		// Try to restore backup on failure
-		if restoreErr := utils.MoveFilesRecursively(BackupDir, AppDir); restoreErr != nil {
+	if err := os.Rename(stagingDir, appDir); err != nil {
+		if restoreErr := os.Rename(backupDir, appDir); restoreErr != nil {
 			log.Errorf("Failed to restore backup after update failure: %v", restoreErr)
 		}
 		return fmt.Errorf("failed to move update in place: %w", err)
 	}
+	syscall.Sync()
+
 	return nil
 }

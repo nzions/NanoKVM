@@ -25,7 +25,10 @@
 # hardware (cgo) server and an S95nanokvm that starts kvm_system, and both
 # segfault under qemu. --refresh re-applies the two edits that matter after an
 # OTA (steps 2 and 3) IN PLACE on an image this script already processed:
-# it reinstalls the nokvm server and strips the kvm_system start line from both
+# it reinstalls the nokvm server, copies /kvmapp/system/init.d/S95nanokvm over
+# /etc/init.d/S95nanokvm (what kvm_system does on a device; it never runs under
+# qemu, so the boot copy would otherwise stay stale), and strips the kvm_system
+# start line from both
 # S95nanokvm copies that run (/etc/init.d/S95nanokvm, which rcS runs at boot,
 # and /kvmapp/system/init.d/S95nanokvm, which the OTA runs for `restart`).
 # Run it with the qemu VM STOPPED; it refuses an image without
@@ -338,6 +341,14 @@ if [ "$MODE" = refresh ]; then
     exists /kvmapp/server || die "/kvmapp/server does not exist in the image: not a NanoKVM rootfs"
     put_file "$SERVER" /kvmapp/server/NanoKVM-Server 755
     info "server installed ($(wc -c <"$SERVER") bytes)"
+    # kvm_system never runs under qemu, so nothing refreshes /etc/init.d/S95nanokvm
+    # from the OTA's copy. Do what kvm_system's system_init does on a device:
+    # install /kvmapp/system/init.d/S95nanokvm as /etc/init.d/S95nanokvm.
+    exists /kvmapp/system/init.d/S95nanokvm ||
+        die "/kvmapp/system/init.d/S95nanokvm not found in the image"
+    dump_to /kvmapp/system/init.d/S95nanokvm "$T/s95.new"
+    put_file "$T/s95.new" /etc/init.d/S95nanokvm 755
+    info "/etc/init.d/S95nanokvm installed from /kvmapp/system/init.d/S95nanokvm"
     # Both copies run: /etc/init.d/S95nanokvm at boot (rcS), and
     # /kvmapp/system/init.d/S95nanokvm for the `restart` an OTA issues.
     strip_kvm_system /etc/init.d/S95nanokvm 1

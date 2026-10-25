@@ -8,7 +8,10 @@ const (
 
 	AppDir    = "/kvmapp"
 	BackupDir = "/root/old"
-	CacheDir  = "/root/.kvmcache"
+	// StagingDir holds the complete, synced new tree just before it is renamed to AppDir.
+	// S95nanokvm's boot recovery knows this path.
+	StagingDir = "/kvmapp.new"
+	CacheDir   = "/root/.kvmcache"
 
 	updateWorkspacePrefix = "nanokvm-update-"
 	cacheDirMode          = 0o700

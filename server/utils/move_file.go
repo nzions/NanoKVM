@@ -56,23 +56,3 @@ func MoveFileCrossFS(src, dst string) error {
 	}
 	return nil
 }
-
-func MoveFilesRecursively(src, dst string) error {
-	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		fileName := strings.Replace(path, src, "", 1)
-		dstName := dst + fileName
-		fileInfo, err := os.Stat(path)
-		if err != nil {
-			return err
-		}
-
-		if fileInfo.IsDir() {
-			return os.MkdirAll(dstName, fileInfo.Mode())
-		}
-		return MoveFile(path, dstName)
-	})
-}
