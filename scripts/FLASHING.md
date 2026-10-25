@@ -1,0 +1,67 @@
+# Flashing a NanoKVM Cube microSD card from macOS
+
+These steps flash the image that `sd-image.sh` builds: the stock Sipeed 1.4.3 image with our
+signed release in `/kvmapp`. The commands are for the current published build, 2.5.12.
+For another build, take the file names and hashes from `SHA256SUMS`.
+
+Published at https://hc.nikspace.net/nanokvm/sdimg/:
+
+| file | size | sha256 |
+|---|---|---|
+| `nanokvm-cube-2.5.12-sd.img.xz` | 207,363,884 B | `846d5559e7e01ff772782721a985fbf7835cd32b7448d04dbd2501cddf7ef7b2` |
+| `nanokvm-cube-2.5.12-sd.img` | 1,627,390,464 B | `411d5fe7ad8ee691255adaadd0ec4a8eb998ac84dda48d3f6580e71056de69c0` |
+
+You need a microSD card reader on the Mac.
+
+## 0. Get the card out
+
+Power the Cube off. The microSD slot may be inside the case, so you may need to take the
+cover off to reach it.
+
+## Option A: Raspberry Pi Imager (easiest)
+
+1. Install it: `brew install --cask raspberry-pi-imager`, or get it from https://www.raspberrypi.com/software/.
+2. Download the image and check its hash:
+
+       cd ~/Downloads && curl -fLO https://hc.nikspace.net/nanokvm/sdimg/nanokvm-cube-2.5.12-sd.img.xz && shasum -a 256 nanokvm-cube-2.5.12-sd.img.xz
+
+   It must print `846d5559e7e01ff772782721a985fbf7835cd32b7448d04dbd2501cddf7ef7b2`.
+3. Insert the card and open Imager.
+4. **Device**: pick any device, or "No filtering".
+5. **Operating System**: scroll to the bottom, choose **Use Custom**, and select the `.img.xz`.
+6. **Storage**: pick the SD card. Check its size so you don't pick another disk.
+7. Press **Next**. If it offers OS customisation, answer **No**. Write it; Imager
+   verifies the card and ejects it.
+
+## Option B: Terminal
+
+This uses the raw `.img`, because macOS ships no `xz`.
+
+1. Download the image and check its hash:
+
+       cd ~/Downloads && curl -fLO https://hc.nikspace.net/nanokvm/sdimg/nanokvm-cube-2.5.12-sd.img && shasum -a 256 nanokvm-cube-2.5.12-sd.img
+
+   It must print `411d5fe7ad8ee691255adaadd0ec4a8eb998ac84dda48d3f6580e71056de69c0`.
+2. Find the card: `diskutil list external physical`. It is the disk the size of your card,
+   e.g. `/dev/disk4`. **Be sure of N**: `dd` overwrites whatever disk you give it.
+3. Write it, with `N` replaced by that number:
+
+       diskutil unmountDisk /dev/diskN && sudo dd if=nanokvm-cube-2.5.12-sd.img of=/dev/rdiskN bs=4m status=progress && sync && diskutil eject /dev/diskN
+
+## After flashing
+
+1. Put the card back, cable the Cube as before, and power it on. First boot takes a minute
+   or two.
+2. The OLED shows a random 12-character admin password, which is also root's. The first
+   web login forces a password change.
+3. **kvm1 in our estate: do NOT log in with it.** A rook makes the forced change itself, so
+   that the new password goes straight into sage. Put the OLED password into sage and
+   share it with the rook, on m5sspro (where nik's sage key is):
+
+       printf '%s' '<OLED password>' | ~/.claude/bin/sage set --stdin secret /nik/devicecred/nanokvm/kvm1/admin && ~/.claude/bin/sage share /nik/devicecred/nanokvm/kvm1/admin rook-agent && ~/.claude/bin/sage sync
+
+   Then tell the rook. It logs in with that password, sets a new one stored in sage for
+   rookery, captures the device cert, adds kvm1 to rookery's and capsd's config, and runs
+   the screenshot and signed/tampered OTA checks (journey 01k5oi5052).
+4. If the OLED is still blank after a few minutes, report it. The image has not been
+   boot-tested on hardware before; it cannot run under qemu.
