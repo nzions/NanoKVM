@@ -6,6 +6,7 @@
 #define HDMI_INT_H
 
 #include "kvm_gpio.h"
+#include "lt6911.h"
 
 // ---- LT6911 INT line: GPIO character device (v2 uABI) ----------------------
 //
@@ -75,9 +76,10 @@ static inline int hdmi_int_open(void)
     return result;
 }
 
-// Drains the line event fd (non-blocking). Returns true when the variant's
-// edge (C: rising, UXC/D: falling) was seen.
-static inline bool hdmi_int_edge_seen(int fd, uint8_t hdmi_version)
+// Drains the line event fd (non-blocking). Returns true when `edge` (the
+// variant's lt6911_ops.int_edge: C rising, UXC/D falling) was seen. LT6911_INT_NONE
+// sees nothing.
+static inline bool hdmi_int_edge_seen(int fd, enum lt6911_int_edge edge)
 {
     struct nk_gpio_v2_line_event ev[16];
     bool seen = false;
@@ -90,9 +92,8 @@ static inline bool hdmi_int_edge_seen(int fd, uint8_t hdmi_version)
         }
         if(n == 0 || n % (ssize_t)sizeof(ev[0]) != 0) return seen;
         for(size_t i = 0; i < (size_t)n / sizeof(ev[0]); i++){
-            if(hdmi_version == 0 && ev[i].id == NK_GPIO_V2_LINE_EVENT_RISING_EDGE) seen = true;
-            if((hdmi_version == 1 || hdmi_version == 3) &&
-               ev[i].id == NK_GPIO_V2_LINE_EVENT_FALLING_EDGE) seen = true;
+            if(edge == LT6911_INT_RISING && ev[i].id == NK_GPIO_V2_LINE_EVENT_RISING_EDGE) seen = true;
+            if(edge == LT6911_INT_FALLING && ev[i].id == NK_GPIO_V2_LINE_EVENT_FALLING_EDGE) seen = true;
         }
     }
 }

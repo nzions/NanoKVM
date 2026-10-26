@@ -84,7 +84,8 @@ riscv64-unknown-linux-musl-gcc -static -O2 -Wall -Wextra \
     -o "$NANOKVM_PATH/tools/kvmgpio/kvmgpio" "$NANOKVM_PATH/tools/kvmgpio/kvmgpio.c"
 riscv64-unknown-linux-musl-gcc -march=rv64gc -O2 \
     -o "$NANOKVM_PATH/tools/nanokvm_update_edid/nanokvm_update_edid" \
-    "$NANOKVM_PATH/tools/nanokvm_update_edid/nanokvm_update_edid.c"
+    "$NANOKVM_PATH/tools/nanokvm_update_edid/nanokvm_update_edid.c" \
+    "$NANOKVM_PATH/support/sg2002/additional/kvm/src/lt6911.c"
 echo "::endgroup::"
 
 # NanoKVM-Server links libkvm.so by name from server/dl_lib (-L../dl_lib -lkvm).

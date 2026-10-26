@@ -27,7 +27,12 @@ int main(int argc, char **argv)
         fprintf(stderr, "usage: hdmiint <hdmi_version> <seconds>\n");
         return 2;
     }
+    // The argument keeps its old numbering (0 = C, 1 = UXC, 3 = D); the edge is
+    // what lt6911.c's ops table says for that variant.
     uint8_t version = (uint8_t)atoi(argv[1]);
+    enum lt6911_int_edge edge = version == 0 ? LT6911_INT_RISING
+                              : (version == 1 || version == 3) ? LT6911_INT_FALLING
+                              : LT6911_INT_NONE;
     long deadline = ms_now() + atol(argv[2]) * 1000L;
     int fd = hdmi_int_open();
     if(fd < 0){
@@ -39,7 +44,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "FAIL: O_NONBLOCK: %d\n", errno);
         return 2;
     }
-    hdmi_int_edge_seen(fd, version);
+    hdmi_int_edge_seen(fd, edge);
     printf("ready: hdmi_version %u\n", version);
     fflush(stdout);
     int probes = 0, wakes = 0;
@@ -55,7 +60,7 @@ int main(int argc, char **argv)
         }
         if(n == 0) break;
         wakes++;
-        bool probe = hdmi_int_edge_seen(fd, version);
+        bool probe = hdmi_int_edge_seen(fd, edge);
         printf("wake %d: %s\n", wakes, probe ? "PROBE (variant edge seen)" : "no probe (other edge)");
         fflush(stdout);
         if(probe) probes++;

@@ -1,3 +1,16 @@
+## 2.6.13 (2026-10-26)
+
+### Changes
+
+* One LT6911 driver. `support/sg2002/additional/kvm/src/lt6911.c` + `internal/lt6911.h` (plain C, linked into libkvm and compiled into `nanokvm_update_edid`) own `/dev/i2c-4`: the Maix `i2c::I2C LT6911_i2c(4)` global and the three copies of the variant code in `kvm_vision.cpp` (enable/disable, hdmi_res, csi_res, plus the unused register dump helpers) are gone, and so are the edid tool's own four I2C helpers and page cache. (kvm_system's dead `hdmi.cpp` and its global I2C object were already removed in 2.5.17.)
+* Checked I/O: every transfer is an `I2C_RDWR` ioctl whose result and count are checked; every call returns 0 or a negative errno. The old unchecked `readfrom()` result dereference is gone. `lt6911_reg_read/_write(dev, page, reg, ...)` select the page themselves on every call (the page register is never caller state) under one process-wide lock; `lt6911_probe` holds that lock across enable -> query -> disable. Page select is its own write (its own STOP), then the register access, as the old code and the EDID tool did on the wire
+* `enum lt6911_variant {UNKNOWN, C, UXC, D, UXE}` is detected once by `lt6911_open` from `/etc/kvm/hdmi_version` (S15kvmhwd's marker: c / ux / d / ue) and drives a `struct lt6911_ops` table (`enable`, `disable`, `signal_present`, `csi_res`, address, INT edge). A missing, unreadable or unknown marker is an error (the state machine logs it and does not probe) where `kvm_vision` used to fall back to C. `hdmi_int_edge_seen` takes the ops table's `enum lt6911_int_edge`
+* Hactive scale reconciled: the width register is scaled per register (`lt6911_res_regs.h_scale`). The C receive side (page D2) and D (page E0) count pairs of pixels (x2); the C CSI side (page C2) and UXC CSI (page 85) are real pixels. The old code multiplied C's receive side by 2 only for a log line, and D's by 2 for both reads: the sizes handed to the VI are unchanged. One deliberate change: "signal present" is `width != 0 && height != 0` for every variant (D used `||`)
+* A probe whose I2C failed no longer reads as "no signal": the state is kept, the error logged, and a resync request is still answered
+* Address: every row of the ops table is 0x2B, as before. S15kvmhwd detects a C by an ACK at 0x2C and UXC/D at 0x2B, while kvm_vision and the edid tool have always talked to a C at 0x2B; the tree cannot say which address a C answers at, so behaviour is kept and the question is open (`i2cdetect -y 4` on a C board)
+* `nanokvm_update_edid` uses the library (variant detection, bus open, every register access); its build line now includes `lt6911.c`
+* Not run on hardware (kvm1 offline). libkvm_mmf's prebuilt Sophgo `lt6911_cmos.c` is a fourth, unremoved bus user: it opens `/dev/i2c-%u` and probes/reads/writes the chip when the VI chain starts
+
 ## 2.6.12 (2026-10-26)
 
 ### Changes

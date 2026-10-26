@@ -7,7 +7,8 @@ CFLAGS += -I/usr/local/RISC-V-toolchain/riscv64-linux-musl-x86_64/sysroot/usr/in
 
 CC = $(CROSS_COMPILE)gcc
 
-SRC = nanokvm_update_edid.c
+# lt6911.c is the one LT6911 driver, shared with libkvm.
+SRC = nanokvm_update_edid.c ../../support/sg2002/additional/kvm/src/lt6911.c
 
 TARGET = nanokvm_update_edid
 

@@ -13,6 +13,7 @@
 #include "internal/vi_state_writer.hpp"
 #include "internal/hdmi_int.h"
 #include "internal/kvm_board.h"
+#include "internal/lt6911.h"
 
 #include <errno.h>
 #include <stdarg.h>
@@ -53,16 +54,11 @@
 #define watchdog_temp_path      "/tmp/watchdog"
 #define watchdog_file           "/tmp/nanokvm_wd"
 
-#define LT6911_ADDR 	0x2B
-#define LT6911_READ 	0xFF
-#define LT6911_WRITE 	0x00
-
 pthread_mutex_t vi_mutex;
 
 using namespace maix;
 using namespace maix::sys;
 using namespace maix::peripheral;
-i2c::I2C LT6911_i2c(4, i2c::Mode::MASTER);
 
 typedef struct {
 	uint16_t vi_width = default_vi_width;
@@ -79,7 +75,6 @@ typedef struct {
     uint8_t try_exit_thread = 0;
     uint8_t thread_is_running = 0;
     uint8_t Auto_res = 0;
-    uint8_t hdmi_version = 0;
     uint8_t hdmi_res_type = 0;
     uint8_t hdmi_res_err = 0;
     uint8_t venc_auto_recyc = 0;
@@ -264,250 +259,12 @@ uint8_t chack_ion()
     else return 2;
 }
 
-void lt6911_enable()
+// Classifies the size the chip sends down the CSI link and logs it.
+static uint8_t classify_csi_res(struct lt6911_res csi, uint16_t *p_width, uint16_t *p_height)
 {
-	uint8_t buf[2];
-
-    if(kvmv_cfg.hdmi_version == 3){
-        return;
-    }
-
-	buf[0] = 0xff;
-	buf[1] = 0x80;
-	LT6911_i2c.writeto(LT6911_ADDR, buf, 2);
-
-	buf[0] = 0xee;
-	buf[1] = 0x01;
-	LT6911_i2c.writeto(LT6911_ADDR, buf, 2);
-
-    if(kvmv_cfg.hdmi_version == 1){
-        // disable watchdog
-        buf[0] = 0x10;
-        buf[1] = 0x00;
-        LT6911_i2c.writeto(LT6911_ADDR, buf, 2);
-    }
-}
-
-void lt6911_disable()
-{
-	uint8_t buf[2];
-
-    if(kvmv_cfg.hdmi_version == 3){
-        return;
-    }
-
-	buf[0] = 0xff;
-	buf[1] = 0x80;
-	LT6911_i2c.writeto(LT6911_ADDR, buf, 2);
-
-	buf[0] = 0xee;
-	buf[1] = 0x00;
-	LT6911_i2c.writeto(LT6911_ADDR, buf, 2);
-}
-
-uint8_t lt6911_get_hdmi_res()
-{
-	uint8_t buf[2];
-	uint8_t revbuf[4];
-	uint16_t Vactive;
-	uint16_t Hactive;
-
-
-    if(kvmv_cfg.hdmi_version == 0){
-        // LT6911C
-        buf[0] = 0xff;
-        buf[1] = 0xd2;
-        LT6911_i2c.writeto(LT6911_ADDR, buf, 2);
-
-        buf[0] = 0x83;
-        buf[1] = 0x11;
-        LT6911_i2c.writeto(LT6911_ADDR, buf, 2);
-
-        time::sleep_ms(5);
-
-        // Vactive
-        buf[0] = 0x96;
-        LT6911_i2c.writeto(LT6911_ADDR, buf, 1);
-        maix::Bytes *dat0 = LT6911_i2c.readfrom(LT6911_ADDR, 2);
-
-        // Hactive
-        buf[0] = 0x8b;
-        LT6911_i2c.writeto(LT6911_ADDR, buf, 1);
-        maix::Bytes *dat1 = LT6911_i2c.readfrom(LT6911_ADDR, 2);
-
-        revbuf[0] = (uint8_t)dat0->data[0];
-        revbuf[1] = (uint8_t)dat0->data[1];
-        revbuf[2] = (uint8_t)dat1->data[0];
-        revbuf[3] = (uint8_t)dat1->data[1];
-
-        Vactive = (revbuf[0] << 8)|revbuf[1];
-        Hactive = (revbuf[2] << 8)|revbuf[3];
-        Hactive *= 2;
-
-        debug("[hdmi]HDMI res modification event\n");
-        debug("[hdmi]new res: %d * %d\n", Hactive, Vactive);
-
-        delete dat0;
-        delete dat1;
-
-        if (Vactive != 0 && Hactive != 0){
-            return 1;
-        } else {
-            return 0;
-        }
-    } else if (kvmv_cfg.hdmi_version == 1){
-        // LT6911UXC
-        buf[0] = 0xff;
-        buf[1] = 0x86;
-        LT6911_i2c.writeto(LT6911_ADDR, buf, 2);
-
-        buf[0] = 0xff;
-        buf[1] = 0x86;
-        LT6911_i2c.writeto(LT6911_ADDR, buf, 2);
-
-        // HDMI signal disappear/stable
-        buf[0] = 0xA3;
-        LT6911_i2c.writeto(LT6911_ADDR, buf, 1);
-        maix::Bytes *dat0 = LT6911_i2c.readfrom(LT6911_ADDR, 1);
-
-        revbuf[0] = (uint8_t)dat0->data[0];
-        delete dat0;
-
-        debug("[hdmi]HDMI-UXC res modification event\n");
-
-        if(revbuf[0] == 0x55)       return 1;
-        else if(revbuf[0] == 0x88)  return 0;
-        else return 0;
-    } else if (kvmv_cfg.hdmi_version == 3){
-        // LT6911D
-        buf[0] = 0xff;
-        buf[1] = 0xe0;
-        LT6911_i2c.writeto(LT6911_ADDR, buf, 2);
-
-        // Hactive
-        buf[0] = 0x8c;
-        LT6911_i2c.writeto(LT6911_ADDR, buf, 1);
-        maix::Bytes *dat0 = LT6911_i2c.readfrom(LT6911_ADDR, 2);
-
-        // Vactive
-        buf[0] = 0x8e;
-        LT6911_i2c.writeto(LT6911_ADDR, buf, 1);
-        maix::Bytes *dat1 = LT6911_i2c.readfrom(LT6911_ADDR, 2);
-
-        revbuf[0] = (uint8_t)dat0->data[0];
-        revbuf[1] = (uint8_t)dat0->data[1];
-        revbuf[2] = (uint8_t)dat1->data[0];
-        revbuf[3] = (uint8_t)dat1->data[1];
-
-        Hactive = ((revbuf[0] << 8)|revbuf[1]) * 2;
-        Vactive = (revbuf[2] << 8)|revbuf[3];
-
-        debug("[hdmi]HDMI-D res modification event\n");
-        debug("[hdmi]new res: %d * %d\n", Hactive, Vactive);
-
-        delete dat0;
-        delete dat1;
-
-        if(Hactive != 0 || Vactive != 0) return 1;
-        else return 0;
-    } else {
-        return 0;
-    }
-}
-
-uint8_t lt6911_get_csi_res(uint16_t *p_width, uint16_t *p_height)
-{
-	uint8_t buf[2];
-	uint8_t revbuf[4];
-    uint8_t res_type;
-	uint16_t Vactive;
-	uint16_t Hactive;
-
-    if(kvmv_cfg.hdmi_version == 0){
-        // LT6911C
-        buf[0] = 0xff;
-        buf[1] = 0xc2;
-        LT6911_i2c.writeto(LT6911_ADDR, buf, 2);
-
-        // Vactive
-        buf[0] = 0x06;
-        LT6911_i2c.writeto(LT6911_ADDR, buf, 1);
-        maix::Bytes *dat0 = LT6911_i2c.readfrom(LT6911_ADDR, 2);
-
-        // Hactive
-        buf[0] = 0x38;
-        LT6911_i2c.writeto(LT6911_ADDR, buf, 1);
-        maix::Bytes *dat1 = LT6911_i2c.readfrom(LT6911_ADDR, 2);
-
-        revbuf[0] = (uint8_t)dat0->data[0];
-        revbuf[1] = (uint8_t)dat0->data[1];
-        revbuf[2] = (uint8_t)dat1->data[0];
-        revbuf[3] = (uint8_t)dat1->data[1];
-
-        delete dat0;
-        delete dat1;
-
-        Vactive = (revbuf[0] << 8)|revbuf[1];
-        Hactive = (revbuf[2] << 8)|revbuf[3];
-    } else if(kvmv_cfg.hdmi_version == 1) {
-        // LT6911UXC
-        debug("[hdmi]UXC get csi res\n");
-        buf[0] = 0xff;
-        buf[1] = 0x85;
-        LT6911_i2c.writeto(LT6911_ADDR, buf, 2);
-
-        // Vactive
-        buf[0] = 0xF0;
-        LT6911_i2c.writeto(LT6911_ADDR, buf, 1);
-        maix::Bytes *dat0 = LT6911_i2c.readfrom(LT6911_ADDR, 2);
-
-        // Hactive
-        buf[0] = 0xEA;
-        LT6911_i2c.writeto(LT6911_ADDR, buf, 1);
-        maix::Bytes *dat1 = LT6911_i2c.readfrom(LT6911_ADDR, 2);
-
-        revbuf[0] = (uint8_t)dat0->data[0];
-        revbuf[1] = (uint8_t)dat0->data[1];
-        revbuf[2] = (uint8_t)dat1->data[0];
-        revbuf[3] = (uint8_t)dat1->data[1];
-
-        delete dat0;
-        delete dat1;
-
-        Vactive = (revbuf[0] << 8)|revbuf[1];
-        Hactive = (revbuf[2] << 8)|revbuf[3];
-    } else if(kvmv_cfg.hdmi_version == 3) {
-        // LT6911D
-        debug("[hdmi]D get csi res\n");
-        buf[0] = 0xff;
-        buf[1] = 0xe0;
-        LT6911_i2c.writeto(LT6911_ADDR, buf, 2);
-
-        // Vactive
-        buf[0] = 0x8e;
-        LT6911_i2c.writeto(LT6911_ADDR, buf, 1);
-        maix::Bytes *dat0 = LT6911_i2c.readfrom(LT6911_ADDR, 2);
-
-        // Hactive
-        buf[0] = 0x8c;
-        LT6911_i2c.writeto(LT6911_ADDR, buf, 1);
-        maix::Bytes *dat1 = LT6911_i2c.readfrom(LT6911_ADDR, 2);
-
-        revbuf[0] = (uint8_t)dat0->data[0];
-        revbuf[1] = (uint8_t)dat0->data[1];
-        revbuf[2] = (uint8_t)dat1->data[0];
-        revbuf[3] = (uint8_t)dat1->data[1];
-
-        delete dat0;
-        delete dat1;
-
-        Vactive = (revbuf[0] << 8)|revbuf[1];
-        Hactive = ((revbuf[2] << 8)|revbuf[3]) * 2;
-    } else {
-        return UNKNOWN_RES;
-    }
-
-    res_type = check_res(Hactive, Vactive);
+    uint16_t Vactive = csi.height;
+    uint16_t Hactive = csi.width;
+    uint8_t res_type = check_res(Hactive, Vactive);
     *p_width = Hactive;
     *p_height = Vactive;
 
@@ -525,47 +282,6 @@ uint8_t lt6911_get_csi_res(uint16_t *p_width, uint16_t *p_height)
     }
 
 	return res_type;
-}
-
-void lt6911_write_reg(uint8_t reg, uint8_t val)
-{
-	uint8_t buf[2];
-	buf[0] = reg;
-	buf[1] = val;
-	LT6911_i2c.writeto(LT6911_ADDR, buf, 2);
-}
-
-void lt6911_read_reg(uint8_t reg)
-{
-	uint8_t buf[16];
-	buf[0] = reg;
-	LT6911_i2c.writeto(LT6911_ADDR, buf, 1);
-
-	maix::Bytes *dat = LT6911_i2c.readfrom(LT6911_ADDR, 16);
-
-	for(int i = 0; i < 16; i++){
-		buf[i] = (uint8_t)dat->data[i];
-	}
-
-	delete dat;
-
-	debug("[hdmi]%3x %3x %3x %3x %3x %3x %3x %3x |%3x %3x %3x %3x %3x %3x %3x %3x \n", \
-			buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7], \
-			buf[8], buf[9], buf[10], buf[11], buf[12], buf[13], buf[14], buf[15]);
-}
-
-uint8_t lt6911_read_one_reg(uint8_t reg)
-{
-	uint8_t ret;
-	ret = reg;
-	LT6911_i2c.writeto(LT6911_ADDR, &ret, 1);
-
-	maix::Bytes *dat = LT6911_i2c.readfrom(LT6911_ADDR, 1);
-
-	ret = (uint8_t)dat->data[0];
-
-	delete dat;
-	return ret;
 }
 
 // ==============================================================
@@ -589,41 +305,6 @@ void* watchdog_sf_feed(void * arg)
     return NULL;
 }
 
-void get_hdmi_version()
-{
-	FILE *fp;
-	uint8_t RW_Data[2];
-    system("/kvmapp/system/init.d/S15kvmhwd get_hdmi_version");
-	if(access("/etc/kvm/hdmi_version", F_OK) == 0){
-        fp = fopen("/etc/kvm/hdmi_version", "r");
-        fread(RW_Data, sizeof(char), 2, fp);
-        fclose(fp);
-        if(RW_Data[0] == 'u'){
-            // 6911uxc
-            if(RW_Data[1] == 'e'){
-                kvmv_cfg.hdmi_version = 2;
-                debug("[hdmi]HDMI-UE exist!\n");
-            } else if(RW_Data[1] == 'x') {
-                kvmv_cfg.hdmi_version = 1;
-                debug("[hdmi]HDMI-UX exist!\n");
-            } else {
-                kvmv_cfg.hdmi_version = 1;
-                debug("[hdmi]Incomplete version number, set to 'ux'\n");
-            }
-        } else if(RW_Data[0] == 'd'){
-            // 6911d
-            kvmv_cfg.hdmi_version = 3;
-            debug("[hdmi]HDMI-D exist!\n");
-        } else {
-            // 6911c
-            kvmv_cfg.hdmi_version = 0;
-            debug("[hdmi]HDMI-C exist!\n");
-        }
-        RW_Data[0] = 0;
-    } else {
-        kvmv_cfg.hdmi_version = 0;
-    }
-}
 
 // ====HDMI STATE MACHINE========================================
 
@@ -734,9 +415,14 @@ int kvmv_hdmi_wait(uint64_t _last_seq, struct kvm_hdmi_snapshot* _p_out, int _ti
     return ret;
 }
 
-// Held for the whole of an LT6911 register sequence, and by
-// kvmv_hdmi_control around hdmi_stopped (chip held in reset: do not read).
+// Orders a probe against the chip being put in reset: held around the
+// hdmi_stopped check and the probe, and by kvmv_hdmi_control around
+// hdmi_stopped (chip held in reset: do not read). It does NOT guard the bus or
+// the chip's page register: lt6911.c owns those and takes its own lock.
 static pthread_mutex_t lt_mutex = PTHREAD_MUTEX_INITIALIZER;
+// The one LT6911 handle: opened by the state machine thread, which is its only
+// user, closed when that thread ends.
+static struct lt6911_dev lt_dev = { -1, LT6911_UNKNOWN, NULL };
 static uint8_t hdmi_stopped = 0;     // written under lt_mutex; read atomically
 
 static pthread_t hdmi_thread;
@@ -759,17 +445,22 @@ static void hdmi_post_resync(void)
     hdmi_wake();
 }
 
-// Caller holds lt_mutex.
-static hdmi_probe_t lt6911_probe(void)
+// Caller holds lt_mutex. 0 and `out`, or the library's negative errno (the
+// chip could not be read: the answer is unknown, NOT "no signal").
+static int hdmi_probe_chip(hdmi_probe_t *out)
 {
-    hdmi_probe_t p = {false, UNKNOWN_RES, 0, 0};
-    lt6911_enable();
-    if(lt6911_get_hdmi_res()){
-        p.present = true;
-        p.res_type = lt6911_get_csi_res(&p.width, &p.height);
+    out->present = false;
+    out->res_type = UNKNOWN_RES;
+    out->width = 0;
+    out->height = 0;
+    struct lt6911_probe_result r;
+    int err = lt6911_probe(&lt_dev, &r);
+    if(err != 0) return err;
+    if(r.present){
+        out->present = true;
+        out->res_type = classify_csi_res(r.csi, &out->width, &out->height);
     }
-    lt6911_disable();
-    return p;
+    return 0;
 }
 
 // Caller holds vi_mutex. VENC first, then VPSS and VI/CSI.
@@ -847,16 +538,29 @@ static void hdmi_apply(const hdmi_probe_t &p, bool resync)
 void* hdmi_state_machine(void * arg)
 {
     kvmv_cfg.thread_is_running = 1;
-    get_hdmi_version();
+    // S15kvmhwd (re)detects the chip and writes the marker; lt6911_open reads
+    // it once and fails closed on anything it does not know.
+    int sys_ret = system("/kvmapp/system/init.d/S15kvmhwd get_hdmi_version");
+    if(sys_ret != 0) fprintf(stderr, "[hdmi]S15kvmhwd get_hdmi_version returned %d\n", sys_ret);
+    int open_err = lt6911_open(&lt_dev);
+    if(open_err != 0){
+        fprintf(stderr, "[hdmi]FATAL: LT6911 unavailable (%d), HDMI state is UNKNOWN (not probing, not reporting connected)\n", open_err);
+        kvmv_cfg.thread_is_running = 0;
+        return NULL;
+    }
+    const struct lt6911_ops *ops = lt_dev.ops;
+    debug("[hdmi]%s exists\n", ops->name);
 
     if(hdmi_wake_fd < 0){
         fprintf(stderr, "[hdmi]state machine: no wake eventfd: %d\n", errno);
+        lt6911_close(&lt_dev);
         kvmv_cfg.thread_is_running = 0;
         return NULL;
     }
     int int_fd = hdmi_int_open();
     if(int_fd < 0){
         fprintf(stderr, "[hdmi]FATAL: LT6911 INT line unavailable, HDMI state is UNKNOWN (not probing, not reporting connected)\n");
+        lt6911_close(&lt_dev);
         kvmv_cfg.thread_is_running = 0;
         return NULL;
     }
@@ -864,10 +568,11 @@ void* hdmi_state_machine(void * arg)
     if(fl < 0 || fcntl(int_fd, F_SETFL, fl | O_NONBLOCK) < 0){
         fprintf(stderr, "[hdmi]FATAL: INT line O_NONBLOCK failed: %d\n", errno);
         close(int_fd);
+        lt6911_close(&lt_dev);
         kvmv_cfg.thread_is_running = 0;
         return NULL;
     }
-    hdmi_int_edge_seen(int_fd, kvmv_cfg.hdmi_version);     // drop edges from before we started
+    hdmi_int_edge_seen(int_fd, ops->int_edge);     // drop edges from before we started
     hdmi_post_resync();             // initial read of the chip
 
     struct pollfd fds[2];
@@ -898,11 +603,11 @@ void* hdmi_state_machine(void * arg)
             resync = true;
         }
         if(fds[1].revents & POLLIN){
-            if(hdmi_int_edge_seen(int_fd, kvmv_cfg.hdmi_version)) probe_now = true;
+            if(hdmi_int_edge_seen(int_fd, ops->int_edge)) probe_now = true;
         }
 
         if(probe_now){
-            if(kvmv_cfg.hdmi_version == 2){
+            if(lt_dev.variant == LT6911_UXE){
                 // No register read for this chip: assume the default mode.
                 hdmi_probe_t assumed = {true, NORMAL_RES, default_vi_width, default_vi_height};
                 hdmi_apply(assumed, resync);
@@ -910,14 +615,29 @@ void* hdmi_state_machine(void * arg)
                 pthread_mutex_lock(&lt_mutex);
                 bool stopped = __atomic_load_n(&hdmi_stopped, __ATOMIC_ACQUIRE) != 0;
                 hdmi_probe_t p = {false, UNKNOWN_RES, 0, 0};
-                if(!stopped) p = lt6911_probe();
+                int probe_err = 0;
+                if(!stopped) probe_err = hdmi_probe_chip(&p);
                 pthread_mutex_unlock(&lt_mutex);
                 // Held in reset: wait for kvmv_hdmi_control(1) to resync.
-                if(!stopped) hdmi_apply(p, resync);
+                if(stopped){
+                    // nothing to apply
+                } else if(probe_err != 0){
+                    // The chip could not be read, so the state is not known to
+                    // have changed: keep it, but answer a resync request.
+                    fprintf(stderr, "[hdmi]LT6911 probe failed: %d (state kept)\n", probe_err);
+                    if(resync){
+                        pthread_mutex_lock(&vi_mutex);
+                        hdmi_publish_locked(vi_inited, true);
+                        pthread_mutex_unlock(&vi_mutex);
+                    }
+                } else {
+                    hdmi_apply(p, resync);
+                }
             }
         }
     }
     close(int_fd);
+    lt6911_close(&lt_dev);
     kvmv_cfg.thread_is_running = 0;
     return NULL;
 }
