@@ -4,5 +4,4 @@
 # Anything not listed fails the build, and so does an entry that no longer differs
 # (so whoever fixes a listed item must delete its entry). The sections field is exact:
 # to relax a size, list the build's "<section> <size>" line AND the golden's, with a reason.
-libkvm.so rpath none # golden is no rpath; see the next entry
-libkvm.so rpath /work/home/NanoKVM/support/sg2002/kvm_vision_test/build/kvm_mmf # build-dir leak, removed in S6 (01k5t2ca4b)
+

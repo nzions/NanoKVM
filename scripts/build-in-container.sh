@@ -2,7 +2,8 @@
 #
 # Build every riscv64 artifact of a release, from inside the nanokvm-builder
 # image (docker/Dockerfile). Not meant to be run on the host: it needs the
-# riscv64 musl toolchain and the patched MaixCDK checkout that the image ships.
+# riscv64 musl toolchain that the image ships. MaixCDK is not used: kvm_system and the two
+# libraries are built by support/sg2002/maixlite (scripts/build-maixlite.sh).
 #
 # Produces:
 #   kvmapp/kvm_system/kvm_system    kvm_system daemon
@@ -13,9 +14,9 @@
 
 set -euo pipefail
 
-# docker/entrypoint sets HOME for the build user. support/sg2002/build resolves
-# both MaixCDK and the source tree through ~, so a wrong HOME would send the
-# whole build at /root; say so plainly rather than emitting "directory missing".
+# docker/entrypoint sets HOME for the build user. The source tree is resolved through
+# ~, so a wrong HOME would send the whole build at /root; say so plainly rather than
+# emitting "directory missing".
 BUILD_HOME="${BUILD_HOME:-/home/build}"
 if [ "${HOME:-}" != "$BUILD_HOME" ]; then
     echo "[ERROR] HOME is '${HOME:-unset}', expected $BUILD_HOME" >&2
@@ -23,10 +24,9 @@ if [ "${HOME:-}" != "$BUILD_HOME" ]; then
     exit 1
 fi
 
-MAIXCDK_PATH="$HOME/MaixCDK"
 NANOKVM_PATH="$HOME/NanoKVM"
 
-for dir in "$MAIXCDK_PATH" "$NANOKVM_PATH"; do
+for dir in "$NANOKVM_PATH"; do
     if [ ! -d "$dir" ]; then
         echo "[ERROR] $dir not found - is this running inside nanokvm-builder?" >&2
         exit 1
@@ -36,7 +36,7 @@ done
 # Check the toolchain up front. builder-image reuses any existing image, so an
 # image built before a tooling change silently lacks it - and without this the
 # SDK build would run for minutes before server/build.sh failed at the end.
-for tool in go riscv64-unknown-linux-musl-gcc patchelf; do
+for tool in go riscv64-unknown-linux-musl-gcc patchelf cmake make; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         echo "[ERROR] '$tool' is missing from the builder image" >&2
         echo "        the image is out of date; rebuild it with: make rebuild-image" >&2
@@ -44,49 +44,32 @@ for tool in go riscv64-unknown-linux-musl-gcc patchelf; do
     fi
 done
 
-# The SDK tree is owned by the ids baked into the image (DOCKER_UID/DOCKER_GID),
-# while the entrypoint drops to the caller's ids. If they disagree, syncing
-# components fails partway through a long build; catch it here instead.
-if [ ! -w "$MAIXCDK_PATH/components" ]; then
-    echo "[ERROR] $MAIXCDK_PATH/components is not writable by $(id -u):$(id -g)" >&2
-    echo "        the image was built for different ids; rebuild it with:" >&2
-    echo "        make rebuild-image" >&2
-    exit 1
-fi
-
-# shellcheck disable=SC1091
-. "$MAIXCDK_PATH/bin/activate"
-
-echo "::group::support: sync MaixCDK components"
-cd "$NANOKVM_PATH/support/sg2002"
-# The image bakes support/sg2002/additional/ into MaixCDK's components at image
-# build time, and ./build only re-copies them when components/kvm is missing.
-# Refresh unconditionally so a cached image never yields stale libraries.
-./build update_lib
-echo "::endgroup::"
-
-# kvm_system is built without MaixCDK: support/sg2002/maixlite, the vendored subset of the
-# MaixCDK sources it compiled, with the same flags and link line (scripts/build-maixlite.sh
-# holds them to the MaixCDK golden). libkvm.so below still goes through MaixCDK (S6).
-echo "::group::support: build kvm_system (maixlite)"
-MAIXLITE_BUILD="${MAIXLITE_BUILD:-$HOME/maixlite-build}"
+# The riscv64 programs are built without MaixCDK: support/sg2002/maixlite, the vendored subset
+# of the MaixCDK sources they compiled, with the same flags and link lines
+# (scripts/build-maixlite.sh holds them to the MaixCDK goldens). The compiler is the
+# image's.
 MAIXLITE_TOOLCHAIN_BIN="${MAIXLITE_TOOLCHAIN_BIN:-$(cd -P "$(dirname "$(command -v riscv64-unknown-linux-musl-gcc)")" && pwd)}"
 export MAIXLITE_TOOLCHAIN_BIN
-bash "$NANOKVM_PATH/scripts/build-maixlite.sh" "$NANOKVM_PATH" "$MAIXLITE_BUILD"
+
+echo "::group::support: build kvm_system (maixlite)"
+MAIXLITE_BUILD="${MAIXLITE_BUILD:-$HOME/maixlite-build}"
+bash "$NANOKVM_PATH/scripts/build-maixlite.sh" "$NANOKVM_PATH" "$MAIXLITE_BUILD" kvm_system
 echo "::endgroup::"
 
-echo "::group::support: build kvm_vision (libkvm.so)"
-./build kvm_vision
-./build kvm_vision add_to_kvmapp
-echo "::endgroup::"
-
-# The 12-library MMF link set: libkvm_mmf.so was linked against NANOKVM_MMF_LIB
-# (scripts/build-mmf.sh: libraries built from the pinned sophgo-middleware plus that
-# pin's closed ISP/3A blobs; support/sg2002/additional/kvm_mmf/CMakeLists.txt). Fail
-# closed: without it the link would silently fall back to MaixCDK's v2/lib.
-echo "::group::mmf: ship the libraries built from the pinned middleware"
-: "${NANOKVM_MMF_LIB:?NANOKVM_MMF_LIB is unset: libkvm_mmf must link the pinned build, not MaixCDK (run via scripts/forge-build.sh)}"
+# libkvm_mmf.so links the 12-library MMF set in NANOKVM_MMF_LIB (scripts/build-mmf.sh:
+# libraries built from the pinned sophgo-middleware plus that pin's closed ISP/3A blobs;
+# support/sg2002/maixlite/libs/kvm_mmf/CMakeLists.txt). Fail closed: without it there is
+# nothing to link.
+: "${NANOKVM_MMF_LIB:?NANOKVM_MMF_LIB is unset: libkvm_mmf must link the pinned build (run via scripts/forge-build.sh)}"
 : "${NANOKVM_MIDDLEWARE_SRC:?NANOKVM_MIDDLEWARE_SRC is unset}"
+: "${NANOKVM_MMF_UAPI:?NANOKVM_MMF_UAPI is unset}"
+
+echo "::group::support: build libkvm_mmf.so and libkvm.so (maixlite)"
+MAIXLITE_LIBS_BUILD="${MAIXLITE_LIBS_BUILD:-$HOME/maixlite-libs-build}"
+bash "$NANOKVM_PATH/scripts/build-maixlite.sh" "$NANOKVM_PATH" "$MAIXLITE_LIBS_BUILD" kvm_vision_test
+echo "::endgroup::"
+
+echo "::group::mmf: ship the libraries built from the pinned middleware"
 mmf_dl="$NANOKVM_PATH/kvmapp/server/dl_lib"
 mmf_set="libsys.so libcvi_bin.so libvpu.so libvenc.so libvdec.so libini.so libisp.so libcvi_bin_isp.so libisp_algo.so libae.so libaf.so libawb.so"
 mmf_files=()
@@ -94,8 +77,8 @@ for lib in $mmf_set; do
     src="$NANOKVM_MMF_LIB/$lib"
     [ "$lib" = libini.so ] && src="$NANOKVM_MMF_LIB/3rd/libini.so"
     [ -f "$src" ] || { echo "[ERROR] $src is missing from the pinned build" >&2; exit 1; }
-    # MaixCDK's dist stages the libraries the component linked; they must be these exact
-    # bytes. A different file is a MaixCDK library that sneaked in.
+    # Nothing but libkvm.so and libkvm_mmf.so is staged in dl_lib so far; if a library is
+    # already there it must be these exact bytes. A different file sneaked in.
     if [ -f "$mmf_dl/$lib" ] && ! cmp -s "$src" "$mmf_dl/$lib"; then
         echo "[ERROR] $mmf_dl/$lib is not the pinned build ($src); refusing to ship it" >&2
         exit 1

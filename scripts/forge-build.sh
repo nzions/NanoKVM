@@ -215,15 +215,18 @@ set -u
 # Ask CMake (3.17+, from the environment) for compile_commands.json in every MaixCDK
 # project; it changes no flag, only writes the file for the evidence bundle below.
 export CMAKE_EXPORT_COMPILE_COMMANDS=ON
-# kvm_system is built by support/sg2002/maixlite (no MaixCDK), in this CMake build tree and
-# with the image's compiler; libkvm.so and libkvm_mmf.so still go through MaixCDK (S6).
+# kvm_system, libkvm_mmf.so and libkvm.so are built by support/sg2002/maixlite (no MaixCDK), in
+# these two CMake build trees and with the image's compiler. MaixCDK itself no longer builds
+# anything (its copy and venv above are unused; removing them is S7).
 MAIXLITE_BUILD="$HOME/maixlite-build"
-export MAIXLITE_BUILD MAIXLITE_TOOLCHAIN_BIN="$MCDK_TC_BIN"
-# The CMake build tree of a project: maixlite's for kvm_system, MaixCDK's for the rest.
+MAIXLITE_LIBS_BUILD="$HOME/maixlite-libs-build"
+export MAIXLITE_BUILD MAIXLITE_LIBS_BUILD MAIXLITE_TOOLCHAIN_BIN="$MCDK_TC_BIN"
+# The CMake build tree of a project (named as MaixCDK's projects were).
 proj_bdir() {
     case "$1" in
         kvm_system) printf '%s' "$MAIXLITE_BUILD" ;;
-        *) printf '%s' "$WORK_NANOKVM/support/sg2002/$1/build" ;;
+        kvm_vision_test) printf '%s' "$MAIXLITE_LIBS_BUILD" ;;
+        *) die "proj_bdir: unknown project '$1'" ;;
     esac
 }
 # The compiler CMake settled on (CMakeCache.txt has no CMAKE_<LANG>_COMPILER here: MaixCDK
@@ -235,27 +238,21 @@ MCDK_BUILD_LOG="$HOME/maixcdk-build.log"
 bash "$WORK_NANOKVM/scripts/build-in-container.sh" 2>&1 | tee "$MCDK_BUILD_LOG"
 unset CMAKE_EXPORT_COMPILE_COMMANDS
 
-# --- MaixCDK downloaded nothing and compiled with the image's toolchain (fail closed) ---
-# MaixCDK's downloader (tools/cmake/file_downloader.py) prints "-- Downloading <file> from:",
-# "-- Download <n>% (...)" and "-- Extracting <pkg> to <dir>". Any of them, or any file in
-# dl/pkgs, means a package came from the network.
-log "check: MaixCDK downloaded nothing"
-[ -s "$MCDK_BUILD_LOG" ] || die "check: the MaixCDK build log is empty, so the download check could not see anything"
-command grep -q 'Toolchain for platform maixcam is ready' "$MCDK_BUILD_LOG" \
-    || die "check: the MaixCDK build log has no 'Toolchain for platform maixcam is ready' line: the log is not the build's"
-if command grep -nE '^-- (Downloading |Download [0-9]+%|Download file size|Extracting )' "$MCDK_BUILD_LOG"; then
-    die "check: MaixCDK downloaded or extracted a package (lines above)"
+# --- MaixCDK built nothing ---------------------------------------------------------------
+# No MaixCDK build runs any more (S6): the build log must not mention one, so a build step
+# that quietly went back through MaixCDK fails here (fail closed).
+log "check: no MaixCDK build ran"
+[ -s "$MCDK_BUILD_LOG" ] || die "check: the build log is empty, so the MaixCDK check could not see anything"
+command grep -q '^\[maixlite\] kvm_system staged' "$MCDK_BUILD_LOG" \
+    || die "check: the build log has no maixlite kvm_system staging line: the log is not the build's"
+command grep -q '^\[maixlite\] libkvm_mmf.so and libkvm.so staged' "$MCDK_BUILD_LOG" \
+    || die "check: the build log has no maixlite libraries staging line: the log is not the build's"
+if command grep -nE 'maixcdk build|Toolchain for platform maixcam|^-- (Downloading |Download [0-9]+%|Extracting )' "$MCDK_BUILD_LOG"; then
+    die "check: a MaixCDK build ran (lines above)"
 fi
-if [ -d "$WORK_MAIXCDK/dl/pkgs" ]; then
-    n_pkgs="$(find "$WORK_MAIXCDK/dl/pkgs" -type f | wc -l)"
-    [ "$n_pkgs" -eq 0 ] || die "check: $WORK_MAIXCDK/dl/pkgs holds $n_pkgs file(s): $(find "$WORK_MAIXCDK/dl/pkgs" -type f)"
-    log "check: $WORK_MAIXCDK/dl/pkgs exists and holds 0 files"
-else
-    log "check: $WORK_MAIXCDK/dl/pkgs does not exist"
-fi
-log "check: no 'Downloading'/'Download n%'/'Extracting' line in $MCDK_BUILD_LOG ($(wc -l < "$MCDK_BUILD_LOG") lines)"
+log "check: both maixlite builds staged, no MaixCDK line in $MCDK_BUILD_LOG ($(wc -l < "$MCDK_BUILD_LOG") lines)"
 
-log "check: the compilers MaixCDK used resolve to /opt/sg2002/host-tools"
+log "check: the compilers the builds used resolve to /opt/sg2002/host-tools"
 for proj in kvm_system kvm_vision_test; do
     for var in C CXX; do
         cc="$(cmake_compiler "$(proj_bdir "$proj")" "$var")" || die "check: $proj: no CMAKE_${var}_COMPILER in the build's CMake${var}Compiler.cmake"
@@ -288,8 +285,8 @@ for bin in "$WORK_NANOKVM/kvmapp/kvm_system/kvm_system" \
            "$WORK_NANOKVM/server/NanoKVM-Server"; do
     bash "$WORK_NANOKVM/scripts/binprint.sh" "$bin" "$EVIDENCE/binaries" || die "binprint failed on $bin"
 done
-# Hold the three binaries to the 2.6.38 golden ABI manifest (tools/binabi): kvm_system is now
-# built by maixlite, the two libraries by MaixCDK.
+# Hold the three binaries to the 2.6.38 golden ABI manifest (tools/binabi); all three are built
+# by maixlite.
 bash "$WORK_NANOKVM/tools/binabi/check.sh" "$EVIDENCE/binaries" || die "binabi: ABI differs from the golden manifest"
 
 # Paths in the generated build files carry this build's HOME; replace them so two builds
@@ -298,7 +295,7 @@ norm_paths() {
     sed -e "s#$WORK_MAIXCDK#@MAIXCDK@#g" -e "s#$WORK_NANOKVM#@NANOKVM@#g" \
         -e "s#$MW_SRC#@MIDDLEWARE@#g" -e "s#$MMF_OUT#@MMF_OUT@#g" -e "s#$HOME#@HOME@#g"
 }
-log "evidence: compile and link flags of the MaixCDK projects"
+log "evidence: compile and link flags of the maixlite projects"
 for proj in kvm_system kvm_vision_test; do
     bdir="$(proj_bdir "$proj")"
     [ -d "$bdir" ] || die "$bdir is missing: $proj was built elsewhere?"
@@ -327,7 +324,7 @@ for proj in kvm_system kvm_vision_test; do
     fi
 done
 
-log "evidence: the toolchain MaixCDK compiled with"
+log "evidence: the toolchain the builds compiled with"
 {
     for proj in kvm_system kvm_vision_test; do
         for var in C CXX; do

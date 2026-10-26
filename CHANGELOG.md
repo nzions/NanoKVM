@@ -1,3 +1,12 @@
+## 2.6.42 (2026-10-26)
+
+### Changes
+
+* `libkvm_mmf.so` and `libkvm.so` are built without MaixCDK, and nothing in the release path builds with MaixCDK any more. `support/sg2002/maixlite` gains the `kvm_vision_test` project (`-DMAIXLITE_PROJECT=kvm_vision_test`; its own build tree, `libs/{vision,kvm_mmf,kvm}/CMakeLists.txt`, a `config-kvm_vision_test/` stand-in for the generated headers with `PROJECT_ID kvm_vision_test`): the same sources (`support/sg2002/additional/{kvm_mmf,kvm,vision}`, `NANOKVM_MIDDLEWARE_SRC` / `NANOKVM_MMF_LIB` / `NANOKVM_MMF_UAPI` as before), defines, include order, flags and link lines as the MaixCDK carrier project. `scripts/build-maixlite.sh` takes the project as a third argument, holds the flags to `tools/binabi/golden/kvm_vision_test.flags` (generated from the 2.6.41 evidence; the carrier executable and its `main` are not in it), strips both libraries as MaixCDK's `gen_binary.cmake` did and stages them in `kvmapp/server/dl_lib`. `scripts/build-in-container.sh` no longer syncs components into MaixCDK, activates its venv or runs `./build kvm_vision`.
+* `libkvm.so` no longer carries an RPATH. MaixCDK's CMake left the absolute path of its build directory in it (`/work/home/NanoKVM/support/sg2002/kvm_vision_test/build/kvm_mmf`); the maixlite project sets `CMAKE_SKIP_RPATH`, and the two `libkvm.so` rpath entries in `tools/binabi/allow.txt` are gone. `flags.sh` deletes that one option from the MaixCDK `link.txt` it reads, as its only accepted difference. `kvm_system` keeps `-Wl,-rpath=$ORIGIN/dl_lib`.
+* `scripts/forge-build.sh`: the MaixCDK download checks (they read a MaixCDK build log that no longer exists) are replaced by a check that the log shows both maixlite stagings and no MaixCDK line; the compiler check and the evidence flags now read the two maixlite build trees. The MaixCDK copy and venv it still makes are unused (removing them is S7).
+* Not run on hardware
+
 ## 2.6.41 (2026-10-26)
 
 ### Changes
