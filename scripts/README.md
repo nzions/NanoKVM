@@ -154,7 +154,7 @@ the server can be exercised without hardware. It needs `debugfs`, `e2fsck`
 
 ```sh
 # server: CGO_ENABLED=0 GOOS=linux GOARCH=riscv64 go build -tags nokvm   (from server/)
-scripts/emu-image.sh [--sha256 <hex>] <stock.img> <NanoKVM-Server> <out.img>
+scripts/emu-image.sh [--sha256 <hex>] [--authorized-key <pubfile>] <stock.img> <NanoKVM-Server> <out.img>
 ```
 
 `<out.img>` must not exist; the stock image is only read. The script finds
@@ -179,6 +179,15 @@ back and the script fails if one did not land:
 5. `/usr/bin/init` becomes a symlink to `/bin/busybox` (the kernel is booted
    with `init=/usr/bin/init`).
 6. `/etc/kvm/ssh_stop` is removed so sshd starts.
+7. `/etc/kvm/emulator` marks the image as an emulator (our supervised
+   `S95nanokvm` skips `kvm_system` when it exists).
+8. With `--authorized-key <pubfile>`, the OpenSSH public key(s) in `<pubfile>`
+   are authorised for root: `/root/.ssh` (0700) and `/root/.ssh/authorized_keys`
+   (0600), both `root:root`, read back like every other edit. The script
+   refuses a file that is not an OpenSSH public key or that holds a private key.
+   Without the flag the image carries no credential. Use a dedicated,
+   emulator-only key (the fleet's is `/rook-agent/nanokvm/emu-access-key` in
+   sage; the `.pub` half is derived with `ssh-keygen -y`), never a device key.
 
 Boot it:
 

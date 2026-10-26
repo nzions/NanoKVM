@@ -1,3 +1,10 @@
+## 2.5.20 (2026-10-26)
+
+### Changes
+
+* scripts/emu-image.sh: `--authorized-key <pubfile>` authorises a public key for root in the emulator image (`/root/.ssh` 0700, `authorized_keys` 0600, root-owned, read back), so the image build is reproducible instead of hand debugfs edits; scripts/README.md documents it
+* No device code changed
+
 ## 2.5.19 (2026-10-26)
 
 ### Changes

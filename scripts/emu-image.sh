@@ -39,8 +39,12 @@
 # dd conv=notrunc splice back.
 #
 # Usage:
-#   scripts/emu-image.sh [--sha256 <hex>] <stock.img> <NanoKVM-Server> <out.img>
+#   scripts/emu-image.sh [--sha256 <hex>] [--authorized-key <pubfile>] <stock.img> <NanoKVM-Server> <out.img>
 #   scripts/emu-image.sh --refresh <img> <NanoKVM-Server>
+#
+# --authorized-key <pubfile>: authorise the OpenSSH public key(s) in <pubfile>
+# for root in the image: /root/.ssh (0700) and /root/.ssh/authorized_keys (0600),
+# both root:root. The image otherwise carries no credential.
 #
 # NanoKVM-Server: CGO_ENABLED=0 GOOS=linux GOARCH=riscv64 go build -tags nokvm
 # (from server/). <out.img> must not exist.
@@ -74,7 +78,7 @@ info() {
 
 usage() {
     cat >&2 <<EOF
-Usage: $0 [--sha256 <hex>] <stock.img> <NanoKVM-Server> <out.img>
+Usage: $0 [--sha256 <hex>] [--authorized-key <pubfile>] <stock.img> <NanoKVM-Server> <out.img>
        $0 --refresh <img> <NanoKVM-Server>   (in place, after an OTA; VM stopped)
 EOF
     exit 1
@@ -93,6 +97,7 @@ sha_of() {
 # ------------------------------------------------------------------ arguments
 
 WANT_SHA=""
+AUTH_KEY=""
 MODE=build
 if [ "${1:-}" = "--refresh" ]; then
     [ $# -eq 3 ] || usage
@@ -102,11 +107,21 @@ if [ "${1:-}" = "--refresh" ]; then
     SERVER="$3"
     OUT=""
 else
-    if [ "${1:-}" = "--sha256" ]; then
-        [ $# -ge 2 ] || usage
-        WANT_SHA="$2"
-        shift 2
-    fi
+    while [ $# -gt 0 ]; do
+        case "$1" in
+        --sha256)
+            [ $# -ge 2 ] || usage
+            WANT_SHA="$2"
+            shift 2
+            ;;
+        --authorized-key)
+            [ $# -ge 2 ] || usage
+            AUTH_KEY="$2"
+            shift 2
+            ;;
+        *) break ;;
+        esac
+    done
     [ $# -eq 3 ] || usage
     STOCK="$1"
     SERVER="$2"
@@ -115,6 +130,12 @@ fi
 
 if [ -n "$WANT_SHA" ]; then
     echo "$WANT_SHA" | grep -qE '^[0-9a-fA-F]{64}$' || die "--sha256 must be 64 hex digits"
+fi
+if [ -n "$AUTH_KEY" ]; then
+    [ -f "$AUTH_KEY" ] || die "--authorized-key file not found: $AUTH_KEY"
+    ! grep -q 'PRIVATE KEY' "$AUTH_KEY" || die "--authorized-key $AUTH_KEY holds a private key; give the .pub file"
+    grep -qE '^(ssh-(ed25519|rsa)|ecdsa-sha2-[a-z0-9]+|sk-[a-z0-9@.-]+) [A-Za-z0-9+/=]+' "$AUTH_KEY" ||
+        die "--authorized-key $AUTH_KEY holds no OpenSSH public key line"
 fi
 for t in debugfs e2fsck sfdisk dd od sha256sum cmp awk grep mktemp cp diff; do
     case "$t" in
@@ -447,6 +468,21 @@ fi
 # ------------------------------------------------------------ 7. emulator mark
 
 mark_emulator
+
+# ------------------------------------------------ 8. root's authorized key
+
+if [ -n "$AUTH_KEY" ]; then
+    exists /root || die "/root does not exist in the image"
+    if ! exists /root/.ssh; then
+        dfsw "mkdir /root/.ssh"
+    fi
+    dfsw "sif /root/.ssh mode 040700"
+    dfsw "sif /root/.ssh uid 0"
+    dfsw "sif /root/.ssh gid 0"
+    mode_is /root/.ssh 700
+    put_file "$AUTH_KEY" /root/.ssh/authorized_keys 600
+    info "authorised $(grep -cE '^(ssh-|ecdsa-|sk-)' "$AUTH_KEY") key(s) from $AUTH_KEY for root"
+fi
 
 # ------------------------------------------------- check, splice back, verify
 
