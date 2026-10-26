@@ -1,3 +1,9 @@
+## 2.6.38 (2026-10-26)
+
+### Changes
+
+* Fix forward of 2.6.37 (red on forge, nothing shipped): every MaixCDK step passed and the download check passed (no download line, no `dl/pkgs`), but the compiler check looked for `CMAKE_C_COMPILER` in `CMakeCache.txt`, where MaixCDK does not cache it; it now reads the compiler CMake settled on from `CMakeFiles/*/CMake{C,CXX}Compiler.cmake`.
+
 ## 2.6.37 (2026-10-26)
 
 ### Changes

@@ -215,6 +215,11 @@ set -u
 # Ask CMake (3.17+, from the environment) for compile_commands.json in every MaixCDK
 # project; it changes no flag, only writes the file for the evidence bundle below.
 export CMAKE_EXPORT_COMPILE_COMMANDS=ON
+# The compiler CMake settled on (CMakeCache.txt has no CMAKE_<LANG>_COMPILER here: MaixCDK
+# sets it in a variable): "set(CMAKE_<LANG>_COMPILER "<path>")" in CMake<LANG>Compiler.cmake.
+cmake_compiler() {
+    sed -n "s#^set(CMAKE_$2_COMPILER \"\\(.*\\)\")\$#\\1#p" "$1"/CMakeFiles/*/CMake"$2"Compiler.cmake | command grep .
+}
 MCDK_BUILD_LOG="$HOME/maixcdk-build.log"
 bash "$WORK_NANOKVM/scripts/build-in-container.sh" 2>&1 | tee "$MCDK_BUILD_LOG"
 unset CMAKE_EXPORT_COMPILE_COMMANDS
@@ -241,17 +246,14 @@ log "check: no 'Downloading'/'Download n%'/'Extracting' line in $MCDK_BUILD_LOG 
 
 log "check: the compilers MaixCDK used resolve to /opt/sg2002/host-tools"
 for proj in kvm_system kvm_vision_test; do
-    cache="$WORK_NANOKVM/support/sg2002/$proj/build/CMakeCache.txt"
-    [ -s "$cache" ] || die "check: $cache is missing"
-    for var in CMAKE_C_COMPILER CMAKE_CXX_COMPILER; do
-        cc="$(command grep -E "^$var:[A-Z]+=" "$cache" | cut -d= -f2-)"
-        [ -n "$cc" ] || die "check: $var is not in $cache"
+    for var in C CXX; do
+        cc="$(cmake_compiler "$WORK_NANOKVM/support/sg2002/$proj/build" "$var")" || die "check: $proj: no CMAKE_${var}_COMPILER in the build's CMake${var}Compiler.cmake"
         real="$(realpath "$cc")" || die "check: $cc does not resolve"
         case "$real" in
             /opt/sg2002/host-tools/*) ;;
-            *) die "check: $proj $var $cc resolves to $real, not /opt/sg2002/host-tools" ;;
+            *) die "check: $proj CMAKE_${var}_COMPILER $cc resolves to $real, not /opt/sg2002/host-tools" ;;
         esac
-        log "check: $proj $var = $cc -> $real"
+        log "check: $proj CMAKE_${var}_COMPILER = $cc -> $real"
     done
 done
 # Leave the venv: the web build must not see the SDK's python on PATH first.
@@ -314,9 +316,9 @@ done
 log "evidence: the toolchain MaixCDK compiled with"
 {
     for proj in kvm_system kvm_vision_test; do
-        for var in CMAKE_C_COMPILER CMAKE_CXX_COMPILER; do
-            cc="$(command grep -E "^$var:[A-Z]+=" "$WORK_NANOKVM/support/sg2002/$proj/build/CMakeCache.txt" | cut -d= -f2-)"
-            printf '%s %s %s -> %s\n' "$proj" "$var" "$cc" "$(realpath "$cc")"
+        for var in C CXX; do
+            cc="$(cmake_compiler "$WORK_NANOKVM/support/sg2002/$proj/build" "$var")"
+            printf '%s CMAKE_%s_COMPILER %s -> %s\n' "$proj" "$var" "$cc" "$(realpath "$cc")"
         done
     done
 } > "$EVIDENCE/toolchain/compilers.txt" || die "could not record the compilers"
