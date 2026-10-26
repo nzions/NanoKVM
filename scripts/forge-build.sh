@@ -173,6 +173,16 @@ mkdir -p "$(dirname "$EMU_SERVER")"
     CGO_ENABLED=0 GOOS=linux GOARCH=riscv64 go build -trimpath -tags nokvm -o "$EMU_SERVER" .
 )
 [ -s "$EMU_SERVER" ] || die "the emulator server build produced no $EMU_SERVER"
+
+# gpioedge: the GPIO chardev v2 edge proof for the emulator's gpio-sim kernel
+# (tools/gpioedge, no dependencies). Run in the guest; never installed on a device.
+EMU_GPIOEDGE="$WORK_NANOKVM/build/emu/gpioedge"
+log "building the emulator gpio edge proof (tools/gpioedge)"
+(
+    cd "$WORK_NANOKVM/tools/gpioedge"
+    CGO_ENABLED=0 GOOS=linux GOARCH=riscv64 go build -trimpath -o "$EMU_GPIOEDGE" .
+)
+[ -s "$EMU_GPIOEDGE" ] || die "the gpioedge build produced no $EMU_GPIOEDGE"
 [ -s "$WORK_NANOKVM/scripts/emu-image.sh" ] || die "scripts/emu-image.sh is missing from the tree"
 
 # --- publish to the artifacts share --------------------------------------------
@@ -197,6 +207,8 @@ else
     mkdir "$STAGE/emu"
     install -m 0755 "$EMU_SERVER" "$STAGE/emu/NanoKVM-Server"
     (cd "$STAGE/emu" && sha256sum NanoKVM-Server > NanoKVM-Server.sha256)
+    install -m 0755 "$EMU_GPIOEDGE" "$STAGE/emu/gpioedge"
+    (cd "$STAGE/emu" && sha256sum gpioedge > gpioedge.sha256)
     install -m 0755 "$WORK_NANOKVM/scripts/emu-image.sh" "$STAGE/emu/emu-image.sh"
     mv "$STAGE" "$DEST"
     log "published $DEST"

@@ -1,3 +1,11 @@
+## 2.5.19 (2026-10-26)
+
+### Changes
+
+* tools/gpioedge: a dependency-free Go program for the emulator that makes a gpio-sim chip through configfs, requests line 0 for both edges (GPIO_V2_GET_LINE_IOCTL), toggles the simulated pull and checks that every edge arrives as a line event on an fd that `ppoll` wakes on. Proves the event source a GPIO-chardev INT path would use in place of `/proc/lt_int`
+* scripts/forge-build.sh: builds gpioedge (riscv64, no cgo) and publishes it as `emu/gpioedge` beside `emu/NanoKVM-Server` (emulator only, not in the OTA tarball)
+* No device code changed
+
 ## 2.5.18 (2026-10-26)
 
 ### Changes
