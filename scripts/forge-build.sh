@@ -12,7 +12,8 @@
 #   2. web: pnpm install --frozen-lockfile && pnpm build
 #   3. scripts/package.sh <version>    nanokvm_<ver>.tar.gz + latest.json
 # plus an evidence bundle of the MaixCDK-built binaries and toolchain (published as
-# <version>/evidence/, not packaged; scripts/binprint.sh, scripts/toolchain-compare.sh).
+# <version>/evidence/, not packaged; scripts/binprint.sh). MaixCDK downloads NOTHING: its
+# toolchain is the image's /opt/sg2002/host-tools and the build fails if anything is fetched.
 # and then publishes the result to /artifacts/<version>/. Everything is written
 # under $HOME (a private copy of the tree and of MaixCDK) and /artifacts.
 #
@@ -132,6 +133,35 @@ cp -a "$SRC" "$WORK_NANOKVM"
 cp -a "$MAIXCDK_SRC" "$WORK_MAIXCDK"
 chmod -R u+rwX "$WORK_NANOKVM" "$WORK_MAIXCDK"
 
+# --- MaixCDK's toolchain is the image's, not a download -------------------------------
+# platforms/maixcam.yaml names a 266 MiB host-tools tarball (url) and where its compiler
+# lands under dl/extracted (bin_path). tools/cmake/build.py downloads only when the
+# toolchain has a url, and tools/cmake/check_toolchain.py os.path.join()s bin_path onto
+# dl/extracted, so an absolute bin_path is used as is. The image's /opt/sg2002/host-tools is
+# byte-identical to that tarball's (evidence/toolchain of 2.6.36). Both lines are replaced
+# exactly once or the build stops. The yaml is in the private copy, not in /opt.
+MCDK_YAML="$WORK_MAIXCDK/platforms/maixcam.yaml"
+MCDK_URL_LINE='    url: https://github.com/sipeed/MaixCDK/releases/download/v0.0.0/host-tools-2025.7.28.tar.xz'
+MCDK_BIN_LINE='    bin_path: toolchains/maixcam/host-tools/gcc/riscv64-linux-musl-x86_64/bin'
+MCDK_TC_BIN="$(cd "$HOST_TOOLS_BIN" && pwd -P)" || die "$HOST_TOOLS_BIN is missing from the image"
+[ -x "$MCDK_TC_BIN/riscv64-unknown-linux-musl-gcc" ] || die "$MCDK_TC_BIN/riscv64-unknown-linux-musl-gcc is not executable"
+[ -f "$MCDK_YAML" ] || die "$MCDK_YAML is missing"
+n_url="$(command grep -cFx -e "$MCDK_URL_LINE" "$MCDK_YAML")" || true
+n_bin="$(command grep -cFx -e "$MCDK_BIN_LINE" "$MCDK_YAML")" || true
+[ "$n_url" = 1 ] && [ "$n_bin" = 1 ] || die "$MCDK_YAML is not the pinned MaixCDK's: url line x$n_url, bin_path line x$n_bin (want 1 each)"
+: > "$MCDK_YAML.new"
+while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+        "$MCDK_URL_LINE") printf '%s\n' '    url:' ;;
+        "$MCDK_BIN_LINE") printf '%s\n' "    bin_path: $MCDK_TC_BIN" ;;
+        *) printf '%s\n' "$line" ;;
+    esac
+done < "$MCDK_YAML" > "$MCDK_YAML.new"
+mv "$MCDK_YAML.new" "$MCDK_YAML"
+command grep -qFx -e "    bin_path: $MCDK_TC_BIN" "$MCDK_YAML" || die "bin_path was not rewritten in $MCDK_YAML"
+[ -z "$(command grep -F "host-tools-2025.7.28.tar.xz" "$MCDK_YAML" | command grep -v '^ *#' | command grep -v 'filename:')" ] || die "an active download url is left in $MCDK_YAML"
+log "MaixCDK toolchain: $MCDK_TC_BIN (no url, nothing to download)"
+
 # --- pinned middleware source ----------------------------------------------------
 # scpcom/sophgo-middleware @ 4e231ef5967f from the artifacts share, sha256-checked,
 # fail closed (scripts/fetch-middleware.sh). Fetched first so a missing or wrong
@@ -185,8 +215,45 @@ set -u
 # Ask CMake (3.17+, from the environment) for compile_commands.json in every MaixCDK
 # project; it changes no flag, only writes the file for the evidence bundle below.
 export CMAKE_EXPORT_COMPILE_COMMANDS=ON
-bash "$WORK_NANOKVM/scripts/build-in-container.sh"
+MCDK_BUILD_LOG="$HOME/maixcdk-build.log"
+bash "$WORK_NANOKVM/scripts/build-in-container.sh" 2>&1 | tee "$MCDK_BUILD_LOG"
 unset CMAKE_EXPORT_COMPILE_COMMANDS
+
+# --- MaixCDK downloaded nothing and compiled with the image's toolchain (fail closed) ---
+# MaixCDK's downloader (tools/cmake/file_downloader.py) prints "-- Downloading <file> from:",
+# "-- Download <n>% (...)" and "-- Extracting <pkg> to <dir>". Any of them, or any file in
+# dl/pkgs, means a package came from the network.
+log "check: MaixCDK downloaded nothing"
+[ -s "$MCDK_BUILD_LOG" ] || die "check: the MaixCDK build log is empty, so the download check could not see anything"
+command grep -q 'Toolchain for platform maixcam is ready' "$MCDK_BUILD_LOG" \
+    || die "check: the MaixCDK build log has no 'Toolchain for platform maixcam is ready' line: the log is not the build's"
+if command grep -nE '^-- (Downloading |Download [0-9]+%|Download file size|Extracting )' "$MCDK_BUILD_LOG"; then
+    die "check: MaixCDK downloaded or extracted a package (lines above)"
+fi
+if [ -d "$WORK_MAIXCDK/dl/pkgs" ]; then
+    n_pkgs="$(find "$WORK_MAIXCDK/dl/pkgs" -type f | wc -l)"
+    [ "$n_pkgs" -eq 0 ] || die "check: $WORK_MAIXCDK/dl/pkgs holds $n_pkgs file(s): $(find "$WORK_MAIXCDK/dl/pkgs" -type f)"
+    log "check: $WORK_MAIXCDK/dl/pkgs exists and holds 0 files"
+else
+    log "check: $WORK_MAIXCDK/dl/pkgs does not exist"
+fi
+log "check: no 'Downloading'/'Download n%'/'Extracting' line in $MCDK_BUILD_LOG ($(wc -l < "$MCDK_BUILD_LOG") lines)"
+
+log "check: the compilers MaixCDK used resolve to /opt/sg2002/host-tools"
+for proj in kvm_system kvm_vision_test; do
+    cache="$WORK_NANOKVM/support/sg2002/$proj/build/CMakeCache.txt"
+    [ -s "$cache" ] || die "check: $cache is missing"
+    for var in CMAKE_C_COMPILER CMAKE_CXX_COMPILER; do
+        cc="$(command grep -E "^$var:[A-Z]+=" "$cache" | cut -d= -f2-)"
+        [ -n "$cc" ] || die "check: $var is not in $cache"
+        real="$(realpath "$cc")" || die "check: $cc does not resolve"
+        case "$real" in
+            /opt/sg2002/host-tools/*) ;;
+            *) die "check: $proj $var $cc resolves to $real, not /opt/sg2002/host-tools" ;;
+        esac
+        log "check: $proj $var = $cc -> $real"
+    done
+done
 # Leave the venv: the web build must not see the SDK's python on PATH first.
 set +u
 deactivate
@@ -195,10 +262,9 @@ set -u
 # --- evidence bundle: what MaixCDK built, and with what -------------------------
 # So a later build without MaixCDK can be proven ABI-equivalent: a fingerprint of each
 # binary (scripts/binprint.sh), the compile and link flags MaixCDK's CMake generated for
-# kvm_system and kvm_vision_test, and a byte comparison of MaixCDK's downloaded toolchain
-# with the image's Sophgo one. Published next to the package as <version>/evidence/.
-# Not part of the OTA tarball. A toolchain DIFFERENCE is informational; a missing piece
-# of the bundle fails the build.
+# kvm_system and kvm_vision_test, and the compilers MaixCDK resolved. Published next to
+# the package as <version>/evidence/. Not part of the OTA tarball; a missing piece of the
+# bundle fails the build.
 EVIDENCE="$HOME/evidence"
 rm -rf "$EVIDENCE"
 mkdir -p "$EVIDENCE/binaries" "$EVIDENCE/flags" "$EVIDENCE/toolchain"
@@ -245,24 +311,25 @@ for proj in kvm_system kvm_vision_test; do
     fi
 done
 
-log "evidence: MaixCDK toolchain vs the image's Sophgo toolchain"
-TC_MAIXCDK="$WORK_MAIXCDK/dl/extracted/toolchains/maixcam/host-tools/gcc/riscv64-linux-musl-x86_64"
-TC_SOPHGO="$(cd "$HOST_TOOLS_BIN/.." && pwd)"
-bash "$WORK_NANOKVM/scripts/toolchain-compare.sh" "$TC_MAIXCDK" "$TC_SOPHGO" "$EVIDENCE/toolchain" \
-    || die "toolchain comparison failed"
-for v in A B; do
-    norm_paths < "$EVIDENCE/toolchain/gcc-v-$v.txt" > "$EVIDENCE/toolchain/gcc-v-$v.txt.n"
-    mv "$EVIDENCE/toolchain/gcc-v-$v.txt.n" "$EVIDENCE/toolchain/gcc-v-$v.txt"
-done
+log "evidence: the toolchain MaixCDK compiled with"
+{
+    for proj in kvm_system kvm_vision_test; do
+        for var in CMAKE_C_COMPILER CMAKE_CXX_COMPILER; do
+            cc="$(command grep -E "^$var:[A-Z]+=" "$WORK_NANOKVM/support/sg2002/$proj/build/CMakeCache.txt" | cut -d= -f2-)"
+            printf '%s %s %s -> %s\n' "$proj" "$var" "$cc" "$(realpath "$cc")"
+        done
+    done
+} > "$EVIDENCE/toolchain/compilers.txt" || die "could not record the compilers"
+"$MCDK_TC_BIN/riscv64-unknown-linux-musl-gcc" -v 2>&1 | norm_paths > "$EVIDENCE/toolchain/gcc-v.txt" || die "gcc -v failed"
 
-# Complete or not at all: every binary has all its required prints, the toolchain table
-# and verdict exist, and nothing is empty.
+# Complete or not at all: every binary has all its required prints, the compiler record
+# exists, and nothing is empty.
 for b in kvm_system libkvm.so libkvm_mmf.so NanoKVM-Server; do
     for kind in dynamic exports imports dynsyms attributes comment size sha256 notes stamps; do
         [ -s "$EVIDENCE/binaries/$b.$kind" ] || die "evidence bundle incomplete: binaries/$b.$kind"
     done
 done
-for f in toolchains.txt gcc-v-A.txt gcc-v-B.txt; do
+for f in compilers.txt gcc-v.txt; do
     [ -s "$EVIDENCE/toolchain/$f" ] || die "evidence bundle incomplete: toolchain/$f"
 done
 find "$EVIDENCE" -type f -empty | command grep -q . && die "evidence bundle has empty files: $(find "$EVIDENCE" -type f -empty)"
@@ -276,8 +343,6 @@ for b in kvm_system libkvm.so libkvm_mmf.so NanoKVM-Server; do
     nstamps="$(command grep -vc '^(none)$' "$EVIDENCE/binaries/$b.stamps" || true)"
     printf '  %s: build-id %s; date-like strings: %s\n' "$b" "${bid:-none}" "$nstamps"
 done
-command grep '^\[evidence\] toolchains:' "$EVIDENCE/toolchain/toolchains.txt" \
-    || die "the toolchain verdict is missing from toolchains.txt"
 
 # --- web (what `make web` runs) ------------------------------------------------
 log "building the frontend"
@@ -415,7 +480,7 @@ echo
 echo "version:   $VERSION"
 echo "artifacts: $DEST/{nanokvm_$VERSION.tar.gz,latest.json,nanokvm_$VERSION.tar.gz.sha256}"
 echo "emulator:  $DEST/emu/{NanoKVM-Server,NanoKVM-Server.sha256,emu-image.sh} (not signed, not for the update base)"
-echo "evidence:  $DEST/evidence/ (binary fingerprints, MaixCDK flags, toolchain comparison; not in the package)"
+echo "evidence:  $DEST/evidence/ (binary fingerprints, MaixCDK flags, compilers used; not in the package)"
 echo "sha256:    $SHA256"
 echo "sign name: nanokvm-$VERSION-riscv64"
 echo "next:      keymaster_sign_digest kind=app name=nanokvm-$VERSION-riscv64 sha256=$SHA256"

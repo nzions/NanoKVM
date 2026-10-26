@@ -32,7 +32,9 @@ endif()
 
 
 ###### Add required/dependent components ######
-list(APPEND ADD_REQUIREMENTS basic websocket peripheral)
+# No websocket: nothing here uses websocketpp or asio, and the component would make
+# MaixCDK download both (and define ASIO_STANDALONE) at build time.
+list(APPEND ADD_REQUIREMENTS basic peripheral)
 list(APPEND ADD_REQUIREMENTS kvm_mmf)
 ###############################################
 

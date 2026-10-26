@@ -101,8 +101,11 @@ The same atomic publish also carries `emu/NanoKVM-Server` (a `-tags nokvm`
 `CGO_ENABLED=0` build), `emu/NanoKVM-Server.sha256` and `emu/emu-image.sh` for
 the qemu emulator. They are not in the OTA tarball, not signed, and never go to
 the update base.
-MaixCDK downloads its own toolchain and component packages while building, so
-the run needs network access.
+MaixCDK downloads nothing: its `platforms/maixcam.yaml` in the private copy is
+pointed at the image's `/opt/sg2002/host-tools` (no url, absolute `bin_path`), the
+`websocket` component (asio, websocketpp) is no longer required, and the build fails
+if MaixCDK prints a download line, leaves a file in `dl/pkgs`, or compiles with a
+compiler that does not resolve into `/opt/sg2002/host-tools`.
 
 The output is **unsigned**. The script prints the sha256 and the name to sign;
 a rook then calls

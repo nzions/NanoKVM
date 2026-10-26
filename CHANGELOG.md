@@ -1,3 +1,12 @@
+## 2.6.37 (2026-10-26)
+
+### Changes
+
+* The MaixCDK build downloads nothing. It used to fetch the 266 MiB `host-tools-2025.7.28.tar.xz` (byte-identical, file by file, to the image's `/opt/sg2002/host-tools`, per the 2.6.36 evidence bundle) and, only because the `vision` component required `websocket`, `asio-1.28.0` and `WebSocketpp_0.8.2` from SourceForge. `scripts/forge-build.sh` now rewrites `platforms/maixcam.yaml` in its private MaixCDK copy to an empty `url` and an absolute `bin_path` of `/opt/sg2002/host-tools/...` (MaixCDK downloads only when the toolchain has a url, and joins `bin_path` onto `dl/extracted`, so an absolute path is used as is); both lines must match exactly once or the build stops.
+* `support/sg2002/additional/vision` no longer requires `websocket` (nothing under `support/sg2002` includes websocketpp or asio), which also drops `-DASIO_STANDALONE=1`.
+* The build fails if MaixCDK's output has any `-- Downloading`, `-- Download n%` or `-- Extracting` line, if `dl/pkgs` holds a file, or if `CMAKE_C_COMPILER` / `CMAKE_CXX_COMPILER` in the `kvm_system` and `kvm_vision_test` CMakeCaches do not resolve under `/opt/sg2002/host-tools`; it prints what it checked. The evidence bundle's toolchain part is now `compilers.txt` and `gcc-v.txt`; `scripts/toolchain-compare.sh` is removed, its comparison is done.
+* Not run on hardware
+
 ## 2.6.36 (2026-10-26)
 
 ### Changes
