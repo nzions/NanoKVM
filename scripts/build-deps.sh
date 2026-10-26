@@ -8,17 +8,24 @@
 #       OpenCV's bundled copies, linked in). MaixCDK only ships a prebuilt of
 #       these, so they are built here instead of being taken from git.
 #
-# Usage: build-deps.sh <outdir>      libraries land in <outdir>/lib
+# Usage: build-deps.sh <outdir>      libraries land in <outdir>/lib, the public
+#                                    headers in <outdir>/include/opencv4
 #
-# Every source is downloaded once, checked against the sha256 below and refused
-# on any mismatch: no unpinned fetch, no fallback. FreeType and HarfBuzz are not
-# here: MaixCDK builds them from its own pinned sources and libkvm.so embeds them.
-# Needs on PATH: riscv64-unknown-linux-musl-gcc/g++, cmake, make, curl, tar.
+# libkvm.so is compiled and linked against exactly these headers and libraries
+# (support/sg2002/additional/opencv, which replaces MaixCDK's opencv component;
+# scripts/build-in-container.sh checks it).
+#
+# The source tarball is NOT fetched from github.com: $NANOKVM_SRC_MIRROR (forge-build.sh
+# sets it to $ARTIFACTS/src) names the directory on the artifacts share it must be in,
+# and the script refuses to run without it. A missing file or any sha256 other than the
+# one below aborts the build: no unpinned fetch, no fallback. FreeType and HarfBuzz are
+# not here: MaixCDK builds them from its own pinned sources and libkvm.so embeds them.
+# Needs on PATH: riscv64-unknown-linux-musl-gcc/g++, cmake, make, tar.
 
 set -euo pipefail
 
 OPENCV_VERSION=4.9.0
-OPENCV_URL="https://github.com/opencv/opencv/archive/refs/tags/$OPENCV_VERSION.tar.gz"
+OPENCV_TARBALL=opencv-4.9.0.tar.gz
 OPENCV_SHA256=ddf76f9dffd322c7c3cb1f721d0887f62d747b82059342213138dc190f28bc6c
 
 # The flags MaixCDK builds libkvm.so with (support/sg2002 build log).
@@ -37,28 +44,25 @@ esac
 
 CC=riscv64-unknown-linux-musl-gcc
 CXX=riscv64-unknown-linux-musl-g++
-for tool in "$CC" "$CXX" cmake make curl tar sha256sum readelf; do
+for tool in "$CC" "$CXX" cmake make tar sha256sum readelf; do
     command -v "$tool" >/dev/null 2>&1 || die "'$tool' is missing"
 done
 STRIP=riscv64-unknown-linux-musl-strip
 command -v "$STRIP" >/dev/null 2>&1 || die "'$STRIP' is missing"
+[ -n "${NANOKVM_SRC_MIRROR:-}" ] || die "NANOKVM_SRC_MIRROR is unset: the OpenCV source comes from the artifacts share, not from github.com"
 
-DL="$HOME/deps-dl"
 SRC="$OUT/src"
-mkdir -p "$DL" "$SRC" "$OUT/lib"
+rm -rf "$SRC"
+mkdir -p "$SRC" "$OUT/lib"
 JOBS="$(nproc)"
 
-fetch() { # name url sha256 -> $DL/<name>.tar.gz, verified
-    local name="$1" url="$2" sha="$3" file="$DL/$1.tar.gz"
-    if [ ! -f "$file" ] || [ "$(sha256sum "$file" | cut -d' ' -f1)" != "$sha" ]; then
-        log "downloading $url"
-        curl -fsSL --retry 3 -o "$file.part" "$url"
-        mv "$file.part" "$file"
-    fi
-    local got
+# fetch <tarball> <sha256>: the file must be in the mirror and hash to the pin.
+fetch() {
+    local file="$NANOKVM_SRC_MIRROR/$1" sha="$2" got
+    [ -f "$file" ] || die "$file is missing: put $1 there (sha256 $sha)"
     got="$(sha256sum "$file" | cut -d' ' -f1)"
-    [ "$got" = "$sha" ] || die "$name: sha256 $got, pinned $sha"
-    log "$name sha256 ok"
+    [ "$got" = "$sha" ] || die "$1: sha256 $got, pinned $sha"
+    log "$1 sha256 ok"
 }
 
 # soname_ok <lib> <soname>: the file must declare exactly that SONAME.
@@ -67,8 +71,8 @@ soname_ok() {
 }
 
 # --- OpenCV ----------------------------------------------------------------------
-fetch opencv "$OPENCV_URL" "$OPENCV_SHA256"
-tar -xzf "$DL/opencv.tar.gz" -C "$SRC"
+fetch "$OPENCV_TARBALL" "$OPENCV_SHA256"
+tar -xzf "$NANOKVM_SRC_MIRROR/$OPENCV_TARBALL" -C "$SRC"
 OCV_SRC="$SRC/opencv-$OPENCV_VERSION"
 [ -d "$OCV_SRC/modules/core" ] || die "opencv source tree missing after extraction"
 OCV_BUILD="$OUT/opencv-build"
@@ -100,4 +104,24 @@ for m in core imgproc imgcodecs; do
     soname_ok "$OUT/lib/libopencv_$m.so.409" "libopencv_$m.so.409"
 done
 
-log "done: $(ls "$OUT/lib" | tr '\n' ' ')"
+# The public headers libkvm.so compiles against: what `cmake --install` puts in
+# include/opencv4 for the three built modules (each module's include/, the umbrella
+# opencv2/opencv.hpp, and the two generated headers cvconfig.h / opencv2/opencv_modules.hpp).
+INC="$OUT/include/opencv4"
+rm -rf "$OUT/include"
+mkdir -p "$INC/opencv2"
+for m in core imgproc imgcodecs; do
+    [ -d "$OCV_SRC/modules/$m/include/opencv2" ] || die "opencv module $m has no include/opencv2"
+    cp -R "$OCV_SRC/modules/$m/include/opencv2/." "$INC/opencv2/"
+done
+cp "$OCV_SRC/include/opencv2/opencv.hpp" "$INC/opencv2/opencv.hpp"
+cp "$OCV_BUILD/cvconfig.h" "$INC/cvconfig.h"
+cp "$OCV_BUILD/opencv2/opencv_modules.hpp" "$INC/opencv2/opencv_modules.hpp"
+for h in opencv2/opencv.hpp opencv2/core.hpp opencv2/imgproc.hpp opencv2/imgcodecs.hpp \
+         opencv2/core/version.hpp opencv2/opencv_modules.hpp cvconfig.h; do
+    [ -f "$INC/$h" ] || die "header $h is missing from $INC"
+done
+grep -q "define CV_VERSION_MAJOR *4" "$INC/opencv2/core/version.hpp" || die "headers are not OpenCV 4.x"
+grep -q "define CV_VERSION_MINOR *9" "$INC/opencv2/core/version.hpp" || die "headers are not OpenCV 4.9"
+
+log "done: $(ls "$OUT/lib" | tr '\n' ' '); headers in $INC"

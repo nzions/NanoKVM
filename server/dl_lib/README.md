@@ -12,7 +12,7 @@ them from the build, refusing a package that lacks one. No library comes from Ma
 |---|---|
 | `libkvm.so` | `support/sg2002/additional/kvm` + `vision` (MaixCDK build, `./build kvm_vision`); embeds FreeType 2.13.2 and HarfBuzz 8.2.1 built by MaixCDK from its pinned sources |
 | `libkvm_mmf.so` | `support/sg2002/additional/kvm_mmf` (same build), linked against the libraries below only |
-| `libopencv_core.so.409`, `libopencv_imgproc.so.409`, `libopencv_imgcodecs.so.409` | OpenCV 4.9.0 source tarball, sha256-pinned, `scripts/build-deps.sh` (libjpeg-turbo, libpng, zlib are OpenCV's bundled copies) |
+| `libopencv_core.so.409`, `libopencv_imgproc.so.409`, `libopencv_imgcodecs.so.409` | OpenCV 4.9.0 source tarball (`opencv-4.9.0.tar.gz` from the artifacts share `src/`, sha256-pinned), `scripts/build-deps.sh` (libjpeg-turbo, libpng, zlib are OpenCV's bundled copies); `libkvm.so` is compiled and linked against this same build (`support/sg2002/additional/opencv`) |
 | `libsys.so libcvi_bin.so libvpu.so libvenc.so libvdec.so libini.so` | `scpcom/sophgo-middleware@4e231ef5967f` (`scripts/fetch-middleware.sh`), built by `scripts/build-mmf.sh` with the pin's own `Makefile.param` and `modules/*/Makefile` and the riscv64 musl cross compiler. `libvpu` contains VI/VO/VPSS/GDC/RGN. Kernel uapi headers: the osdrv v2 tarball (scpcom `cbd9c582`; libvenc/libvdec: sophgo `1b3a4964`, v1) the 7.3 kernel is built from, sha256-pinned (`OSDRV_*` in `build-mmf.sh`) |
 
 `libcvi_bin` also needs the declarations of `cvi_json-c` and `cvi_miniz` (Sophgo's renamed json-c and

@@ -176,6 +176,9 @@ CC=riscv64-unknown-linux-musl-gcc sh "$WORK_NANOKVM/tools/abicheck/abicheck.sh" 
 # build-in-container.sh needs HOME == $BUILD_HOME and the activated venv.
 log "building riscv64 artifacts (kvm_system, libkvm.so, NanoKVM-Server)"
 export BUILD_HOME="$HOME"
+# build-in-container.sh builds OpenCV from the share (scripts/build-deps.sh) and compiles
+# libkvm.so against that build; the same mirror as the middleware above.
+export NANOKVM_SRC_MIRROR="$ARTIFACTS/src"
 set +u
 # shellcheck disable=SC1091
 . "$MAIXCDK_SRC/bin/activate"

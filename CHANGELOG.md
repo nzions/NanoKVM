@@ -1,3 +1,12 @@
+## 2.6.27 (2026-10-26)
+
+### Changes
+
+* libkvm.so now compiles and links against OUR OpenCV 4.9.0 build, not MaixCDK's prebuilt. `support/sg2002/additional/opencv` replaces MaixCDK's opencv component (copied over it by `support/sg2002/build`): headers from `build-deps.sh` (`include/opencv4`) and its three `.so.409` files, `NANOKVM_OPENCV_DIR` required, no fallback (configure error). The OpenCV build now runs before the libkvm build.
+* Build check: `build-in-container.sh` requires every OpenCV include/link path in the kvm_vision build tree to be inside `build/deps` (none into a MaixCDK prebuilt), `libkvm.so` NEEDED OpenCV to be a subset of our three sonames including core, every `cv::` symbol it imports to be defined by those libraries, and the staged `.so` files to be byte-identical to the build; it prints the evidence and sha256s. Fails closed.
+* `build-deps.sh` no longer downloads from github.com: the OpenCV source is `opencv-4.9.0.tar.gz` on the artifacts share (`src/`, `$NANOKVM_SRC_MIRROR`), sha256 `ddf76f9dffd322c7c3cb1f721d0887f62d747b82059342213138dc190f28bc6c`, missing or different aborts.
+* Not run on hardware
+
 ## 2.6.26 (2026-10-26)
 
 ### Changes
