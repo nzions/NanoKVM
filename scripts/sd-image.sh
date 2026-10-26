@@ -519,9 +519,13 @@ if [ "$KFIT" = 1 ]; then
             die "$KDTB decompiles without a /dts-v1/; line"
         dtc -I dts -O dtb -o "$FITDIR/kernel.dtb" "$FITDIR/kernel-res.dts" 2>"$FITDIR/dtc.err" || die "dtc cannot compile the DTB with /memreserve/: $(cat "$FITDIR/dtc.err")"
         dtc -I dtb -O dts -o "$FITDIR/kernel.check.dts" "$FITDIR/kernel.dtb" 2>/dev/null || die "dtc cannot re-read the new DTB"
-        grep -q "^/memreserve/ 0x80000000 $FW_RESERVE;" "$FITDIR/kernel.check.dts" ||
-            grep -q "^/memreserve/ 0x0*80000000 0x0*$(printf '%x' $((FW_RESERVE)));" "$FITDIR/kernel.check.dts" ||
-            die "the new DTB lost its /memreserve/: $(grep memreserve "$FITDIR/kernel.check.dts")"
+        # dtc prints the entry as `/memreserve/<tab>0x0000000080000000 0x0000000000080000;`
+        [ "$(grep -c '^/memreserve/' "$FITDIR/kernel.check.dts")" = 1 ] || die "the new DTB does not have exactly one /memreserve/: $(grep memreserve "$FITDIR/kernel.check.dts")"
+        set -- $(grep '^/memreserve/' "$FITDIR/kernel.check.dts")
+        mr_addr=$2
+        mr_size=${3%;}
+        [ $((mr_addr)) -eq $((0x80000000)) ] && [ $((mr_size)) -eq $((FW_RESERVE)) ] ||
+            die "the new DTB's /memreserve/ is '$mr_addr $mr_size', not 0x80000000 $FW_RESERVE"
         info "DTB: /memreserve/ 0x80000000 $FW_RESERVE added"
     fi
 

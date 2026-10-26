@@ -1,3 +1,9 @@
+## 2.6.5 (2026-10-26)
+
+### Fixes
+
+* scripts/sd-image.sh: the check that the new DTB carries its `/memreserve/` compared dtc's text with a fixed spelling; dtc prints `/memreserve/<tab>0x0000000080000000 0x0000000000080000;`. The numbers are compared now. No device code changed
+
 ## 2.6.4 (2026-10-26)
 
 ### Fixes
