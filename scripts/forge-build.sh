@@ -133,13 +133,24 @@ chmod -R u+rwX "$WORK_NANOKVM" "$WORK_MAIXCDK"
 # --- pinned middleware source ----------------------------------------------------
 # scpcom/sophgo-middleware @ 4e231ef5967f from the artifacts share, sha256-checked,
 # fail closed (scripts/fetch-middleware.sh). Fetched first so a missing or wrong
-# mirror stops the build before the long SDK compile. Landed at a fixed path; the
-# kvm_mmf CMake reads it only when NANOKVM_MIDDLEWARE_SRC is exported, which this
-# script does not do yet (the link still uses MaixCDK's middleware; step 01k5spsnba).
+# mirror stops the build before the long SDK compile. Landed at a fixed path.
 MW_SRC="$HOME/mw-src/sophgo-middleware-4e231ef"
 log "fetching the pinned middleware source (4e231ef5967f)"
 NANOKVM_SRC_MIRROR="$ARTIFACTS/src" bash "$WORK_NANOKVM/scripts/fetch-middleware.sh" "$MW_SRC"
 [ "$(cat "$MW_SRC/.pin")" = 4e231ef5967f8f7d77cecd65d9e2052a6f92f18c ] || die "$MW_SRC does not carry the pin"
+
+# --- the open MMF libraries, built from that pin ---------------------------------------
+# libsys libcvi_bin libvpu libvenc libvdec libini from the pin's own make files, plus the
+# pin's closed ISP/3A blobs; closure-checked (NEEDED + undefined symbols). The kvm_mmf CMake
+# links ONLY this directory (scripts/build-mmf.sh), nothing from MaixCDK's v2/lib.
+MMF_OUT="$HOME/mmf-out"
+log "building the MMF libraries from the pinned source"
+NANOKVM_SRC_MIRROR="$ARTIFACTS/src" bash "$WORK_NANOKVM/scripts/build-mmf.sh" "$MW_SRC" "$MMF_OUT"
+export NANOKVM_MIDDLEWARE_SRC="$MW_SRC"
+export NANOKVM_MMF_LIB="$MMF_OUT/lib"
+NANOKVM_MMF_UAPI="$(cat "$MMF_OUT/uapi")"
+export NANOKVM_MMF_UAPI
+
 
 # --- riscv64 artifacts (what `make release-build` runs in the builder image) ---
 # build-in-container.sh needs HOME == $BUILD_HOME and the activated venv.

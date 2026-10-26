@@ -75,6 +75,45 @@ echo "::group::support: build kvm_vision (libkvm.so)"
 ./build kvm_vision add_to_kvmapp
 echo "::endgroup::"
 
+# The 12-library MMF link set: libkvm_mmf.so was linked against NANOKVM_MMF_LIB
+# (scripts/build-mmf.sh: libraries built from the pinned sophgo-middleware plus that
+# pin's closed ISP/3A blobs; support/sg2002/additional/kvm_mmf/CMakeLists.txt). Fail
+# closed: without it the link would silently fall back to MaixCDK's v2/lib.
+echo "::group::mmf: ship the libraries built from the pinned middleware"
+: "${NANOKVM_MMF_LIB:?NANOKVM_MMF_LIB is unset: libkvm_mmf must link the pinned build, not MaixCDK (run via scripts/forge-build.sh)}"
+: "${NANOKVM_MIDDLEWARE_SRC:?NANOKVM_MIDDLEWARE_SRC is unset}"
+mmf_dl="$NANOKVM_PATH/kvmapp/server/dl_lib"
+mmf_set="libsys.so libcvi_bin.so libvpu.so libvenc.so libvdec.so libini.so libisp.so libcvi_bin_isp.so libisp_algo.so libae.so libaf.so libawb.so"
+mmf_files=()
+for lib in $mmf_set; do
+    src="$NANOKVM_MMF_LIB/$lib"
+    [ "$lib" = libini.so ] && src="$NANOKVM_MMF_LIB/3rd/libini.so"
+    [ -f "$src" ] || { echo "[ERROR] $src is missing from the pinned build" >&2; exit 1; }
+    # MaixCDK's dist stages the libraries the component linked; they must be these exact
+    # bytes. A different file is a MaixCDK library that sneaked in.
+    if [ -f "$mmf_dl/$lib" ] && ! cmp -s "$src" "$mmf_dl/$lib"; then
+        echo "[ERROR] $mmf_dl/$lib is not the pinned build ($src); refusing to ship it" >&2
+        exit 1
+    fi
+    install -m 0755 "$src" "$mmf_dl/$lib"
+    mmf_files+=("$mmf_dl/$lib")
+done
+[ -f "$mmf_dl/libkvm_mmf.so" ] || { echo "[ERROR] the build did not stage libkvm_mmf.so" >&2; exit 1; }
+# Nothing else may be in dl_lib at this point (OpenCV is added below).
+for f in "$mmf_dl"/*; do
+    case " $mmf_set libkvm.so libkvm_mmf.so " in
+        *" $(basename "$f") "*) ;;
+        *) echo "[ERROR] unexpected library in kvmapp/server/dl_lib: $(basename "$f")" >&2; exit 1 ;;
+    esac
+done
+mmf_cc=riscv64-unknown-linux-musl-gcc
+bash "$NANOKVM_PATH/scripts/check-mmf-closure.sh" --lib "${mmf_files[@]}" "$mmf_dl/libkvm_mmf.so" \
+    --system "$($mmf_cc -print-file-name=libc.so)" "$($mmf_cc -print-file-name=libstdc++.so.6)" \
+    "$($mmf_cc -print-file-name=libgcc_s.so.1)"
+echo "[INFO] libkvm_mmf.so NEEDED (readelf -d):"
+readelf -d "$mmf_dl/libkvm_mmf.so" | command grep -E 'NEEDED|SONAME|RPATH|RUNPATH'
+echo "::endgroup::"
+
 # OpenCV from pinned source (scripts/build-deps.sh), staged next to the
 # libkvm.so / libkvm_mmf.so the support build just put in kvmapp/server/dl_lib.
 # Nothing under server/dl_lib in git is a library we build; see server/dl_lib/README.md.
@@ -105,7 +144,7 @@ echo "::endgroup::"
 # server binary itself imports stay checked.
 echo "::group::server: cross-compile NanoKVM-Server"
 for lib in libkvm.so libkvm_mmf.so libopencv_core.so.409 libopencv_imgproc.so.409 \
-    libopencv_imgcodecs.so.409; do
+    libopencv_imgcodecs.so.409 $mmf_set; do
     [ -f "$NANOKVM_PATH/kvmapp/server/dl_lib/$lib" ] \
         || { echo "[ERROR] the build did not stage $lib" >&2; exit 1; }
     cp -f "$NANOKVM_PATH/kvmapp/server/dl_lib/$lib" "$NANOKVM_PATH/server/dl_lib/$lib"

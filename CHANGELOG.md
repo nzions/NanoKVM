@@ -1,3 +1,15 @@
+## 2.6.22 (2026-10-26)
+
+### Changes
+
+* `libkvm_mmf` links only libraries forge builds from the pinned scpcom/sophgo-middleware `4e231ef5967f`, plus that pin's closed ISP/3A blobs. Nothing comes from MaixCDK's `v2/lib` any more (the 12 tracked blobs are gone from `server/dl_lib`).
+  * `scripts/build-mmf.sh` builds `libsys libcvi_bin libvpu libvenc libvdec libini` with the pin's own `Makefile.param` / `modules/*/Makefile` and the riscv64 musl cross compiler (nothing is run). `libisp libcvi_bin_isp libisp_algo libae libaf libawb` are copied from `v2/modules/isp/lib/musl_riscv64` of the same pin; their sha256 and the build provenance (the pin's source path in each built library) are printed in the log.
+  * Inputs on the artifacts share, sha256-checked and fail closed: `osdrv-cbd9c582.tar.gz` / `osdrv2-1b3a4964.tar.gz` (the kernel uapi headers the 7.3 kernel is built from; the pin ships none) and `json-c-0.15-20200726.tar.gz`. `scripts/gen-cvi-headers.sh` generates the `cvi_json-c` / `cvi_miniz` declarations `libcvi_bin` includes (Sophgo's OSS tarballs have no source); the symbols resolve at runtime from `libcvi_bin_isp`.
+  * `kvm_mmf`'s CMake, with `NANOKVM_MIDDLEWARE_SRC` set, takes headers, `sample/common` and the link set from the pin and the build output: `v2/include`, `v2/modules/isp/include/cv181x`, the osdrv uapi dirs, `NANOKVM_MMF_LIB`. `sample_common_sensor.c` is the pin's file plus the two NanoKVM changes (`kvm_mmf/pin/sample_common_sensor.c`).
+  * `scripts/check-mmf-closure.sh`, run for the 12 libraries and for `libkvm_mmf` after the link: every NEEDED entry must be in the shipped set or a system library, and every undefined global symbol must be defined in the set or the system libraries; `build-in-container.sh` also refuses any library in `kvmapp/server/dl_lib` that is not the pinned build byte for byte. `package.sh` `BUILT_LIBS` now lists all 17 libraries.
+* Release builds need `scripts/forge-build.sh` (`make release` in docker lacks the share inputs and fails closed).
+* Link and load only: nothing runs on hardware; the runtime proof is the kvm1 smoke test.
+
 ## 2.6.21 (2026-10-26)
 
 ### Changes

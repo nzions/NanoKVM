@@ -1,19 +1,40 @@
 # server/dl_lib
 
-Everything tracked here is a vendor SDK blob with no source in this tree. Every library
-we can build is built by forge and is NOT tracked; `scripts/build-in-container.sh`
-stages them into this directory (untracked) for the server link, and
-`scripts/package.sh` ships them from the build, refusing a package that lacks one.
+Nothing is tracked here but this file. Every library the package ships is built by forge, or is
+a closed blob copied by forge from the pinned middleware source; `scripts/build-in-container.sh`
+stages them into this directory (untracked) for the server link, and `scripts/package.sh` ships
+them from the build, refusing a package that lacks one. No library comes from MaixCDK's `v2/lib`
+(`scripts/build-mmf.sh`, `scripts/check-mmf-closure.sh` fail the build if one sneaks in).
 
 ## Built from source (not in git)
 
 | Library | Source |
 |---|---|
 | `libkvm.so` | `support/sg2002/additional/kvm` + `vision` (MaixCDK build, `./build kvm_vision`); embeds FreeType 2.13.2 and HarfBuzz 8.2.1 built by MaixCDK from its pinned sources |
-| `libkvm_mmf.so` | `support/sg2002/additional/kvm_mmf` (same build) |
+| `libkvm_mmf.so` | `support/sg2002/additional/kvm_mmf` (same build), linked against the libraries below only |
 | `libopencv_core.so.409`, `libopencv_imgproc.so.409`, `libopencv_imgcodecs.so.409` | OpenCV 4.9.0 source tarball, sha256-pinned, `scripts/build-deps.sh` (libjpeg-turbo, libpng, zlib are OpenCV's bundled copies) |
+| `libsys.so libcvi_bin.so libvpu.so libvenc.so libvdec.so libini.so` | `scpcom/sophgo-middleware@4e231ef5967f` (`scripts/fetch-middleware.sh`), built by `scripts/build-mmf.sh` with the pin's own `Makefile.param` and `modules/*/Makefile` and the riscv64 musl cross compiler. `libvpu` contains VI/VO/VPSS/GDC/RGN. Kernel uapi headers: the osdrv v2 tarball (scpcom `cbd9c582`; libvenc/libvdec: sophgo `1b3a4964`, v1) the 7.3 kernel is built from, sha256-pinned (`OSDRV_*` in `build-mmf.sh`) |
 
-## Tracked vendor SDK libraries (no source path here)
+`libcvi_bin` also needs the declarations of `cvi_json-c` and `cvi_miniz` (Sophgo's renamed json-c and
+miniz, whose OSS tarballs are not in the pin). Only the declarations: `scripts/gen-cvi-headers.sh`
+generates them from the sha256-pinned upstream json-c 0.15-20200726 headers (`scripts/mmf-shim/rename/json-c.sed`)
+and a three-function miniz shim. The symbols themselves come at runtime from `libcvi_bin_isp.so`, which
+statically contains json-c and miniz under those names (checked: it exports `cvi_json_object_*`,
+`cvi_compress2`, `cvi_uncompress2`, `cvi_compressBound`). `libsys` includes `<linux/ion_cvitek.h>`
+(5.10 ION) but uses nothing from it; `scripts/mmf-shim/linux/ion_cvitek.h` is an empty stand-in
+(the 7.3 kernel has no ION).
+
+## Closed vendor blobs (copied from the same pin)
+
+`v2/modules/isp/lib/musl_riscv64/` of `scpcom/sophgo-middleware@4e231ef5967f`, copied unchanged by
+`scripts/build-mmf.sh` (sha256 in its `MANIFEST`, printed in the build log). No source exists at this pin.
+
+| Library | What it is |
+|---|---|
+| `libae.so libaf.so libawb.so libisp.so libisp_algo.so libcvi_bin_isp.so` | Sophgo/CVITEK ISP and 3A (closed); step 01k5reln6l |
+
+Nothing else of the 12 libraries `libkvm_mmf.so` links comes from anywhere but the two sections above.
+(2.6.22; before it these 12 were MaixCDK's `v2/lib` prebuilts, tracked here.)
 
 Exactly the dynamic-link closure of `libkvm.so` (`readelf -d` NEEDED, transitively):
 `libkvm.so` -> `libkvm_mmf.so` -> the libraries below.
@@ -65,6 +86,9 @@ Paths are relative to the pin's root (`v2/` for `4e231ef`). Build system everywh
 | `libae` | BLOB | BLOB (same dirs as `libisp_algo`; `modules/isp/algo/ae/` headers only) | closed 3A (step 01k5reln6l) |
 | `libaf` | BLOB | BLOB | closed 3A |
 | `libawb` | BLOB | BLOB | closed 3A |
+
+Status (2.6.22): `4e231ef` is the pin libkvm_mmf links; the 6 FULL rows below are built from it by
+`scripts/build-mmf.sh` and the 6 BLOB rows are copied from it.
 
 Summary: `4e231ef` is source for 6 of 12 (sys, cvi_bin, vdec, venc, vpu, ini) and blob for 6 (all ISP/3A).
 `cd8bb74` is source for 8 of 12 (adds `libisp` and `libcvi_bin_isp`) and blob for 4 (`libisp_algo`, `libae`,
