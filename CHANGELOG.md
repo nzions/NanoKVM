@@ -1,3 +1,10 @@
+## 2.6.29 (2026-10-26)
+
+### Changes
+
+* Build fix for 2.6.28 (red on forge, nothing shipped; libkvm.so itself linked against our OpenCV): the build-tree check flagged `libopencv_freetype.a`, MaixCDK's own contrib freetype component compiled against our headers, as a foreign OpenCV. It is now the one named exception.
+* Not run on hardware
+
 ## 2.6.28 (2026-10-26)
 
 ### Changes

@@ -164,11 +164,13 @@ rules_ours="$(grep -l -F -e "$ocv_dir/include/opencv4" $rules || true)"
 rules_ours_lib="$(grep -l -F -e "$ocv_dir/link" $rules || true)"
 [ -n "$rules_ours" ] || { echo "[ERROR] no compile rule includes $ocv_dir/include/opencv4" >&2; exit 1; }
 [ -n "$rules_ours_lib" ] || { echo "[ERROR] no link rule names $ocv_dir/link (our OpenCV libraries)" >&2; exit 1; }
-# every OpenCV include dir in any rule, and every libopencv path in any link rule, must be ours
+# every OpenCV include dir in any rule, and every libopencv path in any link rule, must be ours.
+# libopencv_freetype.a is MaixCDK's own contrib component (the freetype text module, compiled
+# against our headers above), not an OpenCV core build.
 # shellcheck disable=SC2086
 foreign="$(cat $rules | tr ' ' '\n' \
     | grep -E 'opencv4(_lib|/include)|opencv-mobile|opencv4_install|libopencv_[a-z_]*\.(so|a)' \
-    | grep -v -F -e "$ocv_dir/" | sort -u || true)"
+    | grep -v -F -e "$ocv_dir/" | grep -v -E '(^|/)libopencv_freetype\.a$' | sort -u || true)"
 if [ -n "$foreign" ]; then
     echo "[ERROR] the kvm_vision build references an OpenCV that is not ours ($ocv_dir):" >&2
     printf '  %s\n' $foreign >&2
