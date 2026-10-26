@@ -1,3 +1,10 @@
+## 2.6.36 (2026-10-26)
+
+### Changes
+
+* Build evidence, no change to any shipped byte: forge's `build` now also publishes `<version>/evidence/` next to the package (not in the OTA tarball). For `kvm_system`, `libkvm.so`, `libkvm_mmf.so` and `NanoKVM-Server` it holds `scripts/binprint.sh` fingerprints (dynamic section, sorted exports and imports, dynamic symbol types and visibilities, riscv attributes, `.comment`, section sizes, sha256, build id and embedded dates); for the two MaixCDK projects the compile and link flags CMake generated (`flags.make`, `link.txt`, `CMakeCache.txt`, `compile_commands.json` where CMake honours `CMAKE_EXPORT_COMPILE_COMMANDS`), with this build's paths normalised; and `scripts/toolchain-compare.sh`'s byte comparison of the MaixCDK-downloaded toolchain with the image's Sophgo one (`[evidence] toolchains: IDENTICAL` or `DIFFER`, informational). Together they let a build without MaixCDK be proven ABI-equivalent. An incomplete bundle fails the build.
+* Not run on hardware
+
 ## 2.6.35 (2026-10-26)
 
 ### Changes

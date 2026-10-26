@@ -11,6 +11,8 @@
 #   1. scripts/build-in-container.sh   kvm_system, libkvm.so, NanoKVM-Server
 #   2. web: pnpm install --frozen-lockfile && pnpm build
 #   3. scripts/package.sh <version>    nanokvm_<ver>.tar.gz + latest.json
+# plus an evidence bundle of the MaixCDK-built binaries and toolchain (published as
+# <version>/evidence/, not packaged; scripts/binprint.sh, scripts/toolchain-compare.sh).
 # and then publishes the result to /artifacts/<version>/. Everything is written
 # under $HOME (a private copy of the tree and of MaixCDK) and /artifacts.
 #
@@ -180,11 +182,102 @@ set +u
 # shellcheck disable=SC1091
 . "$MAIXCDK_SRC/bin/activate"
 set -u
+# Ask CMake (3.17+, from the environment) for compile_commands.json in every MaixCDK
+# project; it changes no flag, only writes the file for the evidence bundle below.
+export CMAKE_EXPORT_COMPILE_COMMANDS=ON
 bash "$WORK_NANOKVM/scripts/build-in-container.sh"
+unset CMAKE_EXPORT_COMPILE_COMMANDS
 # Leave the venv: the web build must not see the SDK's python on PATH first.
 set +u
 deactivate
 set -u
+
+# --- evidence bundle: what MaixCDK built, and with what -------------------------
+# So a later build without MaixCDK can be proven ABI-equivalent: a fingerprint of each
+# binary (scripts/binprint.sh), the compile and link flags MaixCDK's CMake generated for
+# kvm_system and kvm_vision_test, and a byte comparison of MaixCDK's downloaded toolchain
+# with the image's Sophgo one. Published next to the package as <version>/evidence/.
+# Not part of the OTA tarball. A toolchain DIFFERENCE is informational; a missing piece
+# of the bundle fails the build.
+EVIDENCE="$HOME/evidence"
+rm -rf "$EVIDENCE"
+mkdir -p "$EVIDENCE/binaries" "$EVIDENCE/flags" "$EVIDENCE/toolchain"
+log "evidence: fingerprinting the MaixCDK-built binaries"
+for bin in "$WORK_NANOKVM/kvmapp/kvm_system/kvm_system" \
+           "$WORK_NANOKVM/kvmapp/server/dl_lib/libkvm.so" \
+           "$WORK_NANOKVM/kvmapp/server/dl_lib/libkvm_mmf.so" \
+           "$WORK_NANOKVM/server/NanoKVM-Server"; do
+    bash "$WORK_NANOKVM/scripts/binprint.sh" "$bin" "$EVIDENCE/binaries" || die "binprint failed on $bin"
+done
+
+# Paths in the generated build files carry this build's HOME; replace them so two builds
+# diff cleanly.
+norm_paths() {
+    sed -e "s#$WORK_MAIXCDK#@MAIXCDK@#g" -e "s#$WORK_NANOKVM#@NANOKVM@#g" \
+        -e "s#$MW_SRC#@MIDDLEWARE@#g" -e "s#$MMF_OUT#@MMF_OUT@#g" -e "s#$HOME#@HOME@#g"
+}
+log "evidence: compile and link flags of the MaixCDK projects"
+for proj in kvm_system kvm_vision_test; do
+    bdir="$WORK_NANOKVM/support/sg2002/$proj/build"
+    [ -d "$bdir" ] || die "$bdir is missing: MaixCDK built $proj elsewhere?"
+    fdir="$EVIDENCE/flags/$proj"
+    mkdir -p "$fdir"
+    nflags=0
+    nlink=0
+    # The generator is Unix Makefiles: flags.make carries the defines, includes and flags
+    # of each target, link.txt its link line.
+    while IFS= read -r f; do
+        rel="${f#"$bdir"/}"
+        norm_paths < "$f" > "$fdir/$(printf '%s' "$rel" | tr '/' '%')"
+        case "$f" in
+            */flags.make) nflags=$((nflags + 1)) ;;
+            */link.txt) nlink=$((nlink + 1)) ;;
+        esac
+    done < <(find "$bdir" -type f \( -name flags.make -o -name link.txt -o -name CMakeCache.txt \) | LC_ALL=C sort)
+    [ "$nflags" -gt 0 ] || die "$proj: no flags.make under $bdir"
+    [ "$nlink" -gt 0 ] || die "$proj: no link.txt under $bdir"
+    [ -s "$bdir/CMakeCache.txt" ] || die "$proj: no CMakeCache.txt in $bdir"
+    if [ -s "$bdir/compile_commands.json" ]; then
+        norm_paths < "$bdir/compile_commands.json" > "$fdir/compile_commands.json"
+        log "evidence: $proj: $nflags flags.make, $nlink link.txt, compile_commands.json"
+    else
+        log "evidence: $proj: $nflags flags.make, $nlink link.txt, NO compile_commands.json (CMAKE_EXPORT_COMPILE_COMMANDS was not honoured)"
+    fi
+done
+
+log "evidence: MaixCDK toolchain vs the image's Sophgo toolchain"
+TC_MAIXCDK="$WORK_MAIXCDK/dl/extracted/toolchains/maixcam/host-tools/gcc/riscv64-linux-musl-x86_64"
+TC_SOPHGO="$(cd "$HOST_TOOLS_BIN/.." && pwd)"
+bash "$WORK_NANOKVM/scripts/toolchain-compare.sh" "$TC_MAIXCDK" "$TC_SOPHGO" "$EVIDENCE/toolchain" \
+    || die "toolchain comparison failed"
+for v in A B; do
+    norm_paths < "$EVIDENCE/toolchain/gcc-v-$v.txt" > "$EVIDENCE/toolchain/gcc-v-$v.txt.n"
+    mv "$EVIDENCE/toolchain/gcc-v-$v.txt.n" "$EVIDENCE/toolchain/gcc-v-$v.txt"
+done
+
+# Complete or not at all: every binary has all its required prints, the toolchain table
+# and verdict exist, and nothing is empty.
+for b in kvm_system libkvm.so libkvm_mmf.so NanoKVM-Server; do
+    for kind in dynamic exports imports dynsyms attributes comment size sha256 notes stamps; do
+        [ -s "$EVIDENCE/binaries/$b.$kind" ] || die "evidence bundle incomplete: binaries/$b.$kind"
+    done
+done
+for f in toolchains.txt gcc-v-A.txt gcc-v-B.txt; do
+    [ -s "$EVIDENCE/toolchain/$f" ] || die "evidence bundle incomplete: toolchain/$f"
+done
+find "$EVIDENCE" -type f -empty | command grep -q . && die "evidence bundle has empty files: $(find "$EVIDENCE" -type f -empty)"
+(cd "$EVIDENCE" && find . -type f ! -name SHA256SUMS | LC_ALL=C sort | xargs sha256sum > SHA256SUMS)
+[ -s "$EVIDENCE/SHA256SUMS" ] || die "evidence bundle incomplete: SHA256SUMS"
+log "evidence bundle ($(find "$EVIDENCE" -type f | wc -l) files):"
+(cd "$EVIDENCE" && find . -type f | LC_ALL=C sort | sed 's/^/  /')
+log "evidence: build ids and embedded dates:"
+for b in kvm_system libkvm.so libkvm_mmf.so NanoKVM-Server; do
+    bid="$(awk '/Build ID/ { print $3; exit }' "$EVIDENCE/binaries/$b.notes")"
+    nstamps="$(command grep -vc '^(none)$' "$EVIDENCE/binaries/$b.stamps" || true)"
+    printf '  %s: build-id %s; date-like strings: %s\n' "$b" "${bid:-none}" "$nstamps"
+done
+command grep '^\[evidence\] toolchains:' "$EVIDENCE/toolchain/toolchains.txt" \
+    || die "the toolchain verdict is missing from toolchains.txt"
 
 # --- web (what `make web` runs) ------------------------------------------------
 log "building the frontend"
@@ -307,8 +400,13 @@ else
     install -m 0755 "$WORK_NANOKVM/tools/kvmgpio/kvmgpio" "$STAGE/emu/kvmgpio"
     (cd "$STAGE/emu" && sha256sum kvmgpio > kvmgpio.sha256)
     install -m 0755 "$WORK_NANOKVM/scripts/emu-image.sh" "$STAGE/emu/emu-image.sh"
+    # evidence/ is MaixCDK-build evidence only: NOT in the OTA tarball, NOT signed.
+    cp -a "$EVIDENCE" "$STAGE/evidence"
     mv "$STAGE" "$DEST"
     log "published $DEST"
+    [ -s "$DEST/evidence/SHA256SUMS" ] || die "$DEST/evidence was not published"
+    (cd "$DEST/evidence" && sha256sum -c --quiet SHA256SUMS) || die "$DEST/evidence differs from what was built"
+    log "published evidence bundle $DEST/evidence ($(find "$DEST/evidence" -type f | wc -l) files)"
 fi
 
 echo
@@ -317,6 +415,7 @@ echo
 echo "version:   $VERSION"
 echo "artifacts: $DEST/{nanokvm_$VERSION.tar.gz,latest.json,nanokvm_$VERSION.tar.gz.sha256}"
 echo "emulator:  $DEST/emu/{NanoKVM-Server,NanoKVM-Server.sha256,emu-image.sh} (not signed, not for the update base)"
+echo "evidence:  $DEST/evidence/ (binary fingerprints, MaixCDK flags, toolchain comparison; not in the package)"
 echo "sha256:    $SHA256"
 echo "sign name: nanokvm-$VERSION-riscv64"
 echo "next:      keymaster_sign_digest kind=app name=nanokvm-$VERSION-riscv64 sha256=$SHA256"
