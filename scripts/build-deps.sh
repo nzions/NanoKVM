@@ -7,8 +7,6 @@
 #       OpenCV 4.9.0 (core, imgproc, imgcodecs; libjpeg-turbo, libpng and zlib are
 #       OpenCV's bundled copies, linked in). MaixCDK only ships a prebuilt of
 #       these, so they are built here instead of being taken from git.
-#   libjson-c.so.5
-#       json-c 0.15 (the 0.15.99 snapshot the tracked blob reported).
 #
 # Usage: build-deps.sh <outdir>      libraries land in <outdir>/lib
 #
@@ -22,10 +20,6 @@ set -euo pipefail
 OPENCV_VERSION=4.9.0
 OPENCV_URL="https://github.com/opencv/opencv/archive/refs/tags/$OPENCV_VERSION.tar.gz"
 OPENCV_SHA256=ddf76f9dffd322c7c3cb1f721d0887f62d747b82059342213138dc190f28bc6c
-
-JSONC_TAG=json-c-0.15-20200726
-JSONC_URL="https://github.com/json-c/json-c/archive/refs/tags/$JSONC_TAG.tar.gz"
-JSONC_SHA256=4ba9a090a42cf1e12b84c64e4464bb6fb893666841d5843cc5bef90774028882
 
 # The flags MaixCDK builds libkvm.so with (support/sg2002 build log).
 ARCH_FLAGS="-mcpu=c906fdv -march=rv64imafdcv0p7xthead -mcmodel=medany -mabi=lp64d"
@@ -105,25 +99,5 @@ for m in core imgproc imgcodecs; do
     "$STRIP" --strip-unneeded "$OUT/lib/libopencv_$m.so.409"
     soname_ok "$OUT/lib/libopencv_$m.so.409" "libopencv_$m.so.409"
 done
-
-# --- json-c ----------------------------------------------------------------------
-fetch json-c "$JSONC_URL" "$JSONC_SHA256"
-tar -xzf "$DL/json-c.tar.gz" -C "$SRC"
-JC_SRC="$SRC/json-c-$JSONC_TAG"
-[ -f "$JC_SRC/CMakeLists.txt" ] || die "json-c source tree missing after extraction"
-JC_BUILD="$OUT/json-c-build"
-rm -rf "$JC_BUILD"
-log "building json-c $JSONC_TAG"
-cmake -S "$JC_SRC" -B "$JC_BUILD" -G "Unix Makefiles" \
-    -DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=riscv64 \
-    -DCMAKE_C_COMPILER="$(command -v "$CC")" -DCMAKE_C_FLAGS="$ARCH_FLAGS" \
-    -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
-    -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_SKIP_RPATH=ON \
-    -DBUILD_SHARED_LIBS=ON -DBUILD_STATIC_LIBS=OFF -DBUILD_TESTING=OFF -DDISABLE_WERROR=ON
-cmake --build "$JC_BUILD" --parallel "$JOBS" --target json-c
-jc_built="$(ls "$JC_BUILD"/libjson-c.so.5.*)" || die "libjson-c.so.5.x was not built"
-install -m 0644 "$jc_built" "$OUT/lib/libjson-c.so.5"
-"$STRIP" --strip-unneeded "$OUT/lib/libjson-c.so.5"
-soname_ok "$OUT/lib/libjson-c.so.5" "libjson-c.so.5"
 
 log "done: $(ls "$OUT/lib" | tr '\n' ' ')"

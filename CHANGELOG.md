@@ -1,3 +1,12 @@
+## 2.6.18 (2026-10-26)
+
+### Changes
+
+* Image diet: 21 libraries nothing loads are no longer shipped (20 tracked blobs removed from `server/dl_lib`, plus the built `libjson-c`). The tracked set is now exactly the `libkvm.so` NEEDED closure: `libae libaf libawb libcvi_bin libcvi_bin_isp libini libisp libisp_algo libsys libvdec libvenc libvpu`). Removed: the audio stack (`libcvi_audio`, `libcvi_VoiceEngine`, `libcvi_vqe`, `libdnvqe`, `libaac*2`, `libtinyalsa`), `libcli` (network CLI with a root login prompt), `libcvi_ispd2` (ISP tuning daemon), `libcvi_ssp`, `libosdc`, `libraw_dump`, `libmipi_tx`, `libmisc`, `libcvi_RES1`, `libcvi_ive`, `libopencv_highgui`, and `libjson-c.so.5` (only `libcvi_ispd2` NEEDed it, so its build is gone from `scripts/build-deps.sh`).
+* `libcvi_ive`: the IVE colour-space code in `kvm_mmf.cpp` is dead (`cvi_rgb2nv21` has no caller, `cvi_ive_init`/`deinit` are only `UNUSED()`-ed); `libkvm_mmf.so` has no undefined `CVI_IVE_*` symbol.
+* `package.sh` prunes the dropped names from the staged tree (`DROPPED_LIBS`). `server/dl_lib/README.md` lists the closure and the removals.
+* Not run on hardware (kvm1 offline)
+
 ## 2.6.17 (2026-10-26)
 
 ### Changes

@@ -71,7 +71,13 @@ require_riscv64() {
 }
 
 # Libraries built from source by this repo's build (never tracked in server/dl_lib).
-BUILT_LIBS="libkvm.so libkvm_mmf.so libopencv_core.so.409 libopencv_imgproc.so.409 libopencv_imgcodecs.so.409 libjson-c.so.5"
+BUILT_LIBS="libkvm.so libkvm_mmf.so libopencv_core.so.409 libopencv_imgproc.so.409 libopencv_imgcodecs.so.409"
+
+# Libraries nothing in the package NEEDs or dlopens (measured with readelf -d and
+# strings over the 2.6.17 package; see server/dl_lib/README.md). They are no longer
+# tracked, and MaixCDK's dist could still stage some of them in kvmapp/server/dl_lib,
+# so they are removed from the staged tree by name rather than shipped.
+DROPPED_LIBS="libaaccomm2.so libaacdec2.so libaacenc2.so libaacsbrdec2.so libaacsbrenc2.so libcli.so libcvi_RES1.so libcvi_VoiceEngine.so libcvi_audio.so libcvi_ispd2.so libcvi_ive.so libcvi_ssp.so libcvi_vqe.so libdnvqe.so libmipi_tx.so libmisc.so libosdc.so libraw_dump.so libtinyalsa.so libopencv_highgui.so.409 libjson-c.so.5"
 
 require_file "$ROOT/server/NanoKVM-Server" "run: make app"
 require_file "$ROOT/kvmapp/kvm_system/kvm_system" "run: make support"
@@ -133,6 +139,9 @@ for name in $BUILT_LIBS; do
     [ -f "$ROOT/kvmapp/server/dl_lib/$name" ] \
         || { echo "[ERROR] built library $name is missing from kvmapp/server/dl_lib (make vision / scripts/build-deps.sh)" >&2; exit 1; }
     require_riscv64 "$ROOT/kvmapp/server/dl_lib/$name"
+done
+for name in $DROPPED_LIBS; do
+    rm -f "$STAGE/server/dl_lib/$name"
 done
 staged_libs=$(cd "$STAGE/server/dl_lib" && ls -1 | LC_ALL=C sort)
 tracked_libs=$( { cd "$ROOT/server/dl_lib" && ls -1 | command grep -v '^README\.md$'; printf '%s\n' $BUILT_LIBS; } | LC_ALL=C sort -u)

@@ -75,10 +75,10 @@ echo "::group::support: build kvm_vision (libkvm.so)"
 ./build kvm_vision add_to_kvmapp
 echo "::endgroup::"
 
-# OpenCV and json-c from pinned source (scripts/build-deps.sh), staged next to the
+# OpenCV from pinned source (scripts/build-deps.sh), staged next to the
 # libkvm.so / libkvm_mmf.so the support build just put in kvmapp/server/dl_lib.
 # Nothing under server/dl_lib in git is a library we build; see server/dl_lib/README.md.
-echo "::group::deps: OpenCV 4.9.0 and json-c from pinned source"
+echo "::group::deps: OpenCV 4.9.0 from pinned source"
 bash "$NANOKVM_PATH/scripts/build-deps.sh" "$NANOKVM_PATH/build/deps"
 mkdir -p "$NANOKVM_PATH/kvmapp/server/dl_lib"
 cp -f "$NANOKVM_PATH"/build/deps/lib/*.so* "$NANOKVM_PATH/kvmapp/server/dl_lib/"
@@ -105,7 +105,7 @@ echo "::endgroup::"
 # server binary itself imports stay checked.
 echo "::group::server: cross-compile NanoKVM-Server"
 for lib in libkvm.so libkvm_mmf.so libopencv_core.so.409 libopencv_imgproc.so.409 \
-    libopencv_imgcodecs.so.409 libjson-c.so.5; do
+    libopencv_imgcodecs.so.409; do
     [ -f "$NANOKVM_PATH/kvmapp/server/dl_lib/$lib" ] \
         || { echo "[ERROR] the build did not stage $lib" >&2; exit 1; }
     cp -f "$NANOKVM_PATH/kvmapp/server/dl_lib/$lib" "$NANOKVM_PATH/server/dl_lib/$lib"
