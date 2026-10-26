@@ -1,3 +1,10 @@
+## 2.6.39 (2026-10-26)
+
+### Changes
+
+* Golden ABI manifest check (`tools/binabi/check.sh`, run by `scripts/forge-build.sh` right after `binprint`): `kvm_system`, `libkvm.so` and `libkvm_mmf.so` are compared field by field (NEEDED, SONAME, RPATH, sorted exports and imports, RISC-V attributes, `.comment`, `.text`/`.rodata`/`.data`/`.bss` sizes) with the golden files taken from the 2.6.38 evidence. A difference not in `tools/binabi/allow.txt` fails the build, and so does an allow entry that no longer differs. The one entry is `libkvm.so`'s build-dir RPATH leak, to be removed in S6. No shipped binary changes.
+* Not run on hardware
+
 ## 2.6.38 (2026-10-26)
 
 ### Changes

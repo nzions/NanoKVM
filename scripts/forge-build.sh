@@ -277,6 +277,8 @@ for bin in "$WORK_NANOKVM/kvmapp/kvm_system/kvm_system" \
            "$WORK_NANOKVM/server/NanoKVM-Server"; do
     bash "$WORK_NANOKVM/scripts/binprint.sh" "$bin" "$EVIDENCE/binaries" || die "binprint failed on $bin"
 done
+# Hold the three MaixCDK-built binaries to the 2.6.38 golden ABI manifest (tools/binabi).
+bash "$WORK_NANOKVM/tools/binabi/check.sh" "$EVIDENCE/binaries" || die "binabi: ABI differs from the golden manifest"
 
 # Paths in the generated build files carry this build's HOME; replace them so two builds
 # diff cleanly.

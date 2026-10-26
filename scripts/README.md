@@ -325,3 +325,14 @@ mkimage/dtc/mtools/e2fsprogs) are at the top of that script, every download is s
 and the result lands in `/artifacts/sdimg/nanokvm-cube-<userspace>-<kernel tag>/` (image `.xz`,
 `.sha256` of the raw image, `build.log`, `verify.txt` from `scripts/sdimage-verify.sh`). A
 published directory is never overwritten. Nothing is flashed.
+
+## ABI manifest (`tools/binabi`)
+
+`scripts/forge-build.sh` runs `tools/binabi/check.sh` on the `scripts/binprint.sh` output right
+after fingerprinting. It compares `kvm_system`, `libkvm.so` and `libkvm_mmf.so` with the golden
+files in `tools/binabi/golden/` (taken from the 2.6.38 evidence): NEEDED, SONAME, RPATH,
+exports, imports, RISC-V attributes, `.comment` and the `.text`/`.rodata`/`.data`/`.bss` sizes
+(exact). Any difference not in `tools/binabi/allow.txt` fails the build, and so does an allow
+entry that no longer differs; each entry carries its reason. The only entry today is
+`libkvm.so`'s build-dir RPATH leak (removed in S6). Run it by hand on any evidence directory:
+`tools/binabi/check.sh <dir>`.
