@@ -1,3 +1,9 @@
+## 2.6.9 (2026-10-26)
+
+### Changes
+
+* scripts/forge-sdimage.sh: the SD image carries release 2.6.8 (userspace GPIO by DT line name, kvmgpio), read straight from `/artifacts/2.6.8/` where the release build published it. No device code changed
+
 ## 2.6.8 (2026-10-26)
 
 ### Fixes
