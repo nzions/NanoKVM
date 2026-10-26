@@ -1,3 +1,9 @@
+## 2.6.8 (2026-10-26)
+
+### Fixes
+
+* tools/kvmgpio: include `<sys/time.h>` (musl needs it for `struct timeval`; the 2.6.7 build stopped there, nothing was published). No other change
+
 ## 2.6.7 (2026-10-26)
 
 ### Changes

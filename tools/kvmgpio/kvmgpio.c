@@ -26,6 +26,7 @@
 #include <poll.h>
 #include <signal.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <time.h>
 
 #define MAX_HELD 16
