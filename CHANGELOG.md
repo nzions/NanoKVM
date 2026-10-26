@@ -1,3 +1,9 @@
+## 2.6.11 (2026-10-26)
+
+### Fixes
+
+* The 2.6.10 build stopped at the server link: the fresh `libkvm.so` the server now links against leaves the mmf and opencv symbols to the package's other libraries, so the server's cgo flags carry `-Wl,--allow-shlib-undefined` and `build-in-container.sh` copies only `libkvm.so`. No other change
+
 ## 2.6.10 (2026-10-26)
 
 ### Changes
@@ -8,7 +14,7 @@
 * The 1 s capture warm-up sleep is gone: after capture is switched on, a capture reader waits for libkvm's next Streaming or NoSignal snapshot (bounded by the request context); the answer to a resync is always published, even when it changes nothing
 * kvm_system reads the resolution from that socket in a blocking thread; its state-file writer and width/height readers are removed
 * Web: `hdmi-state` websocket events feed `hdmiSnapshotAtom`; the HDMI settings entry shows the live resolution and no longer flips its switch after a 1 s timer
-* `build-in-container.sh` links the server against the freshly built `libkvm.so` and `libkvm_mmf.so` (the tracked copies lack the new exports)
+* `build-in-container.sh` links the server against the freshly built `libkvm.so` (the tracked copy lacks the new export)
 * Not run on hardware (kvm1 offline)
 
 ## 2.6.9 (2026-10-26)

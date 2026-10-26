@@ -4,7 +4,7 @@ package common
 
 /*
 	#cgo CFLAGS: -I../include
-	#cgo LDFLAGS: -L../dl_lib -lkvm
+	#cgo LDFLAGS: -L../dl_lib -lkvm -Wl,--allow-shlib-undefined
 	#include "kvm_vision.h"
 */
 import "C"

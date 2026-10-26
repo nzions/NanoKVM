@@ -88,13 +88,13 @@ riscv64-unknown-linux-musl-gcc -march=rv64gc -O2 \
 echo "::endgroup::"
 
 # NanoKVM-Server links libkvm.so by name from server/dl_lib (-L../dl_lib -lkvm).
-# The tracked copies there predate every export added since (kvmv_hdmi_wait in
-# libkvm.so, SAMPLE_COMM_SNS_SetCustomSize in libkvm_mmf.so, which libkvm.so
-# needs), so link against the pair just built.
+# The tracked copy there predates every export added since (kvmv_hdmi_wait), so
+# link against the one just built. That one leaves the mmf and opencv symbols to
+# the other libraries of the package, which are not the link-time ones: the
+# server's cgo flags carry -Wl,--allow-shlib-undefined for it. Symbols the
+# server binary itself imports stay checked.
 echo "::group::server: cross-compile NanoKVM-Server"
-for lib in libkvm.so libkvm_mmf.so; do
-    cp -f "$NANOKVM_PATH/kvmapp/server/dl_lib/$lib" "$NANOKVM_PATH/server/dl_lib/$lib"
-done
+cp -f "$NANOKVM_PATH/kvmapp/server/dl_lib/libkvm.so" "$NANOKVM_PATH/server/dl_lib/libkvm.so"
 cd "$NANOKVM_PATH/server"
 ./build.sh
 echo "::endgroup::"
