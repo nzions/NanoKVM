@@ -1,3 +1,10 @@
+## 2.6.30 (2026-10-26)
+
+### Changes
+
+* OpenCV's configure no longer downloads anything: `build-deps.sh` turns G-API and ADE off (`-DBUILD_opencv_gapi=OFF -DWITH_ADE=OFF`; 2.6.29 fetched ADE v0.1.2d from github.com at configure time, for a module libkvm does not use) and points `OPENCV_DOWNLOAD_PATH` at an empty directory. After configuring it fails closed unless that directory is still empty, there is no `CMakeDownloadLog.txt`, and the configure output has no download line.
+* Not run on hardware
+
 ## 2.6.29 (2026-10-26)
 
 ### Changes
