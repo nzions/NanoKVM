@@ -1,3 +1,9 @@
+## 2.6.1 (2026-10-26)
+
+### Fixes
+
+* nanokvm-supervise: a supervised program that exited (the web server after a SIGTERM or a crash) was never restarted, and the supervisor sat at 100% CPU. busybox 1.36.1 ash mishandles SIGCHLD that arrives while it is inside its `wait` builtin or its in-process `sleep` applet: `nanosleep` returns EINTR and ash then loops on `wait4(-1, WNOHANG)` = ECHILD forever without sleeping again (strace on nanokvm-emu). The supervisor now polls with `kill -0` and an external `/bin/sleep 1` (a forked child, which ash waits for with a plain blocking `wait4`), and calls `wait` only once the job has finished. Measured on nanokvm-emu with the real server: a SIGTERM'd server was running again under the same supervisor at the first check 7 s later (supervisor asleep, CPU flat), `S95nanokvm stop` returned in 3 s with nothing left running, and `start` brought it back. Not hardware-tested: kvm1 was unreachable
+
 ## 2.6.0 (2026-10-26)
 
 ### Changes

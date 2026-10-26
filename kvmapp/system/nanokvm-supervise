@@ -68,13 +68,20 @@ while [ "$stopping" -eq 0 ]; do
     child=$!
     log "started pid $child"
 
-    # `wait` returns early when a trapped signal arrives; keep waiting until the
-    # program is really gone
-    status=0
+    # Poll with an EXTERNAL sleep; never block in ash's `wait` or its built-in
+    # `sleep` while the child runs. In busybox 1.36.1 ash both spin at 100% CPU
+    # once SIGCHLD interrupts them: the in-process sleep's nanosleep returns
+    # EINTR and ash then loops on wait4(-1, WNOHANG) = ECHILD and never sleeps
+    # again (strace on nanokvm-emu, journey 01k5rq5vhc), so the exit was never
+    # logged and the program never restarted. /bin/sleep is a forked child,
+    # which ash waits for with a plain blocking wait4; the SIGCHLD reaps our
+    # child, `kill -0` then fails, and `wait` on the finished job returns its
+    # status at once. A stop (TERM) runs on_term within a second.
     while kill -0 "$child" 2>/dev/null; do
-        wait "$child" 2>/dev/null
-        status=$?
+        /bin/sleep 1
     done
+    wait "$child" 2>/dev/null
+    status=$?
     child=""
 
     [ "$stopping" -eq 0 ] || break
