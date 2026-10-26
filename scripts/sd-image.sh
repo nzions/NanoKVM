@@ -622,8 +622,8 @@ EOF
         mcopy -i "$STOCK@@$((P1_START * SECTOR))" "::$f" "$FITDIR/before.$f" || die "mcopy $f failed on the stock image"
         cmp -s "$FITDIR/before.$f" "$FITDIR/after.$f" || die "$f differs from the stock one"
     done
-    grep -iv 'bytes free\|BOOT *SD' "$FITDIR/mdir.before" >"$FITDIR/mdir.before.rest"
-    grep -iv 'bytes free\|BOOT *SD' "$FITDIR/mdir.after" >"$FITDIR/mdir.after.rest"
+    grep -iv 'bytes free\|BOOT *SD\|[0-9] files ' "$FITDIR/mdir.before" >"$FITDIR/mdir.before.rest"
+    grep -iv 'bytes free\|BOOT *SD\|[0-9] files ' "$FITDIR/mdir.after" >"$FITDIR/mdir.after.rest"
     cmp -s "$FITDIR/mdir.before.rest" "$FITDIR/mdir.after.rest" || die "the boot partition's directory differs beyond BOOT.SD: $(diff "$FITDIR/mdir.before.rest" "$FITDIR/mdir.after.rest")"
     sed -n 's/^/[boot partition] /p' "$FITDIR/mdir.after"
 

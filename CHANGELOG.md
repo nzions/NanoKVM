@@ -1,3 +1,9 @@
+## 2.6.6 (2026-10-26)
+
+### Fixes
+
+* scripts/sd-image.sh: the boot-partition comparison also ignored the free-space line but not the `9 files N bytes` total, which moves with the new BOOT.SD. No device code changed
+
 ## 2.6.5 (2026-10-26)
 
 ### Fixes
