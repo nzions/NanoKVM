@@ -140,7 +140,8 @@ chmod -R u+rwX "$WORK_NANOKVM"
 # The image's Sophgo cross compiler (resolved, no symlinks).
 TOOLCHAIN_BIN="$(cd "$HOST_TOOLS_BIN" && pwd -P)" || die "$HOST_TOOLS_BIN is missing from the image"
 [ -x "$TOOLCHAIN_BIN/riscv64-unknown-linux-musl-gcc" ] || die "$TOOLCHAIN_BIN/riscv64-unknown-linux-musl-gcc is not executable"
--------------------------------------------------
+
+# --- pinned middleware source ----------------------------------------------------
 # scpcom/sophgo-middleware @ 4e231ef5967f from the artifacts share, sha256-checked,
 # fail closed (scripts/fetch-middleware.sh). Fetched first so a missing or wrong
 # mirror stops the build before the long SDK compile. Landed at a fixed path.

@@ -1,3 +1,10 @@
+## 2.6.44 (2026-10-26)
+
+### Changes
+
+* Fix forward of 2.6.43 (red on forge at the first step, nothing shipped): the edit that removed the MaixCDK steps from `scripts/forge-build.sh` left a stray separator line that bash ran as a command. Nothing else changes.
+* Not run on hardware
+
 ## 2.6.43 (2026-10-26)
 
 ### Changes
