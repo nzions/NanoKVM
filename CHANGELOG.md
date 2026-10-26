@@ -1,3 +1,10 @@
+## 2.6.41 (2026-10-26)
+
+### Changes
+
+* Fix forward of 2.6.40 (red on forge, nothing shipped): the maixlite `kvm_system` compiled and linked, and every `flags.make` matched the MaixCDK golden; only two archive member names in `link.txt` differed (`libmain.a`, `libperipheral.a`), because CMake spells an object whose source is outside the target's directory with the source's absolute path. `tools/binabi/flags.sh` now maps those two prefixes (`kvm_system/main/`, `additional/peripheral/`) back to the MaixCDK spelling.
+* Not run on hardware
+
 ## 2.6.40 (2026-10-26)
 
 ### Changes
