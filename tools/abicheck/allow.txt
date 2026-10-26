@@ -1,0 +1,8 @@
+# Accepted vc_drv-boundary drift. Format: PIN NAME reason (one line each).
+# The 4e231ef middleware is v2-generation; cvi_vc_drv is built from the v1 headers.
+# Anything not listed here fails the build, and so does an entry that no longer differs.
+4e231ef USER_FRAME_INFO_S  184 bytes (v2) vs 192 (v1); carried only by CVI_VC_VENC_SEND_FRAMEEX, i.e. CVI_VENC_SendFrameEx, which kvm_mmf does not call
+4e231ef USER_RC_INFO_S     32 bytes (v2) vs 40 (v1); carried only by CVI_VC_VENC_SEND_FRAMEEX, which kvm_mmf does not call
+4e231ef CVI_ERR_VENC_BUTT  error-code range terminator only; no ioctl carries it and kvm_mmf does not use it
+4e231ef _USER_FRAME_INFO_S  struct tag of USER_FRAME_INFO_S above (same type, listed under its tag name too)
+4e231ef _USER_RC_INFO_S     struct tag of USER_RC_INFO_S above (same type, listed under its tag name too)

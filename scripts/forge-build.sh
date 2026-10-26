@@ -151,6 +151,26 @@ export NANOKVM_MMF_LIB="$MMF_OUT/lib"
 NANOKVM_MMF_UAPI="$(cat "$MMF_OUT/uapi")"
 export NANOKVM_MMF_UAPI
 
+# --- ABI check of the pinned middleware against the 7.3 kernel uapi headers -----------
+# tools/abicheck, on the pin and on the two osdrv header trees build-mmf.sh already
+# extracted (sha256-checked there; no second fetch). Fails closed: a missing tool is an
+# error, never a skip, and so is any mismatch not in tools/abicheck/allow.txt (each entry
+# carries its reason; an entry that no longer differs fails too). The riscv64 musl cross
+# gcc does the layout/syntax/mirror stages (target-accurate); probe.c is EXECUTED, so it
+# is built with the image's host cc (the structs are LP64 on both).
+log "abicheck: pinned middleware vs the 7.3 osdrv uapi headers"
+for tool in cc readelf awk comm sort; do
+    command -v "$tool" >/dev/null 2>&1 || die "abicheck needs '$tool', which the build image lacks (a skipped check is a failed one)"
+done
+ABI_OUT="$HOME/abicheck-out"
+rm -rf "$ABI_OUT"
+CC=riscv64-unknown-linux-musl-gcc sh "$WORK_NANOKVM/tools/abicheck/abicheck.sh" \
+    --osdrv-v2 "$MMF_OUT/osdrv-v2/interdrv/v2" --osdrv-v1 "$MMF_OUT/osdrv-v1/interdrv" \
+    --mw-4e231ef "$MW_SRC" --probe-cc cc \
+    --kvm-src "$WORK_NANOKVM/support/sg2002/additional/kvm_mmf/src/kvm_mmf.cpp" \
+    --allow "$WORK_NANOKVM/tools/abicheck/allow.txt" --out "$ABI_OUT" \
+    || die "abicheck found an ABI mismatch between the pinned middleware and the 7.3 kernel headers (see above)"
+
 
 # --- riscv64 artifacts (what `make release-build` runs in the builder image) ---
 # build-in-container.sh needs HOME == $BUILD_HOME and the activated venv.

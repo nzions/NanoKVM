@@ -14,6 +14,11 @@
 #   --mw-cd8bb74 DIR scpcom/sophgo-middleware cd8bb74 clone root (tree at the root)
 #   --kvm-src FILE   kvm_mmf.cpp: boundary diffs are tagged when it names the type
 #   --out DIR        results (default ./abicheck-out)
+#   --allow FILE     accepted vc_drv-boundary drift: "PIN NAME reason..." per line;
+#                    anything else differing fails, and so does an entry that no
+#                    longer differs
+#   --probe-cc CC    compiler for probe.c, which is EXECUTED (default: CC). Set it to
+#                    a host compiler when CC is a cross compiler.
 #
 # CC (default cc) is the compiler. It runs everything on the build host: the
 # structs are LP64 on aarch64 and riscv64 alike, and layout is read from
@@ -30,7 +35,7 @@ cc=${CC:-cc}
 SHA_V2=fb40b511ca4bd30534a42371fc825a657985cbd8f3c0b95162657d32dc7f3d14
 SHA_V1=9913c091e732e301f4dfa5386a91975e33959796546b77d50ee329a74e2743f3
 
-v2dir= v1dir= v2tgz= v1tgz= mw_a= mw_b= kvmsrc= out=./abicheck-out
+v2dir= v1dir= v2tgz= v1tgz= mw_a= mw_b= kvmsrc= out=./abicheck-out allow= probecc=
 while [ $# -gt 0 ]; do
 	case $1 in
 	--osdrv-v2) v2dir=$2 ;;
@@ -41,6 +46,8 @@ while [ $# -gt 0 ]; do
 	--mw-cd8bb74) mw_b=$2 ;;
 	--out) out=$2 ;;
 	--kvm-src) kvmsrc=$2 ;;
+	--allow) allow=$2 ;;
+	--probe-cc) probecc=$2 ;;
 	*) echo "abicheck: unknown argument $1" >&2; exit 2 ;;
 	esac
 	shift 2 || { echo "abicheck: $1 needs a value" >&2; exit 2; }
@@ -95,7 +102,7 @@ say "chip: CHIP_CODE=mars -> include/chip/cv181x (symlink checked), CHIP_ARCH=CV
 say "compiler: $($cc --version | sed -n 1p)  host: $(uname -m) (LP64; target riscv64 LP64 musl, not cross-run)"
 
 probe() { # probe LABEL "INC" -> $out/probe-LABEL.txt
-	$cc -std=gnu11 -Wall -I"$here" $DEFS $2 "$here/probe.c" -o "$work/probe-$1" 2>"$out/probe-$1.build.log" || {
+	${probecc:-$cc} -std=gnu11 -Wall -I"$here" $DEFS $2 "$here/probe.c" -o "$work/probe-$1" 2>"$out/probe-$1.build.log" || {
 		say "probe $1: BUILD FAILED (see $out/probe-$1.build.log)"; fail=1; return 1; }
 	"$work/probe-$1" > "$out/probe-$1.txt"
 }
@@ -176,11 +183,14 @@ checkpin() { # checkpin LABEL MWROOT
 		say "-- vc_drv boundary: pin is v1-generation, same set as cvi_vc_drv: nothing to cross"
 	else
 		say "-- vc_drv boundary: venc/vdec types that differ between v2 and v1 headers"
-		{ cat "$root"/modules/venc/src/*.c "$root"/modules/vdec/src/*.c "$root"/include/cvi_venc.h "$root"/include/cvi_vdec.h \
+		{ echo -; cat "$root"/modules/venc/src/*.c "$root"/modules/vdec/src/*.c "$root"/include/cvi_venc.h "$root"/include/cvi_vdec.h \
 			"$v2dir"/include/common/uapi/linux/cvi_comm_venc.h "$v2dir"/include/common/uapi/linux/cvi_comm_vdec.h \
 			"$v2dir"/include/common/uapi/linux/cvi_comm_rc.h 2>/dev/null; } |
 			command grep -oE '[A-Za-z_][A-Za-z_0-9]*' | LC_ALL=C sort -u > "$work/vcnames-$label.txt"
-		if [ -n "$kvmsrc" ]; then command grep -oE '[A-Za-z_][A-Za-z_0-9]*' "$kvmsrc" | LC_ALL=C sort -u > "$work/kvmnames.txt"; else : > "$work/kvmnames.txt"; fi
+		# The "-" line keeps the file non-empty: awk counts files by FNR == 1, which an
+		# empty file never reaches (that shifted the file index and hid every difference).
+		echo - > "$work/kvmnames.txt"
+		if [ -n "$kvmsrc" ]; then command grep -oE '[A-Za-z_][A-Za-z_0-9]*' "$kvmsrc" | LC_ALL=C sort -u >> "$work/kvmnames.txt" || { say "cannot read $kvmsrc"; exit 2; }; fi
 		awk '
 			FNR == 1 { fi++ }
 			fi == 1 { vc[$1] = 1; next }
@@ -200,7 +210,22 @@ checkpin() { # checkpin LABEL MWROOT
 			}
 			END { for (n in seen) printf "  %s%s%s\n", n, (n in kvmuse ? "  [named in the KVM source]" : ""), seen[n] }
 		' "$work/vcnames-$label.txt" "$work/kvmnames.txt" "$out/layout-v2-vs-v1.diff" | tee "$out/boundary-$label.txt"
-		if [ -s "$out/boundary-$label.txt" ]; then bad=1; else say "  none"; fi
+		if [ -s "$out/boundary-$label.txt" ]; then
+			# Every differing name must be in the allowlist for THIS pin, and every
+			# allowlist entry for this pin must still differ (a stale entry means the
+			# drift changed and the reason was never re-read: fail closed both ways).
+			awk '/^  [^ ]/ { print $1 }' "$out/boundary-$label.txt" | LC_ALL=C sort -u > "$work/bnames-$label.txt"
+			if [ -n "$allow" ]; then
+				awk -v pin="$label" '$1 !~ /^#/ && NF >= 3 && $1 == pin { print $2 }' "$allow" | LC_ALL=C sort -u > "$work/anames-$label.txt"
+			else : > "$work/anames-$label.txt"; fi
+			newn=$(LC_ALL=C comm -23 "$work/bnames-$label.txt" "$work/anames-$label.txt")
+			stale=$(LC_ALL=C comm -13 "$work/bnames-$label.txt" "$work/anames-$label.txt")
+			for n in $(LC_ALL=C comm -12 "$work/bnames-$label.txt" "$work/anames-$label.txt"); do
+				say "  ALLOWED $n: $(awk -v pin="$label" -v n="$n" '$1 == pin && $2 == n { $1 = $2 = ""; sub(/^ +/, ""); print; exit }' "$allow")"
+			done
+			for n in $newn; do say "  NOT ALLOWED (new mismatch): $n"; bad=1; done
+			for n in $stale; do say "  STALE allowlist entry (no longer differs): $n"; bad=1; done
+		else say "  none"; fi
 	fi
 	say "-- mirror structs (sys_ion_data2 vs sys_ion_data)"
 	if $cc -std=gnu11 -I"$here" -I"$here/shim" $DEFS $INC_V2 -I"$root/include" -I"$root/modules/sys/include" "$here/mirror.c" -o /dev/null 2> "$out/mirror-$label.log"; then

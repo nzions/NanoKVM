@@ -1,3 +1,11 @@
+## 2.6.26 (2026-10-26)
+
+### Changes
+
+* Build check: `forge-build.sh` runs `tools/abicheck` on the pinned middleware (4e231ef) against the two osdrv uapi header trees `build-mmf.sh` already extracted (the riscv64 musl cross gcc for layouts, host `cc` for the executed probe). Any mismatch not listed in `tools/abicheck/allow.txt` (each entry has its reason: `USER_FRAME_INFO_S` / `USER_RC_INFO_S` under `CVI_VC_VENC_SEND_FRAMEEX`, `CVI_ERR_VENC_BUTT`) fails the build, and so does a listed entry that no longer differs or a missing tool.
+* abicheck fix: an empty names file shifted awk's file index and hid every vc_drv boundary difference.
+* Not run on hardware
+
 ## 2.6.25 (2026-10-26)
 
 ### Changes
