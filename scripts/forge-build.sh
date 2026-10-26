@@ -176,9 +176,6 @@ CC=riscv64-unknown-linux-musl-gcc sh "$WORK_NANOKVM/tools/abicheck/abicheck.sh" 
 # build-in-container.sh needs HOME == $BUILD_HOME and the activated venv.
 log "building riscv64 artifacts (kvm_system, libkvm.so, NanoKVM-Server)"
 export BUILD_HOME="$HOME"
-# build-in-container.sh builds OpenCV from the share (scripts/build-deps.sh) and compiles
-# libkvm.so against that build; the same mirror as the middleware above.
-export NANOKVM_SRC_MIRROR="$ARTIFACTS/src"
 set +u
 # shellcheck disable=SC1091
 . "$MAIXCDK_SRC/bin/activate"
@@ -229,6 +226,25 @@ for lib in libsys.so libcvi_bin.so libvpu.so libvenc.so libvdec.so libini.so lib
     printf '  %s  %s  %s\n' "$(sha256sum "$shipped" | cut -d' ' -f1)" "$(stat -c %s "$shipped")" "$lib"
     cmp -s "$src" "$shipped" || die "$lib in the package is not the pinned build ($src)"
 done
+
+# No OpenCV in the package (fail closed): no libopencv* file anywhere in the extracted
+# tree, and libkvm.so as packaged has no libopencv NEEDED entry and imports no cv:: symbol.
+log "verifying the package carries no OpenCV"
+PKG_ROOT="$VERIFY_DIR/nanokvm_$VERSION"
+pkg_ocv="$(find "$VERIFY_DIR" -name 'libopencv*')" || die "find failed over $VERIFY_DIR"
+[ -z "$pkg_ocv" ] || die "OpenCV libraries in the package: $pkg_ocv"
+pkg_kvm="$PKG_ROOT/server/dl_lib/libkvm.so"
+[ -f "$pkg_kvm" ] || die "$pkg_kvm is missing from the package"
+pkg_dyn="$(readelf -d "$pkg_kvm")" || die "readelf -d failed on the packaged libkvm.so"
+pkg_syms="$(readelf --dyn-syms --wide "$pkg_kvm")" || die "readelf --dyn-syms failed on the packaged libkvm.so"
+[ "$(printf '%s\n' "$pkg_syms" | awk '$7 == "UND" { n++ } END { print n + 0 }')" -gt 0 ] \
+    || die "the packaged libkvm.so has no undefined dynamic symbol: the cv:: check cannot see anything"
+pkg_needed="$(printf '%s\n' "$pkg_dyn" | sed -n 's/.*(NEEDED).*\[\(.*\)\].*/\1/p' | LC_ALL=C sort -u | tr '\n' ' ')"
+pkg_cv="$(printf '%s\n' "$pkg_syms" | awk '$7 == "UND" && $8 ~ /^_ZN2cv|^_ZNK2cv|opencv/ { print $8 }')"
+log "packaged libkvm.so: $(stat -c %s "$pkg_kvm") bytes, NEEDED: $pkg_needed"
+case " $pkg_needed " in *opencv*) die "the packaged libkvm.so NEEDs OpenCV" ;; esac
+[ -z "$pkg_cv" ] || die "the packaged libkvm.so imports cv:: symbols: $pkg_cv"
+log "no OpenCV in the package: no libopencv file, no libopencv NEEDED entry, no cv:: import"
 rm -rf "$VERIFY_DIR"
 
 # --- emulator build of the server (qemu, no cgo, no hardware) -------------------

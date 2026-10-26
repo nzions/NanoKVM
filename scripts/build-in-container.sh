@@ -70,17 +70,6 @@ echo "::group::support: build kvm_system"
 ./build kvm_system add_to_kvmapp
 echo "::endgroup::"
 
-# OpenCV from pinned source (scripts/build-deps.sh; the tarball comes from the artifacts
-# share via NANOKVM_SRC_MIRROR, sha256-checked). Built BEFORE libkvm.so: the MaixCDK
-# opencv component is replaced by support/sg2002/additional/opencv, which compiles and
-# links libkvm.so against this build's headers and .so files, and refuses to configure
-# without NANOKVM_OPENCV_DIR. The package ships these same .so files.
-echo "::group::deps: OpenCV 4.9.0 from pinned source"
-: "${NANOKVM_SRC_MIRROR:?NANOKVM_SRC_MIRROR is unset: the OpenCV source comes from the artifacts share (run via scripts/forge-build.sh)}"
-bash "$NANOKVM_PATH/scripts/build-deps.sh" "$NANOKVM_PATH/build/deps"
-export NANOKVM_OPENCV_DIR="$NANOKVM_PATH/build/deps"
-echo "::endgroup::"
-
 echo "::group::support: build kvm_vision (libkvm.so)"
 ./build kvm_vision
 ./build kvm_vision add_to_kvmapp
@@ -110,7 +99,7 @@ for lib in $mmf_set; do
     mmf_files+=("$mmf_dl/$lib")
 done
 [ -f "$mmf_dl/libkvm_mmf.so" ] || { echo "[ERROR] the build did not stage libkvm_mmf.so" >&2; exit 1; }
-# Nothing else may be in dl_lib at this point (OpenCV is added below).
+# Nothing else may be in dl_lib at this point.
 for f in "$mmf_dl"/*; do
     case " $mmf_set libkvm.so libkvm_mmf.so " in
         *" $(basename "$f") "*) ;;
@@ -129,87 +118,37 @@ echo "[INFO] libkvm_mmf.so NEEDED (readelf -d), build log of the pinned MMF link
 readelf -d "$mmf_dl/libkvm_mmf.so" | command grep -E 'NEEDED|SONAME|RPATH|RUNPATH'
 echo "::endgroup::"
 
-# Stage the OpenCV libraries next to the libkvm.so / libkvm_mmf.so the support build just
-# put in kvmapp/server/dl_lib, then PROVE libkvm.so came from them (fail closed):
-#   1. the MaixCDK build tree of kvm_vision: every compile and link rule that mentions
-#      OpenCV points into build/deps, and none into a MaixCDK prebuilt;
-#   2. libkvm.so NEEDs exactly our three sonames, and every cv:: symbol it imports is
-#      defined by those three libraries;
-#   3. what is staged is byte-identical to build-deps.sh's output (nothing from MaixCDK).
+# libkvm.so carries no OpenCV: the vision component is a NanoKVM cut of MaixCDK's
+# (support/sg2002/additional/vision) and the camera path is MMF hardware only. PROVE it
+# (fail closed): no libopencv* NEEDED entry, no imported cv:: symbol, no OpenCV library
+# staged in kvmapp/server/dl_lib (the unexpected-library check above already refuses one).
 # Nothing under server/dl_lib in git is a library we build; see server/dl_lib/README.md.
-echo "::group::deps: stage OpenCV 4.9.0 and prove libkvm.so is built against it"
-ocv_dir="$NANOKVM_PATH/build/deps"
-ocv_set="libopencv_core.so.409 libopencv_imgproc.so.409 libopencv_imgcodecs.so.409"
+echo "::group::deps: prove libkvm.so has no OpenCV"
 kvm_so="$NANOKVM_PATH/kvmapp/server/dl_lib/libkvm.so"
-mkdir -p "$NANOKVM_PATH/kvmapp/server/dl_lib"
-for lib in $ocv_set; do
-    [ -f "$ocv_dir/lib/$lib" ] || { echo "[ERROR] $ocv_dir/lib/$lib was not built" >&2; exit 1; }
-    if [ -f "$mmf_dl/$lib" ] && ! cmp -s "$ocv_dir/lib/$lib" "$mmf_dl/$lib"; then
-        echo "[ERROR] $mmf_dl/$lib is not our OpenCV build ($ocv_dir/lib/$lib); refusing to ship it" >&2
-        exit 1
-    fi
-    install -m 0644 "$ocv_dir/lib/$lib" "$mmf_dl/$lib"
-    cmp -s "$ocv_dir/lib/$lib" "$mmf_dl/$lib" || { echo "[ERROR] staged $lib differs from the build" >&2; exit 1; }
-done
 [ -f "$kvm_so" ] || { echo "[ERROR] the build did not stage libkvm.so" >&2; exit 1; }
-
-# 1. compile and link rules of the kvm_vision build tree
-kvm_build="$NANOKVM_PATH/support/sg2002/kvm_vision_test/build"
-rules="$(find "$kvm_build" \( -name flags.make -o -name link.txt -o -name build.ninja -o -name compile_commands.json \) -type f)"
-[ -n "$rules" ] || { echo "[ERROR] no flags.make/link.txt under $kvm_build: cannot prove where libkvm's OpenCV came from" >&2; exit 1; }
-# (find output holds no spaces: the build tree is under $HOME/NanoKVM)
-# shellcheck disable=SC2086
-rules_ours="$(grep -l -F -e "$ocv_dir/include/opencv4" $rules || true)"
-# shellcheck disable=SC2086
-rules_ours_lib="$(grep -l -F -e "$ocv_dir/link" $rules || true)"
-[ -n "$rules_ours" ] || { echo "[ERROR] no compile rule includes $ocv_dir/include/opencv4" >&2; exit 1; }
-[ -n "$rules_ours_lib" ] || { echo "[ERROR] no link rule names $ocv_dir/link (our OpenCV libraries)" >&2; exit 1; }
-# every OpenCV include dir in any rule, and every libopencv path in any link rule, must be ours.
-# libopencv_freetype.a is MaixCDK's own contrib component (the freetype text module, compiled
-# against our headers above), not an OpenCV core build.
-# shellcheck disable=SC2086
-foreign="$(cat $rules | tr ' ' '\n' \
-    | grep -E 'opencv4(_lib|/include)|opencv-mobile|opencv4_install|libopencv_[a-z_]*\.(so|a)' \
-    | grep -v -F -e "$ocv_dir/" | grep -v -E '(^|/)libopencv_freetype\.a$' | sort -u || true)"
-if [ -n "$foreign" ]; then
-    echo "[ERROR] the kvm_vision build references an OpenCV that is not ours ($ocv_dir):" >&2
-    printf '  %s\n' $foreign >&2
+kvm_dyn="$(readelf -d "$kvm_so")" || { echo "[ERROR] readelf -d failed on $kvm_so" >&2; exit 1; }
+kvm_syms="$(readelf --dyn-syms --wide "$kvm_so")" || { echo "[ERROR] readelf --dyn-syms failed on $kvm_so" >&2; exit 1; }
+[ "$(printf '%s\n' "$kvm_syms" | awk '$7 == "UND" { n++ } END { print n + 0 }')" -gt 0 ] || { echo "[ERROR] libkvm.so has no undefined dynamic symbol: the symbol check cannot see anything" >&2; exit 1; }
+needed_all="$(printf '%s\n' "$kvm_dyn" | sed -n 's/.*(NEEDED).*\[\(.*\)\].*/\1/p' | LC_ALL=C sort -u)"
+needed_ocv="$(printf '%s\n' "$needed_all" | grep -i 'opencv' || true)"
+cv_syms="$(printf '%s\n' "$kvm_syms" | awk '$7 == "UND" && $8 ~ /^_ZN2cv|^_ZNK2cv|^_ZN6cv|opencv/ { print $8 }' | sed 's/@.*//' | LC_ALL=C sort -u)"
+echo "[INFO] libkvm.so NEEDED: $(printf '%s' "$needed_all" | tr '\n' ' ')"
+if [ -n "$needed_ocv" ]; then
+    echo "[ERROR] libkvm.so NEEDs OpenCV: $needed_ocv" >&2
     exit 1
 fi
-echo "[INFO] OpenCV in the kvm_vision build tree ($(printf '%s\n' "$rules" | wc -l | tr -d ' ') rule files):"
-echo "  compile rules naming $ocv_dir/include/opencv4: $(printf '%s\n' "$rules_ours" | wc -l | tr -d ' ')"
-echo "  link rules naming $ocv_dir/link: $(printf '%s\n' "$rules_ours_lib" | wc -l | tr -d ' ')"
-echo "  no reference to a MaixCDK prebuilt OpenCV"
-
-# 2. NEEDED and the cv:: symbols
-needed_ocv="$(readelf -d "$kvm_so" | sed -n 's/.*(NEEDED).*\[\(libopencv_[a-z]*\.so\.[0-9]*\)\].*/\1/p' | LC_ALL=C sort -u | tr '\n' ' ')"
-echo "[INFO] libkvm.so NEEDED OpenCV: $needed_ocv"
-for n in $needed_ocv; do
-    case " $ocv_set " in
-        *" $n "*) ;;
-        *) echo "[ERROR] libkvm.so NEEDs $n, which is not one of ours ($ocv_set)" >&2; exit 1 ;;
-    esac
-done
-case " $needed_ocv " in
-    *" libopencv_core.so.409 "*) ;;
-    *) echo "[ERROR] libkvm.so does not NEED libopencv_core.so.409" >&2; exit 1 ;;
-esac
-ocv_defined="$(for lib in $ocv_set; do readelf --dyn-syms --wide "$ocv_dir/lib/$lib"; done \
-    | awk '$7 != "UND" && $8 != "" { print $8 }' | sed 's/@.*//' | LC_ALL=C sort -u)"
-ocv_wanted="$(readelf --dyn-syms --wide "$kvm_so" | awk '$7 == "UND" && $8 ~ /^_ZN2cv|^_ZNK2cv/ { print $8 }' \
-    | sed 's/@.*//' | LC_ALL=C sort -u)"
-[ -n "$ocv_wanted" ] || { echo "[ERROR] libkvm.so imports no cv:: symbol: its OpenCV use cannot be checked" >&2; exit 1; }
-ocv_missing="$(comm -23 <(printf '%s\n' "$ocv_wanted") <(printf '%s\n' "$ocv_defined"))"
-if [ -n "$ocv_missing" ]; then
-    echo "[ERROR] libkvm.so imports cv:: symbols our OpenCV libraries do not define:" >&2
-    printf '  %s\n' $ocv_missing >&2
+if [ -n "$cv_syms" ]; then
+    echo "[ERROR] libkvm.so imports cv:: symbols:" >&2
+    printf '  %s\n' $cv_syms >&2
     exit 1
 fi
-echo "[INFO] all $(printf '%s\n' "$ocv_wanted" | wc -l | tr -d ' ') cv:: symbols libkvm.so imports are defined by our libopencv_{core,imgproc,imgcodecs}"
-echo "[INFO] shipped OpenCV libraries (sha256, size):"
-for lib in $ocv_set; do
-    printf '  %s  %s  %s\n' "$(sha256sum "$mmf_dl/$lib" | cut -d' ' -f1)" "$(stat -c %s "$mmf_dl/$lib")" "$lib"
-done
+ocv_staged="$(find "$NANOKVM_PATH/kvmapp/server/dl_lib" "$NANOKVM_PATH/server/dl_lib" -name 'libopencv*' || true)"
+if [ -n "$ocv_staged" ]; then
+    echo "[ERROR] OpenCV libraries staged for the package:" >&2
+    printf '  %s\n' $ocv_staged >&2
+    exit 1
+fi
+echo "[INFO] no OpenCV: libkvm.so has no libopencv NEEDED entry, imports no cv:: symbol, and no libopencv file is staged"
 echo "::endgroup::"
 
 # GPIO helpers shipped under system/tool/. kvmgpio owns the held GPIO outputs by
@@ -227,13 +166,12 @@ echo "::endgroup::"
 
 # NanoKVM-Server links libkvm.so by name from server/dl_lib (-L../dl_lib -lkvm).
 # The tracked copy there predates every export added since (kvmv_hdmi_wait), so
-# link against the one just built. That one leaves the mmf and opencv symbols to
+# link against the one just built. That one leaves the mmf symbols to
 # the other libraries of the package, which are not the link-time ones: the
 # server's cgo flags carry -Wl,--allow-shlib-undefined for it. Symbols the
 # server binary itself imports stay checked.
 echo "::group::server: cross-compile NanoKVM-Server"
-for lib in libkvm.so libkvm_mmf.so libopencv_core.so.409 libopencv_imgproc.so.409 \
-    libopencv_imgcodecs.so.409 $mmf_set; do
+for lib in libkvm.so libkvm_mmf.so $mmf_set; do
     [ -f "$NANOKVM_PATH/kvmapp/server/dl_lib/$lib" ] \
         || { echo "[ERROR] the build did not stage $lib" >&2; exit 1; }
     cp -f "$NANOKVM_PATH/kvmapp/server/dl_lib/$lib" "$NANOKVM_PATH/server/dl_lib/$lib"

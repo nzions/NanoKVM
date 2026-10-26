@@ -56,38 +56,6 @@ namespace maix::camera
         set_regs_flag = enable;
     }
 
-    err::Err Camera::show_colorbar(bool enable)
-    {
-        // only set variable now
-        // should control camera to show colorbar
-        _show_colorbar = enable;
-        return err::ERR_NONE;
-    }
-
-    static void generate_colorbar(image::Image &img)
-    {
-        int width = img.width();
-        int height = img.height();
-        int step = width / 8;
-        int color_step = 255 / 7;
-        int color = 0;
-        uint8_t colors[8][3] = {
-            {255, 255, 255},
-            {255, 0, 0},
-            {255, 127, 0},
-            {255, 255, 0},
-            {0, 255, 0},
-            {0, 0, 255},
-            {143, 0, 255},
-            {0, 0, 0},
-        };
-        for (int i = 0; i < 8; i++)
-        {
-            image::Color _color(colors[i][0], colors[i][1], colors[i][2], 0, image::FMT_RGB888);
-            img.draw_rect(i * step, 0, step, height, _color, -1);
-            color += color_step;
-        }
-    }
 #ifdef PLATFORM_LINUX
     static char * _get_device(const char *device)
     {
@@ -119,7 +87,6 @@ namespace maix::camera
         _fps = (fps == -1) ? 30 : fps;
         _buff_num = buff_num;
 
-        _show_colorbar = false;
         _open_set_regs = set_regs_flag;
         _impl = NULL;
 
@@ -152,7 +119,6 @@ namespace maix::camera
         _fps = (fps == -1) ? 30 : fps;
         _buff_num = buff_num;
 
-        _show_colorbar = false;
         _open_set_regs = set_regs_flag;
         _impl = base;
 
@@ -202,7 +168,6 @@ namespace maix::camera
         _fps = (fps == -1) ? 30 : fps;
         _buff_num = buff_num;
 
-        _show_colorbar = false;
         _open_set_regs = set_regs_flag;
         _impl = NULL;
 
@@ -241,13 +206,9 @@ namespace maix::camera
     }
 
     bool Camera::_check_format(image::Format format) {
-        if (format == image::FMT_RGB888 || format == image::FMT_BGR888
-        || format == image::FMT_RGBA8888 || format == image::FMT_BGRA8888
-        || format == image::FMT_YVU420SP || format == image::FMT_GRAYSCALE) {
-            return true;
-        } else {
-            return false;
-        }
+        // NanoKVM cut: frames are never converted (that needed OpenCV), so only the
+        // format the MMF capture delivers natively is accepted.
+        return format == image::FMT_YVU420SP;
     }
 
     err::Err Camera::open(int width, int height, image::Format format, int fps, int buff_num)
@@ -342,28 +303,12 @@ namespace maix::camera
             return NULL;
         }
 
-        if (_show_colorbar) {
-            image::Image *img = new image::Image(_width, _height);
-            generate_colorbar(*img);
-            err::check_null_raise(img, "camera read failed");
-            return img;
-        } else {
-            // it's better all done by impl to faster read, but if impl not support, we have to convert it
-            if(_format_impl == _format)
-            {
-                image::Image *img = _impl->read(buff, buff_size);
-                // err::check_null_raise(img, "camera read failed");
-                return img;
-            }
-            else
-            {
-                image::Image *img = _impl->read();
-                image::Image *img2 = img->to_format(_format, buff, buff_size);
-                delete img;
-                // err::check_null_raise(img2, "camera read failed");
-                return img2;
-            }
+        // NanoKVM cut: no format conversion and no colour bar (both needed OpenCV).
+        if (_format_impl != _format) {
+            log::error("camera read: the camera cannot deliver the requested format natively");
+            return NULL;
         }
+        return _impl->read(buff, buff_size);
     }
 
     void Camera::clear_buff()

@@ -121,7 +121,7 @@ together; the device refuses an update without a valid `.sig`.
 |---|---|
 | `version` | the requested version |
 | `server/NanoKVM-Server` | `server/build.sh` (BoringCrypto, RPATH `$ORIGIN/dl_lib`) |
-| `server/dl_lib/` | libkvm.so, libkvm_mmf.so (the `kvm_vision` build), OpenCV 4.9.0 core/imgproc/imgcodecs (`scripts/build-deps.sh`, pinned sha256 sources); the remaining vendor SDK libraries are backfilled from the tracked `server/dl_lib/` (see its README.md) |
+| `server/dl_lib/` | libkvm.so, libkvm_mmf.so (the `kvm_vision` build), no OpenCV (`libkvm.so` is checked for none); the remaining vendor SDK libraries are backfilled from the tracked `server/dl_lib/` (see its README.md) |
 | `server/web/` | `web/dist/` |
 | `kvm_system/kvm_system` | `support/sg2002` `build kvm_system` |
 | `system/tool/` | prebuilt binaries in `tools/nanokvm_update_edid/` |

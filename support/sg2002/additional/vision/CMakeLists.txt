@@ -8,7 +8,6 @@ if(PLATFORM_LINUX)
 elseif(PLATFORM_MAIXCAM)
     list(APPEND ADD_PRIVATE_INCLUDE "port/maixcam")
 endif()
-list(APPEND ADD_PRIVATE_INCLUDE "include_private")
 ###############################################
 
 ############## Add source files ###############
@@ -33,16 +32,13 @@ endif()
 
 
 ###### Add required/dependent components ######
-list(APPEND ADD_REQUIREMENTS basic opencv opencv_freetype websocket peripheral)
-list(APPEND ADD_REQUIREMENTS omv)
+list(APPEND ADD_REQUIREMENTS basic websocket peripheral)
 list(APPEND ADD_REQUIREMENTS kvm_mmf)
 ###############################################
 
 ###### Add link search path for requirements/libs ######
 # list(APPEND ADD_LINK_SEARCH_PATH "${CONFIG_TOOLCHAIN_PATH}/lib")
 # list(APPEND ADD_REQUIREMENTS pthread m)  # add system libs, pthread and math lib for example here
-# set (OpenCV_DIR opencv/lib/cmake/opencv4)
-# find_package(OpenCV REQUIRED)
 ###############################################
 
 ############ Add static libs ##################

@@ -3,6 +3,8 @@
  * @copyright Sipeed Ltd 2023-
  * @license Apache 2.0
  * @update 2023.9.8: Add framework, create this file.
+ *
+ * NanoKVM cut of MaixCDK's maix_camera.hpp: no colour bar, no OpenCV include.
  */
 
 #pragma once
@@ -16,7 +18,6 @@
 #include <map>
 #include <stdexcept>
 #include <vector>
-#include <opencv2/opencv.hpp>
 
 /**
  * @brief maix.camera module, access camera device and get image from it
@@ -261,14 +262,6 @@ namespace maix::camera
         }
 
         /**
-         * Camera output color bar image for test
-         * @param enable enable/disable color bar
-         * @return error code, err::ERR_NONE means success, others means failed
-         * @maixpy maix.camera.Camera.show_colorbar
-         */
-        err::Err show_colorbar(bool enable);
-
-        /**
          * Get channel of camera
          * @return channel number
          * @maixpy maix.camera.Camera.get_channel
@@ -297,7 +290,6 @@ namespace maix::camera
         int _vflip;
         float _exposure;
         float _gain;
-        bool _show_colorbar;
         bool _open_set_regs;
         CameraBase *_impl; // used by implement code
         bool _check_format(image::Format format);

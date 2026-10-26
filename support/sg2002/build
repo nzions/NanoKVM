@@ -56,9 +56,10 @@ stock_components_aside() {
 sync_components() {
   cp -rf $NanoKVM_PATH/support/sg2002/additional/kvm $MAIXCDK_PATH/components
   cp -rf $NanoKVM_PATH/support/sg2002/additional/kvm_mmf $MAIXCDK_PATH/components
+  # replaced, not merged: a file deleted from our vision cut (maix_image_ops.cpp, ...) must
+  # not survive from an earlier sync in a cached MaixCDK tree
+  rm -rf $MAIXCDK_PATH/components/vision
   cp -rf $NanoKVM_PATH/support/sg2002/additional/vision $MAIXCDK_PATH/components
-  # replaces MaixCDK's opencv component: headers and libraries from scripts/build-deps.sh
-  cp -f $NanoKVM_PATH/support/sg2002/additional/opencv/CMakeLists.txt $MAIXCDK_PATH/components/3rd_party/opencv/CMakeLists.txt
   cp -f $NanoKVM_PATH/support/sg2002/additional/peripheral/port/maixcam/maix_i2c.cpp $MAIXCDK_PATH/components/peripheral/port/maixcam/maix_i2c.cpp
   cp -f $NanoKVM_PATH/support/sg2002/additional/sophgo-middleware/v2/sample/common/sample_common_sensor.c $MAIXCDK_PATH/components/3rd_party/sophgo-middleware/sophgo-middleware/v2/sample/common/
 }

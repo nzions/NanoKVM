@@ -1,3 +1,12 @@
+## 2.6.34 (2026-10-26)
+
+### Changes
+
+* OpenCV is gone from the image. `libkvm.so` NEEDed `libopencv_{core,imgproc,imgcodecs}.so.409` only because MaixCDK's whole `maix::image` class (drawing, load/save, fonts) was compiled in; the capture path only ever used `cam->read()` (MMF YVU420SP frames) and the hardware JPEG / H.264 encoders. The `vision` component is now a NanoKVM cut of MaixCDK's: `Image` keeps its constructors, `data()` / `data_size()` / `format()` / `width()` / `height()` and `to_jpeg()` reduced to the hardware YVU420SP branch (any other format returns `nullptr` and logs); the camera accepts only `FMT_YVU420SP` (no format conversion, no colour bar). `maix_image_ops.cpp`, `maix_image_obj.hpp`, `maix_image_color.hpp` and `maix_image_util.hpp` are deleted, and `vision` no longer requires `opencv`, `opencv_freetype` or `omv`, so MaixCDK's FreeType and HarfBuzz are no longer embedded either.
+* Removed: `scripts/build-deps.sh` (its only job was the OpenCV build), `support/sg2002/additional/opencv` and its copy in `support/sg2002/build`, `NANOKVM_OPENCV_DIR`, the OpenCV staging into `kvmapp/server/dl_lib` and `server/dl_lib`, and the libkvm-uses-our-OpenCV checks. The package no longer ships the three `libopencv_*.so.409`. The `opencv-4.9.0.tar.gz` on the artifacts share is left alone, unused.
+* Build check (fail closed) in `build-in-container.sh` and again on the extracted package in `forge-build.sh`: `libkvm.so` has no `libopencv*` NEEDED entry and imports no `cv::` symbol, and no `libopencv*` file is staged or in the package; the log prints the `libkvm.so` NEEDED list and size.
+* Not run on hardware
+
 ## 2.6.33 (2026-10-26)
 
 ### Changes

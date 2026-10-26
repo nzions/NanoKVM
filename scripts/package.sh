@@ -72,13 +72,12 @@ require_riscv64() {
 
 # Libraries built from source by this repo's build (never tracked in server/dl_lib):
 #   libkvm libkvm_mmf           MaixCDK build of support/sg2002
-#   libopencv_*                 scripts/build-deps.sh
 #   libsys libcvi_bin libvpu libvenc libvdec libini
 #                               scripts/build-mmf.sh, from the pinned sophgo-middleware
 #   libisp libcvi_bin_isp libisp_algo libae libaf libawb
 #                               the closed blobs of the SAME pin, copied by build-mmf.sh
 # Every library the package ships is therefore in this list; nothing comes from git.
-BUILT_LIBS="libkvm.so libkvm_mmf.so libopencv_core.so.409 libopencv_imgproc.so.409 libopencv_imgcodecs.so.409 libsys.so libcvi_bin.so libvpu.so libvenc.so libvdec.so libini.so libisp.so libcvi_bin_isp.so libisp_algo.so libae.so libaf.so libawb.so"
+BUILT_LIBS="libkvm.so libkvm_mmf.so libsys.so libcvi_bin.so libvpu.so libvenc.so libvdec.so libini.so libisp.so libcvi_bin_isp.so libisp_algo.so libae.so libaf.so libawb.so"
 
 # Libraries nothing in the package NEEDs or dlopens (measured with readelf -d and
 # strings over the 2.6.17 package; see server/dl_lib/README.md). They are no longer
@@ -144,7 +143,7 @@ done
 #    there is an error even if a stray file sits in server/dl_lib.
 for name in $BUILT_LIBS; do
     [ -f "$ROOT/kvmapp/server/dl_lib/$name" ] \
-        || { echo "[ERROR] built library $name is missing from kvmapp/server/dl_lib (make vision / scripts/build-deps.sh / scripts/build-mmf.sh)" >&2; exit 1; }
+        || { echo "[ERROR] built library $name is missing from kvmapp/server/dl_lib (make vision / scripts/build-mmf.sh)" >&2; exit 1; }
     require_riscv64 "$ROOT/kvmapp/server/dl_lib/$name"
 done
 for name in $DROPPED_LIBS; do

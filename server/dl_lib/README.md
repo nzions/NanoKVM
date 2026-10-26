@@ -10,9 +10,8 @@ them from the build, refusing a package that lacks one. No library comes from Ma
 
 | Library | Source |
 |---|---|
-| `libkvm.so` | `support/sg2002/additional/kvm` + `vision` (MaixCDK build, `./build kvm_vision`); embeds FreeType 2.13.2 and HarfBuzz 8.2.1 built by MaixCDK from its pinned sources |
+| `libkvm.so` | `support/sg2002/additional/kvm` + `vision` (MaixCDK build, `./build kvm_vision`); links no OpenCV and no FreeType since 2.6.34: `vision` is a NanoKVM cut of MaixCDK's (frame holder plus the hardware JPEG encode), and `build-in-container.sh` / `forge-build.sh` fail the build if `libkvm.so` NEEDs a `libopencv*` or imports a `cv::` symbol, or if any `libopencv*` file is in the package |
 | `libkvm_mmf.so` | `support/sg2002/additional/kvm_mmf` (same build), linked against the libraries below only |
-| `libopencv_core.so.409`, `libopencv_imgproc.so.409`, `libopencv_imgcodecs.so.409` | OpenCV 4.9.0 source tarball (`opencv-4.9.0.tar.gz` from the artifacts share `src/`, sha256-pinned), `scripts/build-deps.sh` (libjpeg-turbo, libpng, zlib are OpenCV's bundled copies); `libkvm.so` is compiled and linked against this same build (`support/sg2002/additional/opencv`) |
 | `libsys.so libcvi_bin.so libvpu.so libvenc.so libvdec.so libini.so` | `scpcom/sophgo-middleware@4e231ef5967f` (`scripts/fetch-middleware.sh`), built by `scripts/build-mmf.sh` with the pin's own `Makefile.param` and `modules/*/Makefile` and the riscv64 musl cross compiler. `libvpu` contains VI/VO/VPSS/GDC/RGN. Kernel uapi headers: the osdrv v2 tarball (scpcom `cbd9c582`; libvenc/libvdec: sophgo `1b3a4964`, v1) the 7.3 kernel is built from, sha256-pinned (`OSDRV_*` in `build-mmf.sh`) |
 
 `libcvi_bin` also needs the declarations of `cvi_json-c` and `cvi_miniz` (Sophgo's renamed json-c and
@@ -53,13 +52,21 @@ has a generic dlopen for its own plugins only). They are neither tracked nor shi
 * audio: `libcvi_audio libcvi_VoiceEngine libcvi_vqe libdnvqe libaacdec2 libaacenc2 libaaccomm2 libaacsbrdec2 libaacsbrenc2 libtinyalsa`
 * `libcli` (network CLI with a root login prompt), `libcvi_ispd2` (ISP tuning daemon, binds a socket; its only dependency was json-c)
 * `libcvi_ssp libosdc libraw_dump libmipi_tx libmisc libcvi_RES1 libopencv_highgui.so.409`
-* `libjson-c.so.5`: only `libcvi_ispd2` NEEDed it, so its forge build is gone from `scripts/build-deps.sh`
+* `libjson-c.so.5`: only `libcvi_ispd2` NEEDed it, so its forge build is gone
 * `libcvi_ive.so`: `kvm_mmf.cpp` has an IVE colour-space path (`cvi_rgb2nv21`, `cvi_ive_init`), but nothing calls it
   (`cvi_ive_init`/`deinit` are only `UNUSED()`-ed, `cvi_rgb2nv21` has no caller), so `libkvm_mmf.so` has no undefined
   `CVI_IVE_*` symbol and does not NEED the library.
 
 `scripts/package.sh` also prunes these names from the staged tree (`DROPPED_LIBS`), in case
 MaixCDK's dist stages any of them.
+
+## OpenCV (removed, 2.6.34)
+
+`libopencv_core/imgproc/imgcodecs.so.409` (4.9.0, built by `scripts/build-deps.sh`, now deleted) were
+NEEDed by `libkvm.so` only because MaixCDK's whole `maix::image` class was compiled in. The capture path
+never used it: frames come from MMF as YVU420SP and are encoded by the hardware JPEG/H.264 encoders.
+The vision component now keeps only `Image` (constructors, data access, hardware `to_jpeg`) and the
+camera wrapper. The source tarball stays on the artifacts share, unused.
 
 ## Source availability (per middleware pin)
 

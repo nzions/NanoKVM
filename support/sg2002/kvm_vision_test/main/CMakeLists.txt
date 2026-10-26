@@ -29,8 +29,6 @@ list(APPEND ADD_REQUIREMENTS basic peripheral kvm)
 ###### Add link search path for requirements/libs ######
 # list(APPEND ADD_LINK_SEARCH_PATH "${CONFIG_TOOLCHAIN_PATH}/lib")
 # list(APPEND ADD_REQUIREMENTS pthread m)  # add system libs, pthread and math lib for example here
-# set (OpenCV_DIR opencv/lib/cmake/opencv4)
-# find_package(OpenCV REQUIRED)
 ###############################################
 
 ############ Add static libs ##################
