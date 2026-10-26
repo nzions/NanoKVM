@@ -1,3 +1,10 @@
+## 2.6.31 (2026-10-26)
+
+### Changes
+
+* Build fix for 2.6.30 (red on forge, nothing shipped): OpenCV configured without any download (G-API is unavailable, no ADE), but the "download cache is empty" check treated OpenCV's own placeholder entry in the cache directory as a download. It now fails only on a non-empty regular file there and prints what the directory holds.
+* Not run on hardware
+
 ## 2.6.30 (2026-10-26)
 
 ### Changes

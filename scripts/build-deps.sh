@@ -102,12 +102,15 @@ cmake -S "$OCV_SRC" -B "$OCV_BUILD" -G "Unix Makefiles" \
     -DBUILD_EXAMPLES=OFF -DBUILD_DOCS=OFF -DBUILD_opencv_apps=OFF -DBUILD_opencv_python3=OFF \
     -DBUILD_JAVA=OFF -DOPENCV_GENERATE_PKGCONFIG=OFF \
     -DBUILD_opencv_gapi=OFF -DWITH_ADE=OFF -DOPENCV_DOWNLOAD_PATH="$OCV_DL" 2>&1 | tee "$OCV_CFG_LOG"
-[ -z "$(ls -A "$OCV_DL")" ] || die "OpenCV downloaded into $OCV_DL at configure time: $(ls "$OCV_DL" | tr '\n' ' ')"
+# (OpenCV leaves an empty marker directory/file there itself: only a regular file with content is a download)
+ocv_dl_files="$(find "$OCV_DL" -type f -size +0)"
+[ -z "$ocv_dl_files" ] || die "OpenCV downloaded into $OCV_DL at configure time: $(echo $ocv_dl_files)"
+log "OpenCV download cache contents: $(find "$OCV_DL" -mindepth 1 | tr '\n' ' ')"
 [ ! -e "$OCV_BUILD/CMakeDownloadLog.txt" ] || die "OpenCV configure downloaded something (see $OCV_BUILD/CMakeDownloadLog.txt)"
 if grep -E 'Downloading |downloading |ocv_download' "$OCV_CFG_LOG" | grep -v 'Using github.com to download 3rdparty'; then
     die "OpenCV configure output mentions a download (lines above)"
 fi
-log "OpenCV configure: no download (cache $OCV_DL empty, no CMakeDownloadLog.txt, no download line in the configure output)"
+log "OpenCV configure: no download (no file in the cache $OCV_DL, no CMakeDownloadLog.txt, no download line in the configure output)"
 log "building OpenCV core, imgproc, imgcodecs ($JOBS jobs)"
 cmake --build "$OCV_BUILD" --parallel "$JOBS" --target opencv_core opencv_imgproc opencv_imgcodecs
 
