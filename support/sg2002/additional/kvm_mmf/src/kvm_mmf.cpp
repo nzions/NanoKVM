@@ -151,8 +151,6 @@ typedef struct {
 static priv_t priv;
 static g_priv_t g_priv;
 
-#define MODULE_NAME "soph_vi"
-
 /*
  * Keep the former zero-copy hook's frame lifetime in the MMF implementation.
  * A frame released by the image path stays leased until VENC has consumed it.
@@ -205,52 +203,6 @@ static int _mmf_find_deferred_vi_frame(int width, int height, int format,
 		}
 	}
 	return -1;
-}
-
-static int _is_module_in_use(const char *module_name) {
-    FILE *fp;
-    char buffer[256];
-
-    fp = fopen("/proc/modules", "r");
-    if (fp == NULL) {
-        perror("fopen");
-        return -1;
-    }
-
-    while (fgets(buffer, sizeof(buffer), fp) != NULL) {
-        char mod_name[256];
-        int usage_count;
-
-        sscanf(buffer, "%255s %*s %d", mod_name, &usage_count);
-
-        if (strcmp(mod_name, module_name) == 0) {
-            fclose(fp);
-            return usage_count > 0;
-        }
-    }
-
-    fclose(fp);
-    return 0;
-}
-
-static int reinit_soph_vb(void)
-{
-	printf("mmf insmod..\r\n");
-	system("rmmod soph_ive soph_vc_driver soph_rgn soph_dwa soph_vpss soph_vi soph_snsr_i2c soph_mipi_rx soph_fast_image soph_rtos_cmdqu soph_base");
-	// system("insmod /mnt/system/ko/soph_sys.ko");
-	system("insmod /mnt/system/ko/soph_base.ko");
-	system("insmod /mnt/system/ko/soph_rtos_cmdqu.ko");
-	system("insmod /mnt/system/ko/soph_fast_image.ko");
-	system("insmod /mnt/system/ko/soph_mipi_rx.ko");
-	system("insmod /mnt/system/ko/soph_snsr_i2c.ko");
-	system("insmod /mnt/system/ko/soph_vi.ko");
-	system("insmod /mnt/system/ko/soph_vpss.ko");
-	system("insmod /mnt/system/ko/soph_dwa.ko");
-	system("insmod /mnt/system/ko/soph_rgn.ko");
-	system("insmod /mnt/system/ko/soph_vc_driver.ko");
-	system("insmod /mnt/system/ko/soph_ive.ko");
-
-	return 0;
 }
 
 static int _get_vb_pool_cnt(void)
@@ -1027,11 +979,9 @@ static CVI_S32 _mmf_init(void)
 
 	int old_pool_cnt = _get_vb_pool_cnt();
 	if (old_pool_cnt > 0) {
-		if (_is_module_in_use("soph_vi") == 0) {
-			reinit_soph_vb();
-		} else {
-			printf("You may have repeatedly initialized maix multi-media!");
-		}
+		/* The media drivers are built into the kernel: they cannot be
+		 * reloaded to drop stale VB pools, so say so and carry on. */
+		printf("You may have repeatedly initialized maix multi-media! (%d VB pools already exist)\n", old_pool_cnt);
 	}
 
 	CVI_SYS_GetVersion(&stVersion);

@@ -21,6 +21,8 @@ echo "== boot partition (FAT16, sector $p1s)"
 mdir -i "$IMG@@$((p1s * 512))" ::
 mcopy -i "$IMG@@$((p1s * 512))" ::BOOT.SD "$T/boot.sd"
 echo "BOOT.SD sha256 $(sha256sum "$T/boot.sd" | cut -d' ' -f1)"
+echo "-- uEnv.txt (kernel command line additions: othbootargs)"
+mcopy -i "$IMG@@$((p1s * 512))" ::uEnv.txt - 2>&1
 echo "== dumpimage -l BOOT.SD"
 dumpimage -l "$T/boot.sd"
 echo "== kernel in the FIT vs the Image it was built from"

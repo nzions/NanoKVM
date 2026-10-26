@@ -131,6 +131,7 @@ log "base image $(wc -c <base.img) bytes"
 RAW=nanokvm-cube-sd.img
 {
     sh "$SRC/scripts/sd-image.sh" --kernel-fit in/kernel.Image in/kernel.dtb --no-stock-ko \
+        --bootargs "cvi_vc_drv.MaxVencChnNum=9 cvi_vc_drv.MaxVdecChnNum=9" \
         --stock-sha256 "$BASE_RAW_SHA256" --sha256 "$USERSPACE_SHA256" \
         base.img in/nanokvm.tar.gz "$RAW"
 } 2>&1 | tee out/build.log

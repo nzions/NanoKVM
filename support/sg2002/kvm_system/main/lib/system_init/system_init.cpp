@@ -81,10 +81,6 @@ void new_app_init(void)
 		system("cp -f /kvmapp/system/init.d/S98tailscaled /etc/init.d/");
 	}
 
-	// rmmod soph_saradc
-	system("rmmod soph_saradc");
-	system("rm -f /mnt/system/ko/soph_saradc.ko");
-
 	// PCIe Patch
 	// system("cp /kvmapp/system/init.d/S95nanokvm /etc/init.d/");
 	if(access("/kvmapp/jpg_stream/dl_lib/libmaixcam_lib.so", F_OK) != 0){
@@ -116,63 +112,16 @@ void new_app_init(void)
 	system("sync");
 	// system("/etc/init.d/S95nanokvm restart");
 
-	// update ko
-	FILE *fp;
-	uint8_t RW_Data_0[30];	
-	uint8_t RW_Data_1[30];	
-	fp = popen("md5sum /mnt/system/ko/soph_mipi_rx.ko | grep 086ed01749188975afaa40fb569374f8 | awk '{print $2}'", "r");
-	if ( NULL == fp )
-	{
-		pclose(fp);
-		// return;
-	}
-	fgets((char*)RW_Data_0, 10, fp);
-	pclose(fp);
-	fp = popen("md5sum /mnt/system/ko/soph_mipi_rx.ko | grep 69be7eeded3777f750480a5dd5a1aa26 | awk '{print $2}'", "r");
-	if ( NULL == fp )
-	{
-		pclose(fp);
-		// return;
-	}
-	fgets((char*)RW_Data_1, 10, fp);
-	pclose(fp);
-
-	int8_t hdmi_ver = -1;
-
-	if(access("/etc/kvm/hdmi_version", F_OK) == 0){
-		uint8_t RW_Data[2];
-		FILE *fp = fopen("/etc/kvm/hdmi_version", "r");
-		fread(RW_Data, sizeof(char), 2, fp);
-		fclose(fp);
-		if(RW_Data[0] == 'c') hdmi_ver = 1;
-		else if(RW_Data[0] == 'u') hdmi_ver = 2;
-		else if(RW_Data[0] == 'd') hdmi_ver = 2;
-	}
+	// The vendor media drivers are built into the kernel: there is no
+	// soph_mipi_rx.ko to refresh (the old md5-and-reboot step would have
+	// rebooted on every update, because the file does not exist).
 
 	// system("/etc/init.d/S03usbdev stop_start");
 	create_temp_watchdog();
 
-	if(hdmi_ver == 2){
-		if(RW_Data_1[0] != '/'){
-			system("cp /kvmapp/system/ko/soph_mipi_rx.ko /mnt/system/ko/soph_mipi_rx.ko");
-			system("sync");
-			system("reboot");
-		} else {
-			system("sync");
-			system("/etc/init.d/S15kvmhwd start");
-			system("/etc/init.d/S95nanokvm restart");
-		}
-	} else {
-		if((RW_Data_0[0] != '/') && (RW_Data_1[0] != '/')){
-			system("cp /kvmapp/system/ko/soph_mipi_rx.ko /mnt/system/ko/soph_mipi_rx.ko");
-			system("sync");
-			system("reboot");
-		} else {
-			system("sync");
-			system("/etc/init.d/S15kvmhwd start");
-			system("/etc/init.d/S95nanokvm restart");
-		}
-	}
+	system("sync");
+	system("/etc/init.d/S15kvmhwd start");
+	system("/etc/init.d/S95nanokvm restart");
 
 	if(access("/root/old/kvm_new_img", F_OK) == 0){
 		system("rm -r /root/old");

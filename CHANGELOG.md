@@ -1,3 +1,12 @@
+## 2.6.17 (2026-10-26)
+
+### Changes
+
+* No insmod/rmmod of `soph_*` any more: the Sophgo media drivers are built into the kernel (kernel-nanokvm-sg2002 `-full`). `kvm_mmf` lost `reinit_soph_vb` (rmmod and 11 insmods) and `_is_module_in_use`; with VB pools left over from an earlier init it now logs and carries on (a built-in driver cannot be reloaded). `kvm_system` lost `rmmod soph_saradc` and the `soph_mipi_rx.ko` md5-check-and-reboot step, which on a static kernel (no such file) would have rebooted on every app update.
+* `kvmapp/system/init.d/S00kmod` loads nothing. Its one parameter, `soph_vc_driver.ko MaxVencChnNum=9 MaxVdecChnNum=9`, is now `cvi_vc_drv.MaxVencChnNum=9 cvi_vc_drv.MaxVdecChnNum=9` (`module_param` in `cvi_vc_drv.c`, built-in object `cvi_vc_drv`; driver defaults are 16 and 64). `scripts/sd-image.sh --bootargs` writes them as `othbootargs=` to `uEnv.txt` on the boot partition (forge-sdimage.sh passes them); S00kmod sets them from `/sys/module/cvi_vc_drv/parameters/` (mode 0644) when the command line did not. `--no-stock-ko` now installs this S00kmod instead of its own stub.
+* Still loaded as modules: `i2c-gpio.ko` / `i2c-algo-bit.ko` in `S15kvmhwd` (not `soph_*`; the load fails harmlessly where the files are absent).
+* Not run on hardware (kvm1 offline)
+
 ## 2.6.16 (2026-10-26)
 
 ### Changes

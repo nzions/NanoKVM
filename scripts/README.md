@@ -309,7 +309,8 @@ forge build is `forge_build repo=nanokvm ref=<sha> scope=["scripts"]` (see below
   0x80200000 would overwrite the FIT (and the DTB, which bootm leaves in place) being read.
 * `--fw-reserve`: the stock bootargs carry `riscv.fwsz=0x80000`, the vendor kernel's way of
   keeping off OpenSBI. The mainline DTB has no node for it, so it gets `/memreserve/ 0x80000000 0x80000`.
-* `--no-stock-ko`: `S00kmod` (insmod of `soph_*.ko`) becomes a no-op.
+* `--no-stock-ko`: `S00kmod` (insmod of `soph_*.ko`) is replaced by the repo's `kvmapp/system/init.d/S00kmod`, which loads nothing.
+* `--bootargs <args>`: writes `othbootargs=<args>` to `uEnv.txt` on the boot partition (other lines of an existing uEnv.txt are kept). The former insmod parameters of the built-in drivers go here as `<driver>.<param>=<v>`: `cvi_vc_drv.MaxVencChnNum=9 cvi_vc_drv.MaxVdecChnNum=9` (forge-sdimage.sh passes them). `S00kmod` sets the same two values from `/sys/module/cvi_vc_drv/parameters/` if the command line did not carry them.
 * The stock boot partition is untouched except `BOOT.SD`; `uEnv.txt` on it (loaded by stock
   U-Boot's `loadenvcmd`) can override `othbootargs`, for example `loglevel=7`, without a rebuild.
 * The result is checked structurally only (FIT listing, FAT read-back, kernel extracted from the

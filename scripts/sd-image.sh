@@ -54,7 +54,7 @@
 # Usage:
 #   scripts/sd-image.sh [--stock-sha256 <hex>] [--sha256 <hex>] \
 #       [--kernel-fit <Image> <dtb>] [--fit-load <hex>] [--fit-comp lzma|gzip] \
-#       [--fw-reserve <hex>] [--no-stock-ko] \
+#       [--fw-reserve <hex>] [--no-stock-ko] [--bootargs <args>] \
 #       <stock.img> <nanokvm_VERSION.tar.gz> <out.img>
 #
 #   --sha256        expected sha256 of the release tarball; default: read from
@@ -70,6 +70,11 @@
 #   --fw-reserve    size of the /memreserve/ at the DRAM base 0x80000000 added
 #                   to the DTB (default 0x80000, the stock riscv.fwsz; 0 = none).
 #   --no-stock-ko   neutralise S00kmod, see above.
+#   --bootargs      extra kernel command line (a built-in driver's former insmod
+#                   parameters, `<driver>.<param>=<v>`), written as `othbootargs=`
+#                   into uEnv.txt on the boot partition, which stock U-Boot
+#                   imports (loadenvcmd) and appends to the kernel bootargs.
+#                   Needs --kernel-fit; replaces an existing othbootargs line.
 #
 # <out.img> must not exist. Writes <out.img>.sha256 too.
 
@@ -88,7 +93,7 @@ info() {
 
 usage() {
     cat >&2 <<EOF
-Usage: $0 [--stock-sha256 <hex>] [--sha256 <hex>] [--kernel-fit <Image> <dtb>] [--fit-load <hex>] [--fit-comp lzma|gzip] [--fw-reserve <hex>] [--no-stock-ko] <stock.img> <nanokvm_VERSION.tar.gz> <out.img>
+Usage: $0 [--stock-sha256 <hex>] [--sha256 <hex>] [--kernel-fit <Image> <dtb>] [--fit-load <hex>] [--fit-comp lzma|gzip] [--fw-reserve <hex>] [--no-stock-ko] [--bootargs <args>] <stock.img> <nanokvm_VERSION.tar.gz> <out.img>
 EOF
     exit 1
 }
@@ -112,6 +117,7 @@ FIT_LOAD=0x83000000
 FIT_COMP=lzma
 FW_RESERVE=0x80000
 NO_STOCK_KO=0
+BOOTARGS=""
 while [ $# -gt 0 ]; do
     case "$1" in
     --stock-sha256)
@@ -150,6 +156,11 @@ while [ $# -gt 0 ]; do
         NO_STOCK_KO=1
         shift
         ;;
+    --bootargs)
+        [ $# -ge 2 ] || usage
+        BOOTARGS=$2
+        shift 2
+        ;;
     -*) usage ;;
     *) break ;;
     esac
@@ -175,6 +186,7 @@ if [ "$KFIT" = 1 ]; then
 else
     [ "$FIT_COMP$FIT_LOAD$FW_RESERVE" = "lzma0x830000000x80000" ] || [ "$KFIT" = 1 ] ||
         die "--fit-load, --fit-comp and --fw-reserve need --kernel-fit"
+    [ -z "$BOOTARGS" ] || die "--bootargs needs --kernel-fit"
 fi
 
 [ -f "$STOCK" ] || die "stock image not found: $STOCK"
@@ -286,20 +298,20 @@ info "release $VERSION: $UNPACKED bytes unpacked"
 # from) is the stub too; the read-back below then compares against the stub.
 STOCK_KO_MARK="no stock .ko: drivers are built into the kernel"
 if [ "$NO_STOCK_KO" = 1 ]; then
-    grep -q insmod "$SRC/system/init.d/S00kmod" || die "release S00kmod has no insmod; nothing to neutralise (is this the right release?)"
-    cat >"$SRC/system/init.d/S00kmod" <<EOF
-#!/bin/sh
-# $STOCK_KO_MARK (sd-image.sh --no-stock-ko); the stock script insmod'ed the
-# soph_*.ko files from /mnt/system/ko, which a kernel with its drivers built in
-# neither needs nor can load.
-if [ "\$1" = "start" ]
-then
-	echo "kernel modules: built into the kernel, none loaded"
-fi
-exit 0
-EOF
-    chmod 0755 "$SRC/system/init.d/S00kmod"
-    info "S00kmod replaced by a no-op stub (--no-stock-ko)"
+    if grep -q "$STOCK_KO_MARK" "$SRC/system/init.d/S00kmod"; then
+        info "release S00kmod is already the static-kernel one"
+    else
+        grep -q insmod "$SRC/system/init.d/S00kmod" || die "release S00kmod has no insmod; nothing to neutralise (is this the right release?)"
+        # the stub is the repo's own kvmapp/system/init.d/S00kmod (no insmod; it
+        # sets the cvi_vc_drv channel counts from sysfs when the command line
+        # did not), so there is one text of it
+        STUB=$(dirname "$0")/../kvmapp/system/init.d/S00kmod
+        [ -f "$STUB" ] || die "static-kernel S00kmod not found: $STUB"
+        grep -q "$STOCK_KO_MARK" "$STUB" || die "$STUB lacks the marker '$STOCK_KO_MARK'"
+        cp -- "$STUB" "$SRC/system/init.d/S00kmod"
+        chmod 0755 "$SRC/system/init.d/S00kmod"
+        info "S00kmod replaced by the static-kernel one (--no-stock-ko)"
+    fi
 fi
 
 # ------------------------------------------------------------ debugfs helpers
@@ -626,6 +638,23 @@ EOF
     grep -iv 'bytes free\|BOOT *SD\|[0-9] files ' "$FITDIR/mdir.after" >"$FITDIR/mdir.after.rest"
     cmp -s "$FITDIR/mdir.before.rest" "$FITDIR/mdir.after.rest" || die "the boot partition's directory differs beyond BOOT.SD: $(diff "$FITDIR/mdir.before.rest" "$FITDIR/mdir.after.rest")"
     sed -n 's/^/[boot partition] /p' "$FITDIR/mdir.after"
+
+    # --bootargs: uEnv.txt carries `othbootargs=<args>`; an existing uEnv.txt
+    # keeps every other line
+    if [ -n "$BOOTARGS" ]; then
+        case "$BOOTARGS" in *[!A-Za-z0-9_.=,:/\ +-]*) die "--bootargs holds a character outside A-Za-z0-9_.=,:/+- and space: $BOOTARGS" ;; esac
+        : >"$FITDIR/uEnv.old"
+        if grep -qi '^uEnv *txt' "$FITDIR/mdir.before"; then
+            mcopy -i "$BOOTFAT" ::uEnv.txt "$FITDIR/uEnv.old" || die "mcopy cannot read uEnv.txt"
+            info "uEnv.txt exists on the boot partition: $(wc -c <"$FITDIR/uEnv.old") bytes, its othbootargs line is replaced"
+        fi
+        { grep -v '^othbootargs=' "$FITDIR/uEnv.old" || true; echo "othbootargs=$BOOTARGS"; } >"$FITDIR/uEnv.txt"
+        mcopy -o -i "$BOOTFAT" "$FITDIR/uEnv.txt" ::uEnv.txt || die "mcopy uEnv.txt failed"
+        mcopy -i "$BOOTFAT" ::uEnv.txt "$FITDIR/uEnv.back" || die "mcopy cannot read uEnv.txt back"
+        cmp -s "$FITDIR/uEnv.txt" "$FITDIR/uEnv.back" || die "uEnv.txt read back from the boot partition differs"
+        grep -qx "othbootargs=$BOOTARGS" "$FITDIR/uEnv.back" || die "uEnv.txt has no othbootargs=$BOOTARGS line"
+        info "uEnv.txt: othbootargs=$BOOTARGS"
+    fi
 
     # the kernel and DTB come back out of the FIT unchanged
     dumpimage -T flat_dt -p 0 -o "$FITDIR/out.kernel" "$FITDIR/boot.sd.back" >/dev/null 2>&1 || die "dumpimage cannot extract the kernel (image 0) from the FIT"
