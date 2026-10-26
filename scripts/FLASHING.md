@@ -58,7 +58,7 @@ the first boot takes its admin password from it, so nothing has to be read off t
 2. On m5sspro (where nik's sage key is), as one line: generate the seed, store it in sage
    FIRST, share it with the rook, only then write it to the card, and eject:
 
-       printf 'kvm1' > /Volumes/boot/hostname && S=$(openssl rand -base64 18) && printf '%s' "$S" | ~/.claude/bin/sage set --stdin secret /nik/devicecred/nanokvm/kvm1/admin && ~/.claude/bin/sage share /nik/devicecred/nanokvm/kvm1/admin rook-agent && ~/.claude/bin/sage sync && ~/.claude/bin/sage get /nik/devicecred/nanokvm/kvm1/admin > /Volumes/boot/initial.pass && unset S && sync && diskutil eject /Volumes/boot
+       printf 'kvm1' > /Volumes/boot/hostname && S=$(openssl rand -base64 18) && printf '%s' "$S" | ~/.claude/bin/sage set --stdin secret /nik/devicecred/nanokvm/kvm1/admin && ~/.claude/bin/sage share /nik/devicecred/nanokvm/kvm1/admin rook-agent && ~/.claude/bin/sage sync && ~/.claude/bin/sage get --show /nik/devicecred/nanokvm/kvm1/admin > /Volumes/boot/initial.pass && unset S && sync && diskutil eject /Volumes/boot
 
    The seed is 24 characters (at least 12 are required). `initial.pass` holds just the
    seed. If the file is shorter than 12 characters the device ignores it and falls back to
