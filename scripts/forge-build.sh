@@ -191,6 +191,23 @@ SHA256="$(tr -d ' \n' < "$TARBALL.sha256")"
 printf '%s' "$SHA256" | grep -qE '^[0-9a-f]{64}$' || die "bad sha256 in $TARBALL.sha256: '$SHA256'"
 [ "$SHA256" = "$(sha256sum "$TARBALL" | cut -d' ' -f1)" ] || die "sha256 file does not match the tarball"
 
+# The 12 MMF libraries in the package must be the exact bytes build-mmf.sh staged: nothing
+# between the build and the archive may swap or rewrite one (fail closed).
+log "verifying the MMF libraries inside $(basename "$TARBALL")"
+VERIFY_DIR="$HOME/pkg-verify"
+rm -rf "$VERIFY_DIR"
+mkdir -p "$VERIFY_DIR"
+tar -xzf "$TARBALL" -C "$VERIFY_DIR"
+for lib in libsys.so libcvi_bin.so libvpu.so libvenc.so libvdec.so libini.so libisp.so \
+           libcvi_bin_isp.so libisp_algo.so libae.so libaf.so libawb.so; do
+    src="$MMF_OUT/lib/$lib"
+    [ "$lib" = libini.so ] && src="$MMF_OUT/lib/3rd/libini.so"
+    shipped="$VERIFY_DIR/nanokvm_$VERSION/server/dl_lib/$lib"
+    printf '  %s  %s  %s\n' "$(sha256sum "$shipped" | cut -d' ' -f1)" "$(stat -c %s "$shipped")" "$lib"
+    cmp -s "$src" "$shipped" || die "$lib in the package is not the pinned build ($src)"
+done
+rm -rf "$VERIFY_DIR"
+
 # --- emulator build of the server (qemu, no cgo, no hardware) -------------------
 # Same pinned Go as above. The release server (server/build.sh) is a plain
 # `go build`; -trimpath is added so the binary carries no build-host paths.

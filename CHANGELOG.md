@@ -1,3 +1,10 @@
+## 2.6.25 (2026-10-26)
+
+### Changes
+
+* Build check: after packaging, `forge-build.sh` extracts the archive and requires the 12 MMF libraries inside to be byte-identical to what `build-mmf.sh` staged (fail closed), and `build-in-container.sh` prints their sha256 and size right after staging. 2.6.24 built green, but its blobs were the pin's files without debug sections, not the pin's bytes.
+* Not run on hardware
+
 ## 2.6.24 (2026-10-26)
 
 ### Changes
