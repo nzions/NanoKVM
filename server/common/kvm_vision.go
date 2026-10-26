@@ -99,11 +99,11 @@ func (k *KvmVision) ReadH264(width uint16, height uint16, bitRate uint16) (data 
 	return
 }
 
-func (k *KvmVision) SetHDMI(enable bool) int {
+func (k *KvmVision) SetHDMI(enable bool) HdmiSwitch {
 	k.mutex.RLock()
 	defer k.mutex.RUnlock()
 	if k.closed {
-		return -1
+		return HdmiSwitchFailed
 	}
 
 	hdmiEnable := C.uint8_t(0)
@@ -111,13 +111,15 @@ func (k *KvmVision) SetHDMI(enable bool) int {
 		hdmiEnable = C.uint8_t(1)
 	}
 
-	result := int(C.kvmv_hdmi_control(hdmiEnable))
-	if result < 0 {
+	switch C.kvmv_hdmi_control(hdmiEnable) {
+	case C.KVMV_HDMI_OK:
+		return HdmiSwitched
+	case C.KVMV_HDMI_NO_RESET_LINE:
+		return HdmiNoResetLine
+	default:
 		log.Errorf("failed to set hdmi to %t", enable)
-		return result
+		return HdmiSwitchFailed
 	}
-
-	return result
 }
 
 // hdmiWaitIntervalMs bounds one blocking wait. It is not a poll period: the

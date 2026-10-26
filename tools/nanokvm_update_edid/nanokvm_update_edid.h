@@ -26,7 +26,6 @@
 #define LT6911D_WR_SIZE         32              // LT6911D单次读写最大字节数
 
 #define VERSION_PATH "/etc/kvm/hdmi_version"
-#define PRODUCT_PATH "/etc/kvm/hw"
 
 typedef enum {
     CHIP_LT6911UXC = 0,
@@ -34,12 +33,5 @@ typedef enum {
     CHIP_LT6911D,
     CHIP_UNKNOWN
 } chip_version_t;
-
-typedef enum {
-    PRODUCT_CUBE_A = 0,
-    PRODUCT_CUBE_B,
-    PRODUCT_PCIE_A,
-    PRODUCT_UNKNOWN,
-} product_version_t;
 
 #endif  // NANOKVM_UPDATE_EDID_H

@@ -1,4 +1,5 @@
 #include "oled_ctrl.h"
+#include "internal/kvm_board.h"
 
 using namespace maix;
 using namespace maix::sys;
@@ -44,13 +45,12 @@ int oled_exist(void)
     // system("devmem 0x030010D0 32 0x2");
     // system("devmem 0x030010DC 32 0x2");
 
-	if(access("/etc/kvm/hw", F_OK) == 0){
-		uint8_t RW_Data[2];
-		FILE *fp = fopen("/etc/kvm/hw", "r");
-		fread(RW_Data, sizeof(char), 2, fp);
-		fclose(fp);
-		if(RW_Data[0] == 'b') kvm_hw_ver = 1;
-		else if(RW_Data[0] == 'p') kvm_hw_ver = 2;
+	// The board is detected once (and an unreadable /etc/kvm/hw reported) by
+	// the shared parser. UNKNOWN keeps the alpha OLED, the old default.
+	switch(kvm_board_get()->kind){
+	case KVM_BOARD_CUBE_BETA: kvm_hw_ver = 1; break;
+	case KVM_BOARD_PCIE:      kvm_hw_ver = 2; break;
+	default:                  kvm_hw_ver = 0; break;
 	}
 
 	uint8_t buf[2];

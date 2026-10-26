@@ -28,13 +28,13 @@ void* thread_oled_handle(void * arg)
 	OLED_Clear();
 	if(kvm_oled_state.ue_patch_state == 1){
 		kvm_show_UE();
-		while(kvm_sys_state.oled_thread_running){
+		while(KVM_FLAG_LOAD(kvm_sys_state.oled_thread_running) > 0){
 			time::sleep_ms(100);
 		}
 		OLED_Clear();
 	}
 
-    while(kvm_sys_state.oled_thread_running)
+    while(KVM_FLAG_LOAD(kvm_sys_state.oled_thread_running) > 0)
     {
 		oled_auto_sleep();
 		// printf("[kvmd]thread_oled_handle - while\n");
@@ -63,7 +63,7 @@ void* thread_oled_handle(void * arg)
 		time::sleep_ms(OLED_DELAY);
     }
 	OLED_Clear();
-	kvm_sys_state.oled_thread_running = -1;
+	KVM_FLAG_STORE(kvm_sys_state.oled_thread_running, -1);
 }
 
 void* thread_key_handle(void * arg)
@@ -72,11 +72,11 @@ void* thread_key_handle(void * arg)
 	uint32_t press_cycle;
 	int fd = open ("/dev/input/event0", O_RDONLY);
 	if (fd == -1) {
-		kvm_sys_state.key_thread_running = 0;
+		KVM_FLAG_STORE(kvm_sys_state.key_thread_running, 0);
 	}
 	struct input_event event;
 
-    while(kvm_sys_state.key_thread_running)
+    while(KVM_FLAG_LOAD(kvm_sys_state.key_thread_running))
     {
 		read (fd, &event, sizeof (event));
 		if (event.type == EV_KEY) {
@@ -152,7 +152,7 @@ void* thread_key_handle(void * arg)
 void* thread_sys_handle(void * arg)
 {
 	get_ping_allow_state();
-    while(kvm_sys_state.sys_thread_running)
+    while(KVM_FLAG_LOAD(kvm_sys_state.sys_thread_running))
     {
 		kvm_show_seed_password();
 		// net
@@ -176,17 +176,17 @@ void* thread_sys_handle(void * arg)
 		time::sleep_ms(STATE_DELAY);
 		auto_remove_temp_watchdog();
     }
-	kvm_sys_state.sys_thread_running = 0;
+	KVM_FLAG_STORE(kvm_sys_state.sys_thread_running, 0);
 }
 
 int main(int argc, char* argv[])
 {
     // Catch SIGINT signal(e.g. Ctrl + C), and set exit flag to true.
     signal(SIGINT, [](int sig){ 
-	kvm_sys_state.oled_thread_running = 0;
-	kvm_sys_state.key_thread_running = 0;
-	kvm_sys_state.sys_thread_running = 0;
-	app::set_exit_flag(true); 
+	KVM_FLAG_STORE(kvm_sys_state.oled_thread_running, 0);
+	KVM_FLAG_STORE(kvm_sys_state.key_thread_running, 0);
+	KVM_FLAG_STORE(kvm_sys_state.sys_thread_running, 0);
+	app::set_exit_flag(true);
 	log::info("[kvms]Prepare to exit\n");
 	});	
 
@@ -249,7 +249,7 @@ int main(int argc, char* argv[])
 	// while(!app::need_exit()){
 	uint8_t kvm_wd_count = 0;
 	int kvm_wd_state = 0;
-	while(kvm_sys_state.sys_thread_running){
+	while(KVM_FLAG_LOAD(kvm_sys_state.sys_thread_running)){
 		time::sleep_ms(1000);
 		if(watchdog_sf_is_open()){
 			kvm_wd_state = check_watchdog();
@@ -266,9 +266,17 @@ int main(int argc, char* argv[])
 			kvm_wd_count = 0;
 		}
 	}
-	kvm_sys_state.sys_thread_running = 0;
-	kvm_sys_state.oled_thread_running = 0;
-	kvm_sys_state.key_thread_running = 0;
-	while(kvm_sys_state.oled_thread_running != -1) time::sleep_ms(100);
+	KVM_FLAG_STORE(kvm_sys_state.sys_thread_running, 0);
+	KVM_FLAG_STORE(kvm_sys_state.oled_thread_running, 0);
+	KVM_FLAG_STORE(kvm_sys_state.key_thread_running, 0);
+	// Bounded: the OLED thread acknowledges with -1, but a thread that never
+	// started (or is stuck on the bus) must not hang the shutdown.
+	for(int waited = 0; KVM_FLAG_LOAD(kvm_sys_state.oled_thread_running) != -1; waited += 100){
+		if(waited >= KVM_OLED_STOP_WAIT_MS){
+			printf("[kvms]OLED thread did not stop in %d ms\n", KVM_OLED_STOP_WAIT_MS);
+			break;
+		}
+		time::sleep_ms(100);
+	}
 }
 

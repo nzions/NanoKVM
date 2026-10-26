@@ -18,6 +18,13 @@
 #include <fstream>
 #include <linux/input.h>
 
+// The *_thread_running flags are written by one thread and polled by others:
+// every access goes through these.
+#define KVM_FLAG_LOAD(f)        __atomic_load_n(&(f), __ATOMIC_ACQUIRE)
+#define KVM_FLAG_STORE(f, v)    __atomic_store_n(&(f), (v), __ATOMIC_RELEASE)
+// How long main waits for the OLED thread to acknowledge shutdown.
+#define KVM_OLED_STOP_WAIT_MS   5000
+
 #include "qr.h"
 #include "system_ctrl.h"
 #include "system_state.h"

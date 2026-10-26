@@ -67,6 +67,11 @@ void free_all_kvmv_data();
 void set_h264_gop(uint8_t _gop);
 void set_frame_detact(uint8_t _frame_detact);
 void kvmv_deinit();
+/* kvmv_hdmi_control results. NO_RESET_LINE is not a failure: the board (the
+ * Cube) has no software-driven LT6911 reset, nothing was switched. */
+#define KVMV_HDMI_OK            0
+#define KVMV_HDMI_NO_RESET_LINE 1
+#define KVMV_HDMI_ERROR         0xFF
 uint8_t kvmv_hdmi_control(uint8_t _en);
 
 /**********************************************************************************

@@ -12,6 +12,7 @@
 #include "kvm_vision.h"
 #include "internal/vi_state_writer.hpp"
 #include "internal/hdmi_int.h"
+#include "internal/kvm_board.h"
 
 #include <errno.h>
 #include <stdarg.h>
@@ -79,7 +80,6 @@ typedef struct {
     uint8_t thread_is_running = 0;
     uint8_t Auto_res = 0;
     uint8_t hdmi_version = 0;
-    uint8_t hw_version = 0;
     uint8_t hdmi_res_type = 0;
     uint8_t hdmi_res_err = 0;
     uint8_t venc_auto_recyc = 0;
@@ -574,7 +574,7 @@ void* watchdog_sf_feed(void * arg)
 {
     while(true)
     {
-        if(kvmv_cfg.try_exit_thread == 1)
+        if(__atomic_load_n(&kvmv_cfg.try_exit_thread, __ATOMIC_ACQUIRE) == 1)
             break;
         time::sleep_ms(500);
         if (watchdog_sf_is_open()){
@@ -1441,31 +1441,13 @@ void kvmv_deinit()
 
 uint8_t kvmv_hdmi_control(uint8_t _en)
 {
-    if(kvmv_cfg.hw_version == 0){
-
-        FILE *fp;
-	    uint8_t RW_Data[2];
-        if(access("/etc/kvm/hw", F_OK) == 0){
-            fp = fopen("/etc/kvm/hw", "r");
-            fread(RW_Data, sizeof(char), 1, fp);
-            fclose(fp);
-            switch(RW_Data[0]){
-                case 'a':
-                case 'b':
-                case 'p':
-                    kvmv_cfg.hw_version = RW_Data[0];
-                    break;
-                default :
-                    kvmv_cfg.hw_version = 'a';
-            }
-        }
-    }
+    const struct kvm_board *board = kvm_board_get();
     if(_en == 0){
         // Capture off: there is no signal. On the hardware that resets the
         // LT6911 hdmi_stopped is set first, so a probe already in flight
         // cannot overwrite this with a stale result (hdmi_apply checks it
         // under vi_mutex).
-        if(kvmv_cfg.hw_version == 'p'){
+        if(board->has_hdmi_reset){
             pthread_mutex_lock(&lt_mutex);
             __atomic_store_n(&hdmi_stopped, 1, __ATOMIC_RELEASE);
             pthread_mutex_unlock(&lt_mutex);
@@ -1475,26 +1457,27 @@ uint8_t kvmv_hdmi_control(uint8_t _en)
         hdmi_publish_locked(vi_inited, false);
         pthread_mutex_unlock(&vi_mutex);
     }
-    if(kvmv_cfg.hw_version != 'p'){
-        debug("[kvmv]Hardware not support!\n");
-        return -1;
+    if(!board->has_hdmi_reset){
+        // Not an error: this board has no reset line, nothing to switch.
+        debug("[kvmv]%s has no HDMI reset line\n", board->name);
+        return KVMV_HDMI_NO_RESET_LINE;
     }
-    // The LT6911 reset line is "hdmi-rst" (DT line name), owned by the
-    // kvmgpio daemon S15kvmhwd started; vendor sysfs gpio451 only when no
+    // The LT6911 reset line is the board's DT line name, owned by the
+    // kvmgpio daemon S15kvmhwd started; the board's sysfs pin only when no
     // line carries the name. A failure leaves the state machine untouched.
     if(_en == 0){
         // lt_mutex is held by the state machine for the whole of an LT6911
         // read, so taking it here waits for a read in flight and keeps the
         // machine off the bus while the chip is held in reset.
-        if(nk_gpio_set_held("hdmi-rst", 451, 0) != 0){
-            fprintf(stderr, "[kvmv]hdmi-rst: cannot hold the LT6911 in reset\n");
-            return -1;
+        if(nk_gpio_set_held(board->hdmi_reset_line, board->hdmi_reset_sysfs_fallback, 0) != 0){
+            fprintf(stderr, "[kvmv]%s: cannot hold the LT6911 in reset\n", board->hdmi_reset_line);
+            return KVMV_HDMI_ERROR;
         }
-        return 0;
+        return KVMV_HDMI_OK;
     } else {
-        if(nk_gpio_set_held("hdmi-rst", 451, 1) != 0){
-            fprintf(stderr, "[kvmv]hdmi-rst: cannot release the LT6911 reset\n");
-            return -1;
+        if(nk_gpio_set_held(board->hdmi_reset_line, board->hdmi_reset_sysfs_fallback, 1) != 0){
+            fprintf(stderr, "[kvmv]%s: cannot release the LT6911 reset\n", board->hdmi_reset_line);
+            return KVMV_HDMI_ERROR;
         }
         pthread_mutex_lock(&lt_mutex);
         __atomic_store_n(&hdmi_stopped, 0, __ATOMIC_RELEASE);
@@ -1506,7 +1489,6 @@ uint8_t kvmv_hdmi_control(uint8_t _en)
         kvmv_cfg.fresh_frame_count = fresh_frame_discard_count;
         // The chip came out of reset: have the state machine re-read it.
         hdmi_post_resync();
-        return 0;
+        return KVMV_HDMI_OK;
     }
-    return -1;
 }

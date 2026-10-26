@@ -413,7 +413,7 @@ static bool parse_hdmi_snapshot(const char *line, hdmi_snapshot_t *out)
 
 static void* thread_hdmi_snapshots(void *arg)
 {
-	while (kvm_sys_state.sys_thread_running) {
+	while (KVM_FLAG_LOAD(kvm_sys_state.sys_thread_running)) {
 		int fd = socket(AF_UNIX, SOCK_STREAM, 0);
 		if (fd < 0) {
 			usleep(HDMI_SOCKET_RETRY_US);

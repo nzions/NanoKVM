@@ -38,8 +38,8 @@ func (k *KvmVision) ReadH264(width uint16, height uint16, bitRate uint16) (data 
 	return nil, -1
 }
 
-func (k *KvmVision) SetHDMI(enable bool) int {
-	return -1
+func (k *KvmVision) SetHDMI(enable bool) HdmiSwitch {
+	return HdmiSwitchFailed
 }
 
 // WaitHDMI: there is no libkvm, so no snapshot will ever come.

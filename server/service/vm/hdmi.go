@@ -23,9 +23,9 @@ var (
 	hdmiDemand          = hdmistate.New()
 	hdmiStoppedForIdle  bool
 
-	// setHDMI reports whether libkvm switched capture (kvmv_hdmi_control
-	// returns 0 on success).
-	setHDMI            = func(enabled bool) bool { return common.GetKvmVision().SetHDMI(enabled) == 0 }
+	// setHDMI reports what libkvm did with the capture switch. A board with
+	// no reset line (the Cube) answers HdmiNoResetLine: not an error.
+	setHDMI            = func(enabled bool) common.HdmiSwitch { return common.GetKvmVision().SetHDMI(enabled) }
 	isHdmiDisabled     = utils.IsHdmiDisabled
 	getHdmiIdleTimeout = utils.GetHDMIIdleTimeout
 	hdmiHub            = hdmi.Default()
@@ -49,12 +49,15 @@ func CurrentHdmiSnapshot() hdmi.Snapshot {
 // The seq is read before the switch, so the answer to it cannot be missed.
 func setHdmiLocked(enabled bool) {
 	afterSeq := hdmiSnapshot().Seq
-	ok := setHDMI(enabled)
+	result := setHDMI(enabled)
 	if !enabled {
 		hdmiDemand.ClearWarming()
 		return
 	}
-	if ok {
+	// Only a real switch makes the state machine re-read the chip, so only
+	// that one can be waited on; a board without a reset line has nothing
+	// switched and nothing to warm.
+	if result == common.HdmiSwitched {
 		hdmiDemand.MarkWarming(afterSeq)
 	}
 }

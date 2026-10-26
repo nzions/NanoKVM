@@ -1,3 +1,11 @@
+## 2.6.12 (2026-10-26)
+
+### Changes
+
+* One board, detected once. `internal/kvm_board.h` (header-only, shared by libkvm, `kvm_system` and `nanokvm_update_edid`) reads `/etc/kvm/hw` once (`pthread_once`, checked I/O) into `struct kvm_board {kind, name, has_hdmi_reset, hdmi_reset_line, hdmi_reset_sysfs_fallback}` with `enum kvm_board_kind {UNKNOWN, CUBE_ALPHA, CUBE_BETA, PCIE}`. A missing, unreadable or unrecognised file is logged and the board is UNKNOWN (no reset line), not silently `alpha`. The reset line name `hdmi-rst`, its sysfs fallback pin (451) and the reset pulse (`KVM_HDMI_RESET_PULSE_US`, 100 ms) now live only there; libkvm's `hw_version`, the oled_ctrl parser and the edid tool's own `/etc/kvm/hw` parser are gone
+* The Cube is not an error: `kvmv_hdmi_control` returns `KVMV_HDMI_NO_RESET_LINE` on a board without a reset line (`KVMV_HDMI_ERROR` is now what the old `-1`, which Go read as 255, meant). The server maps the three results to `common.HdmiSwitch` and logs an error only for a real failure
+* Waits: `kvm_system` thread flags are read and written atomically, and the shutdown wait for the OLED thread has a 5 s deadline instead of looping forever; libkvm's watchdog thread reads `try_exit_thread` atomically
+
 ## 2.6.11 (2026-10-26)
 
 ### Fixes

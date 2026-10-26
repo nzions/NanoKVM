@@ -17,6 +17,7 @@
 
 #include "nanokvm_update_edid.h"
 #include "../../support/sg2002/additional/kvm/include/internal/kvm_gpio.h"
+#include "../../support/sg2002/additional/kvm/include/internal/kvm_board.h"
 
 
 int client;
@@ -85,15 +86,17 @@ int check_edid(uint8_t *edid_data, uint16_t edid_size)
 
 // =======================================================================================================
 
-// hdmi-rst is owned by the kvmgpio daemon (S15kvmhwd); the vendor kernel
-// (no line named hdmi-rst) falls back to sysfs gpio451. Fail closed: a reset
-// that did not happen must not be followed by an EDID write as if it had.
-int NanoKVM_PCIe_HDMI_Reset(void)
+// The reset line is the board's (kvm_board.h), owned by the kvmgpio daemon
+// (S15kvmhwd); the vendor kernel (no DT line of that name) falls back to the
+// board's sysfs pin. Fail closed: a reset that did not happen must not be
+// followed by an EDID write as if it had.
+int NanoKVM_HDMI_Reset(const struct kvm_board *board)
 {
-    if (nk_gpio_set_held("hdmi-rst", 451, 0) != 0) return -1;
-    usleep(100000);
-    if (nk_gpio_set_held("hdmi-rst", 451, 1) != 0) return -1;
-    usleep(100000);
+    if (!board->has_hdmi_reset) return -1;
+    if (nk_gpio_set_held(board->hdmi_reset_line, board->hdmi_reset_sysfs_fallback, 0) != 0) return -1;
+    usleep(KVM_HDMI_RESET_PULSE_US);
+    if (nk_gpio_set_held(board->hdmi_reset_line, board->hdmi_reset_sysfs_fallback, 1) != 0) return -1;
+    usleep(KVM_HDMI_RESET_PULSE_US);
     return 0;
 }
 
@@ -751,13 +754,13 @@ int lt6911_edid_config(chip_version_t chip_version, uint8_t *edid_data, uint16_t
 
 // =======================================================================================================
 
-void print_warning(product_version_t product_version) {
+void print_warning(const struct kvm_board *board) {
     printf("\n=========================================================\n");
     printf("Incorrect EDID may cause issues such as \n");
     printf("inability to display images, please modify with caution\n");
     printf("=========================================================\n\n");
 
-    if (product_version == PRODUCT_CUBE_A || product_version == PRODUCT_CUBE_B) {
+    if (!board->has_hdmi_reset) {
         printf("\n==========================================================\n");
         printf("⚠️  WARNING: Hardware version detected as Cube/Lite!\n");
         printf("==========================================================\n");
@@ -768,10 +771,10 @@ void print_warning(product_version_t product_version) {
     }
 }
 
-void print_success(product_version_t product_version) {
+void print_success(const struct kvm_board *board) {
     printf("\n=========================================================\n");
     printf("✅  EDID update successful!\n");
-    if (product_version == PRODUCT_CUBE_A || product_version == PRODUCT_CUBE_B) {
+    if (!board->has_hdmi_reset) {
         printf("Please manually power cycle the device to apply changes.\n");
     }
     printf("=========================================================\n\n");
@@ -816,9 +819,7 @@ int main(int argc, char *argv[]) {
 
     // Check version
     chip_version_t chip_version = CHIP_UNKNOWN;
-    product_version_t product_version = PRODUCT_UNKNOWN;
     char chip_version_str[32] = {0};
-    char product_version_str[32] = {0};
 
     FILE *file = fopen(VERSION_PATH, "r");
     if (file == NULL) {
@@ -833,21 +834,7 @@ int main(int argc, char *argv[]) {
     }
     fclose(file);
 
-    file = fopen(PRODUCT_PATH, "r");
-    if (file == NULL) {
-        fprintf(stderr, "Please upgrade to the latest system\n");
-        return 1;
-    }
-
-    if (fgets(product_version_str, sizeof(product_version_str), file) == NULL) {
-        fprintf(stderr, "Failed to read product version\n");
-        fclose(file);
-        return 1;
-    }
-    fclose(file);
-
     chip_version_str[strcspn(chip_version_str, "\n")] = '\0';
-    product_version_str[strcspn(product_version_str, "\n")] = '\0';
 
     if (strcmp(chip_version_str, "c") == 0) {
         fprintf(stdout, "Chip Version: LT6911C\n");
@@ -866,22 +853,15 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if (strcmp(product_version_str, "alpha") == 0) {
-        fprintf(stdout, "Product Version: CUBE_A\n");
-        product_version = PRODUCT_CUBE_A;
-    } else if (strcmp(product_version_str, "beta") == 0) {
-        fprintf(stdout, "Product Version: CUBE_B\n");
-        product_version = PRODUCT_CUBE_B;
-    } else if (strcmp(product_version_str, "pcie") == 0) {
-        fprintf(stdout, "Product Version : PCIE_A\n");
-        product_version = PRODUCT_PCIE_A;
-    } else {
+    const struct kvm_board *board = kvm_board_get();
+    if (board->kind == KVM_BOARD_UNKNOWN) {
         fprintf(stderr, "Product Version Error: Unknown version\n");
         return 1;
     }
+    fprintf(stdout, "Product Version: %s\n", board->name);
 
-    print_warning(product_version);
-    if (product_version == PRODUCT_CUBE_A || product_version == PRODUCT_CUBE_B) {
+    print_warning(board);
+    if (!board->has_hdmi_reset) {
         if (get_user_confirmation() == 0) {
             return EXIT_FAILURE;
         }
@@ -905,8 +885,8 @@ int main(int argc, char *argv[]) {
     }
     fprintf(stdout, "EDID data loaded successfully from %s\n", argv[1]);
 
-    if (product_version == PRODUCT_PCIE_A && NanoKVM_PCIe_HDMI_Reset() != 0) {
-        fprintf(stderr, "Failed to reset the LT6911 (hdmi-rst)\n");
+    if (board->has_hdmi_reset && NanoKVM_HDMI_Reset(board) != 0) {
+        fprintf(stderr, "Failed to reset the LT6911 (%s)\n", board->hdmi_reset_line);
         return EXIT_FAILURE;
     }
 
@@ -916,12 +896,12 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (product_version == PRODUCT_PCIE_A && NanoKVM_PCIe_HDMI_Reset() != 0) {
-        fprintf(stderr, "Failed to reset the LT6911 (hdmi-rst)\n");
+    if (board->has_hdmi_reset && NanoKVM_HDMI_Reset(board) != 0) {
+        fprintf(stderr, "Failed to reset the LT6911 (%s)\n", board->hdmi_reset_line);
         return EXIT_FAILURE;
     }
 
-    print_success(product_version);
+    print_success(board);
 
     return EXIT_SUCCESS;
 }
