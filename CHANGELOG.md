@@ -1,3 +1,11 @@
+## 2.5.17 (2026-10-26)
+
+### Changes
+
+* libkvm: `debug()` forwards its arguments (`vprintf`); it printed the raw format string and dropped every value
+* libkvm: the watchdog and VI-detection thread functions return `NULL` on exit (they fell off the end of a `void*` function)
+* libkvm: the post-idle frame discard (`fresh_frame_discard_count`) runs in its own bounded loop and no longer spends the read's try budget (`KVMV_MAX_TRY_NUM`), so the first read after enabling HDMI does not give up with "image not exist" before the stale frames are consumed
+
 ## 2.5.16 (2026-10-26)
 
 ### Changes

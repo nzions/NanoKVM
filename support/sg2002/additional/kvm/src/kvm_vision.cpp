@@ -14,6 +14,7 @@
 #include "internal/vi_state_writer.hpp"
 
 #include <errno.h>
+#include <stdarg.h>
 #include <sys/stat.h>
 
 #define default_venc_chn        1
@@ -209,7 +210,10 @@ static void set_hdmi_detection_state(uint8_t active)
 void debug(const char *format, ...)
 {
     if(debug_en){
-        printf(format);
+        va_list args;
+        va_start(args, format);
+        vprintf(format, args);
+        va_end(args);
     }
 }
 
@@ -1133,6 +1137,7 @@ void* watchdog_sf_feed(void * arg)
             vision_update_watchdog();
         }
     }
+    return NULL;
 }
 
 void get_hdmi_version()
@@ -1443,6 +1448,7 @@ void* vi_subsystem_detection(void * arg)
 		time::sleep_ms(10);
     }
     kvmv_cfg.thread_is_running = 0;
+    return NULL;
 }
 
 int sync_vi_res()
@@ -1845,17 +1851,19 @@ int kvmv_read_img(uint16_t _width, uint16_t _height, uint8_t _type, uint16_t _ql
         image::Image *img = cam->read();
         // debug("[kvmv]read img: %d \r\n", (int)(time::time_ms() - start_time));
 
-        if(img != NULL){
-            if(kvmv_cfg.fresh_frame_count != 0){
-                // Do not restart VI after HDMI idle. Reopening the MMF
-                // channel can exhaust the carveout heap when the detector
-                // thread is also transitioning. Consume queued frames
-                // instead; the camera buffer contains at most three frames.
-                kvmv_cfg.fresh_frame_count--;
-                delete img;
-                continue;
-            }
+        // Do not restart VI after HDMI idle. Reopening the MMF
+        // channel can exhaust the carveout heap when the detector
+        // thread is also transitioning. Consume queued frames
+        // instead; the camera buffer contains at most three frames.
+        // Discard in its own bounded loop (fresh_frame_count only ever
+        // decrements) so that it does not spend the try_num budget.
+        while(img != NULL && kvmv_cfg.fresh_frame_count != 0){
+            kvmv_cfg.fresh_frame_count--;
+            delete img;
+            img = cam->read();
+        }
 
+        if(img != NULL){
             // frame detect
             if(_type == VENC_MJPEG && kvmv_cfg.frame_detact != 0){
                 if(kvmv_cfg.stream_stop == 0){
