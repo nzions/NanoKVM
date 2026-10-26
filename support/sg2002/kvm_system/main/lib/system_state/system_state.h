@@ -33,7 +33,7 @@ void kvm_update_eth_state(void);
 void kvm_update_wifi_state(void);
 void kvm_update_rndis_state(void);
 void kvm_update_tailscale_state(void);
-uint8_t ion_free_space(void);
+
 int get_nic_state(const char* interface_name);
 int create_temp_watchdog(void);
 void rm_temp_watchdog(void);

@@ -213,51 +213,13 @@ int vision_update_watchdog()
     fclose(file);
     return 1;
 }
-
-/* return :
- * 0 : error
- * 1 : out of mem
- * 2 : normal
-*/
-uint8_t chack_ion()
-{
-    // Reads the first "usage rate:" line of the ion summary and takes its
-    // second whitespace-separated field, as the former
-    // `grep "usage rate:" | awk '{print $2}'` pipeline printed it.
-    static const char ion_summary_path[] = "/sys/kernel/debug/ion/cvi_carveout_heap_dump/summary";
-    char line[256];
-    char RW_Data[10] = {0};
-    uint8_t ATOI_Data[3] = {0};
-    uint8_t ion_usage_rate;
-    FILE* fp = fopen(ion_summary_path, "r");
-    if ( NULL == fp )
-    {
-        return 0;
-    }
-    while (fgets(line, sizeof(line), fp) != NULL)
-    {
-        if (strstr(line, "usage rate:") == NULL) continue;
-        const char *p = line;
-        p += strspn(p, " \t\r\n");
-        p += strcspn(p, " \t\r\n");
-        p += strspn(p, " \t\r\n");
-        size_t n = strcspn(p, " \t\r\n");
-        // awk printed the field plus a newline; the old read kept at most 7 chars of it
-        snprintf(RW_Data, 8, "%.*s\n", (int)n, p);
-        break;
-    }
-    fclose(fp);
-    RW_Data[8] = 0;
-    if (RW_Data[6] == '&') return 1;
-    else {
-        ATOI_Data[0] = RW_Data[5];
-        ATOI_Data[1] = RW_Data[6];
-    }
-    ion_usage_rate = atoi((char*)ATOI_Data);
-
-    if(ion_usage_rate >= 95) return 1;
-    else return 2;
-}
+/*
+ * No ION usage check: the 7.3 kernel has no /sys/kernel/debug/ion/
+ * cvi_carveout_heap_dump/summary (its ION compat is dma-buf on the sys CMA
+ * pool and exports no usage node), so the old "usage rate >= 95% -> reboot"
+ * watchdog check could never fire and is removed rather than left to fail
+ * silently.
+ */
 
 // Classifies the size the chip sends down the CSI link and logs it.
 static uint8_t classify_csi_res(struct lt6911_res csi, uint16_t *p_width, uint16_t *p_height)
@@ -294,10 +256,6 @@ void* watchdog_sf_feed(void * arg)
             break;
         time::sleep_ms(500);
         if (watchdog_sf_is_open()){
-            if (chack_ion() == 1){
-                debug("[kvmv] Ion memory is full reboot now!\n");
-                system("reboot");
-            }
             // debug("[kvmv] watchdog_sf_feed now!\n");
             vision_update_watchdog();
         }

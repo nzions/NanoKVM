@@ -576,12 +576,6 @@ void kvm_update_tailscale_state(void)
 
 //============================================================================
 
-uint8_t ion_free_space(void)
-{
-	//cat /sys/kernel/debug/ion/cvi_carveout_heap_dump/summary | grep "usage rate:" | awk '{print $2}'
-
-	return 0;
-}
 
 int create_temp_watchdog(void) 
 {

@@ -1,3 +1,10 @@
+## 2.6.20 (2026-10-26)
+
+### Changes
+
+* The ION debugfs readers are gone: `/sys/kernel/debug/ion/cvi_carveout_heap_dump/summary` does not exist on the 7.3 kernel (its ION compat, `cvi_ion.c` in kernel-nanokvm-sg2002, is dma-buf on the sys CMA pool and creates no debugfs node), so all three readers were dead. `kvm_mmf` lost the ION leak scan (`_free_leak_memory_of_ion`; the kernel frees a dead process's dma-bufs on fd close; the VB scan of `/proc/cvitek/vb` stays), `kvm` lost the "ION usage >= 95% -> reboot" watchdog check (`chack_ion`, which returned 0 and never fired), and `kvm_system` lost the empty `ion_free_space` stub.
+* Not run on hardware
+
 ## 2.6.19 (2026-10-26)
 
 ### Changes

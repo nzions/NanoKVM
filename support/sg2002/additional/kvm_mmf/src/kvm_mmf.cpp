@@ -287,84 +287,15 @@ static SAMPLE_VI_CONFIG_S g_stViConfig;
 static SAMPLE_INI_CFG_S g_stIniCfg;
 static CVI_S32 _mmf_vpss_deinit_new(VPSS_GRP VpssGrp);
 
-static int _free_leak_memory_of_ion(void)
-{
-	#define MAX_LINE_LENGTH 256
-    FILE *fp;
-    char line[MAX_LINE_LENGTH];
-    char alloc_buf_size_str[20], phy_addr_str[20], buffer_name[20];
-    #define MMF_SCAN_FIELD	"%19s"	/* sizeof the three buffers above, less the NUL */
-    int alloc_buf_size;
-	uint64_t phy_addr;
-	#define MMF_LEAK_MAX 32
-	struct sys_ion_data_new leaks[MMF_LEAK_MAX];
-	int leak_cnt = 0, leak_overflow = 0, scan_failed = 0, free_failed = 0;
-
-    fp = fopen("/sys/kernel/debug/ion/cvi_carveout_heap_dump/summary", "r");
-    if (fp == NULL) {
-        fprintf(stderr, "Error opening file\n");
-        return 1;
-    }
-
-    while (fgets(line, MAX_LINE_LENGTH, fp) != NULL) {
-        if (sscanf(line, "%*d " MMF_SCAN_FIELD " " MMF_SCAN_FIELD " %*d " MMF_SCAN_FIELD, alloc_buf_size_str, phy_addr_str, buffer_name) == 3) {
-			printf("[ION] %s  %s  %s\r\n", alloc_buf_size_str, phy_addr_str, buffer_name);
-			// ISP_SHARED_BUFFER_0 may still be owned by kvm_system while the
-			// server starts. Releasing it here makes SAMPLE_PLAT_VI_INIT fail.
-			if (strcmp(buffer_name, "VI_DMA_BUF"))
-				continue;
-			if (leak_cnt >= MMF_LEAK_MAX) {
-				printf("[ION] more than %d leaked VI_DMA_BUF entries, rest ignored\r\n", MMF_LEAK_MAX);
-				leak_overflow = 1;
-				continue;
-			}
-			struct sys_ion_data_new ion_data = {
-				.cached = 1,
-				.dmabuf_fd = (uint32_t)-1,
-			};
-
-            alloc_buf_size = atoi(alloc_buf_size_str);
-            phy_addr = (unsigned int)strtol(phy_addr_str, NULL, 16);
-
-			ion_data.size = alloc_buf_size;
-			ion_data.addr_p = phy_addr;
-			memset(ion_data.name, 0, sizeof(ion_data.name));
-			snprintf((char *)ion_data.name, sizeof(ion_data.name), "%s", buffer_name);
-
-            printf("alloc_buf_size(%s): %d, phy_addr(%s): %#lx, buffer_name: %s\n",
-						alloc_buf_size_str, alloc_buf_size, phy_addr_str, phy_addr, buffer_name);
-
-			printf("ion_data.size:%d, ion_data.addr_p:%#x, ion_data.name:%s\r\n", ion_data.size, (int)ion_data.addr_p, ion_data.name);
-
-			leaks[leak_cnt++] = ion_data;
-        }
-    }
-
-    if (ferror(fp)) {
-        fprintf(stderr, "Error reading ion summary\n");
-        scan_failed = 1;
-    }
-    if (fclose(fp) != 0) {
-        fprintf(stderr, "Error closing ion summary\n");
-        scan_failed = 1;
-    }
-
-	/* Scan is over: free what was collected, then tear down once. */
-	for (int i = 0; i < leak_cnt; i++) {
-		int res = ionFree(&leaks[i]);
-		if (res) {
-			printf("ionFree failed! res:%#x\r\n", res);
-			free_failed = 1;
-		}
-	}
-
-	if (free_failed) {
-		mmf_deinit();
-		return -1;
-	}
-
-	return (scan_failed || leak_overflow) ? -1 : 0;
-}
+/*
+ * There is no ION leak scan on the 7.3 kernel. Its ION compat (cvi_ion.c in
+ * the kernel-nanokvm-sg2002 image) hands out dma-buf fds backed by the sys
+ * CMA pool and creates no debugfs node: /sys/kernel/debug/ion/
+ * cvi_carveout_heap_dump/summary does not exist, and the kernel releases a
+ * dead process's buffers when its fds close. The scan that read that node
+ * (and silently did nothing without it) is gone; VB pools are still scanned
+ * from /proc/cvitek/vb below.
+ */
 
 static int _free_leak_memory_of_vb(void) {
 	#define MAX_LINE_LENGTH 256
@@ -1034,10 +965,6 @@ static CVI_S32 _mmf_init(void)
 	/************************************************
 	 * step3:  Init modules
 	 ************************************************/
-	if (0 != _free_leak_memory_of_ion()) {
-		SAMPLE_PRT("free leak ion memory error\n");
-	}
-
 	if (0 != _free_leak_memory_of_vb()) {
 		SAMPLE_PRT("free leak vb memory error\n");
 	}
