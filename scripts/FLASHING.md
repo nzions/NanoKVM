@@ -75,5 +75,4 @@ the first boot takes its admin password from it, so nothing has to be read off t
    `initial.pass` is still on the card after a minute or two of running, the device could
    not remove it: delete it yourself and report it.
 6. If it never comes up on the network after a few minutes, report it. The image has not been
-   boot-tested on hardware before; it cannot run under qemu. after a few minutes, report it. The image has not been
    boot-tested on hardware before; it cannot run under qemu.
