@@ -7,7 +7,7 @@ default, or `kvm_vision_test`, the name of the MaixCDK carrier project the libra
 from), each in its own build tree (`scripts/build-maixlite.sh`).
 
 This is a **trimmed vendor copy** of [Sipeed/MaixCDK](https://github.com/sipeed/MaixCDK) at
-commit `30f4b8b7e3f66ded9cfa64fb081b46e30bc27248` (the `MAIXCDK_COMMIT` of `docker/Dockerfile`),
+commit `30f4b8b7e3f66ded9cfa64fb081b46e30bc27248`,
 holding only what they compile: the `basic`, `peripheral`, `ini`, `ntp_client` and
 `yaml` (yaml-cpp) components, platform maixcam, plus the header directories on their include
 paths. 153 files plus MaixCDK's `LICENSE` (Apache-2.0). yaml-cpp (MIT) and ntp_client keep

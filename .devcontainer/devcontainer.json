@@ -1,11 +1,11 @@
-// Dev container for NanoKVM: Go cross-compilation, MaixCDK C support layer
+// Dev container for NanoKVM: Go cross-compilation, C support layer
 // and web frontend in a single container. See "Development" in README.md.
 {
   "name": "NanoKVM",
   "build": {
     "dockerfile": "Dockerfile"
   },
-  // The Makefile and support/sg2002/build expect the repository at
+  // The Makefile and scripts/build-in-container.sh expect the repository at
   // ~/NanoKVM of the baked-in "build" user -- mount it exactly there.
   "workspaceMount": "source=${localWorkspaceFolder},target=/home/build/NanoKVM,type=bind,consistency=cached",
   "workspaceFolder": "/home/build/NanoKVM",
@@ -15,12 +15,7 @@
   // mount stays writable. The remap chowns /home/build once, which makes
   // the first container creation noticeably slower.
   "updateRemoteUserUID": true,
-  // Equivalent of `. ~/MaixCDK/bin/activate` for every process spawned in
-  // the container, interactive or not (tasks, extensions, exec).
-  "remoteEnv": {
-    "VIRTUAL_ENV": "/home/build/MaixCDK",
-    "PATH": "/home/build/MaixCDK/bin:${containerEnv:PATH}"
-  },
+
   "forwardPorts": [3001],
   "portsAttributes": {
     "3001": {

@@ -1,3 +1,11 @@
+## 2.6.43 (2026-10-26)
+
+### Changes
+
+* Every MaixCDK leftover is removed; the three binaries are unchanged. `scripts/forge-build.sh` no longer copies `/opt/maixcdk`, activates its venv or rewrites `maixcam.yaml`, and `.build.json` no longer requires `maixcdk`. Deleted: the MaixCDK dev script `support/sg2002/build`, the carrier project `support/sg2002/kvm_vision_test/`, the MaixCDK `CMakeLists.txt` and `Kconfig` of `support/sg2002/additional/{kvm,kvm_mmf,vision}` (the plain CMake under `support/sg2002/maixlite/libs/` builds them), and the unreferenced `support/sg2002/additional/sophgo-middleware` sample copy (`additional/kvm_mmf/pin/sample_common_sensor.c` is the one built). `docker/Dockerfile` drops the MaixCDK/venv stage; the Makefile loses the `support` and `vision` targets (`all` is `release-build`); the dev container, the builder workflow, `.gitignore`, `.dockerignore` and the READMEs lose their MaixCDK steps.
+* `scripts/forge-build.sh` fails closed: the build exits non-zero if `$HOME/MaixCDK` exists (before or after the build), if the environment references MaixCDK, or if the build log contains a `Downloading` line or a MaixCDK path.
+* Not run on hardware
+
 ## 2.6.42 (2026-10-26)
 
 ### Changes

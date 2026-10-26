@@ -10,15 +10,15 @@
     "       -tags nokvm swaps common/kvm_vision.go (cgo, links the riscv64-only dl_lib/libkvm.so) for its stub.",
     "build  the riscv64 release, the same steps `make release` runs in docker, without docker. Runs in the",
     "       `c` image (forge-c >= 1.26 carries the NanoKVM toolchains at /opt, opt-in: Sophgo host-tools,",
-    "       MaixCDK + venv, Go 1.26.0, Node + pnpm). scripts/forge-build.sh does the work and writes",
+    "       Go 1.26.0, Node + pnpm). scripts/forge-build.sh does the work and writes",
     "       /artifacts/<version>/{nanokvm_<version>.tar.gz, latest.json, nanokvm_<version>.tar.gz.sha256};",
     "       /artifacts is the repo's artifacts share (/data/nfs/artifacts/nanokvm on beefy). A published",
     "       version is never overwritten with different bytes. The result is UNSIGNED: sign the printed",
     "       sha256 with keymaster_sign_digest kind=app name=nanokvm-<version>-riscv64 (scripts/README.md).",
     "       The version comes from CHANGELOG.md (or an exact numeric git tag, or $NANOKVM_VERSION).",
     "       `bash`, not `sh`: the script and build-in-container.sh use bash.",
-    "       MaixCDK downloads its own toolchain and component packages at build time, so the run needs",
-    "       network and takes a while; 8 CPUs / 8g is a first guess, forge_stats will say what it used."
+    "       The build uses no MaixCDK and downloads nothing (forge-build.sh fails closed if it does);",
+    "       8 CPUs / 8g is a first guess, forge_stats will say what it used."
   ],
   "build": {
     "check": {
@@ -34,7 +34,6 @@
       "memory": "8g",
       "requires": [
         "go-nanokvm",
-        "maixcdk",
         "sg2002-host-tools",
         "node",
         "pnpm"

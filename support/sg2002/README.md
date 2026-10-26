@@ -1,26 +1,22 @@
 # NanoKVM Support Instructions
 
-## Environment Preparation
-1. NanoKVM-Lite/Full/PCIe is based on the SG2002 as the main control chip. The projects in the support section are compiled under the [MaixCDK](https://github.com/sipeed/MaixCDK) framework. Before compiling, please ensure that the `MaixCDK` environment is correctly configured. For configuration instructions, click [here](https://github.com/sipeed/MaixCDK/blob/main/docs/doc_zh/README.md).
+NanoKVM-Lite/Full/PCIe is based on the SG2002 as the main control chip. The programs in the
+support section are built with plain CMake and the Sophgo riscv64 musl cross compiler
+(`riscv64-unknown-linux-musl-gcc`, in the builder image or on forge). MaixCDK is not used and
+nothing is downloaded at build time.
 
-## kvm_system Compilation Instructions
+## What is here
 
-> The `kvm_system` is responsible for monitoring the NanoKVM system status, system updates, screen key drivers, and a few system functions, compiled with MaixCDK.
+- `kvm_system/main`: the `kvm_system` daemon. It monitors the NanoKVM system status, handles
+  system updates, the screen key drivers and a few system functions.
+- `additional/kvm`, `additional/kvm_mmf`, `additional/vision`: the sources of `libkvm.so` and
+  `libkvm_mmf.so`, the image acquisition and encoding subsystem the Go server calls.
+- `additional/peripheral`: NanoKVM's own `maix_i2c.cpp`.
+- `maixlite/`: the CMake projects that build all of the above (a trimmed vendor copy of the
+  MaixCDK sources they compile; see `maixlite/README.md`).
 
-1. Before compiling, please ensure that the above-mentioned `MaixCDK` environment is correctly configured.
-2. Modify the paths of `MAIXCDK_PATH` and `NanoKVM_PATH` in `./build`.
-3. Execute `./build kvm_system` to compile `kvm_system`.
-4. Use `scp ./kvm_system/dist/kvm_system_release/kvm_system root@192.168.x.x:/kvmapp/kvm_system` to copy it to NanoKVM for testing.
-5. Use `./build add_to_kvmapp` to place the executable file into the `/kvmapp` installation package.
-6. Use `./build kvm_system clean` to clean the compilation of `kvm_system`.
+## Building
 
-## kvm_vision Compilation Instructions
-
-> `kvm_vision` refers to the image acquisition and encoding subsystem of NanoKVM, compiled with MaixCDK to produce dynamic libraries for Go calls. Use `kvm_vision_test` to compile and test the dynamic library.
-
-1. Before compiling, please ensure that the above-mentioned `MaixCDK` environment is correctly configured.
-2. Modify the paths of `MAIXCDK_PATH` and `NanoKVM_PATH` in `./build`.
-3. Execute `./build kvm_vision` to compile `kvm_vision_test`.
-4. You can test the dynamic libraries in `kvm_vision_test/dist/kvm_vision_test_release/dl_lib/`.
-5. Use `./build add_to_kvmapp` to place the dynamic libraries into the `/kvmapp` installation package.
-6. Use `./build kvm_vision clean` to clean the compilation of `kvm_vision`.
+`kvm_system`, `libkvm.so` and `libkvm_mmf.so` are built by `scripts/build-maixlite.sh`, which
+`scripts/build-in-container.sh` runs as part of `make release-build` (docker) and
+`scripts/forge-build.sh` (forge). See `scripts/README.md` and `maixlite/README.md`.

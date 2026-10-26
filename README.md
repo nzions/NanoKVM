@@ -93,12 +93,12 @@ Start with the guide that matches the part of NanoKVM you want to work on:
 
 ### Dev container (optional)
 
-The repository ships a [Dev Container](https://containers.dev) setup (`.devcontainer/`) that layers the frontend toolchain (Node 22, pnpm 11) on top of the release builder image (RISC-V cross toolchain, Go, MaixCDK), so one container covers Go, C support-layer and web development. It is a convenience for IDE users; the `make` targets in the repository root remain the canonical CLI workflow.
+The repository ships a [Dev Container](https://containers.dev) setup (`.devcontainer/`) that layers the frontend toolchain (Node 22, pnpm 11) on top of the release builder image (RISC-V cross toolchain, Go), so one container covers Go, C support-layer and web development. It is a convenience for IDE users; the `make` targets in the repository root remain the canonical CLI workflow.
 
 - Requirements: Docker plus an editor or CLI with dev container support (e.g. the VS Code "Dev Containers" extension, or `devcontainer up`).
-- On creation the container prepares itself automatically: `support/sg2002/build update_lib` (resyncs MaixCDK components with the checkout) and `pnpm install` for the frontend.
+- On creation the container prepares itself automatically: `pnpm install` for the frontend.
 - Backend: run `server/build.sh` for a release-equivalent binary (BoringCrypto + `dl_lib` RPATH). `make app` builds a plain development binary without those, so prefer `server/build.sh` whenever the result should match a release.
-- Support layer: `cd support/sg2002 && ./build kvm_system` (the MaixCDK virtualenv is part of the container environment).
+- Support layer: `make release-build` builds `kvm_system`, `libkvm.so` and `libkvm_mmf.so` (plain CMake, `scripts/build-maixlite.sh`) with the rest of the riscv64 artifacts.
 - Frontend: `cd web && pnpm dev` (VS Code forwards port 3001 automatically; other clients may need to map it themselves); see [web/README.md](web/README.md) for pointing it at a device.
 - The base image `ghcr.io/sipeed/nanokvm-builder:latest` is x86-64 only; on Apple Silicon it runs under emulation (works, but C builds are slow). You can also build the image locally first (`make builder-image`) and point the `BASE_IMAGE` build arg at it (e.g. via `build.args` in `devcontainer.json`). On Linux hosts the first container creation also takes a while: the container user is remapped to your uid, which re-chowns its home directory once.
 - Hardware-dependent verification still requires a real NanoKVM device; the container covers compiling, linting and mock-mode web development only.
@@ -115,7 +115,7 @@ The NanoKVM Cube/PCIe hardware is built from these components:
 - **NanoKVM-A board:** Provides OLED, ATX control output through USB-C, auxiliary power, and physical ATX power/reset buttons.
 - **NanoKVM-B board:** Connects NanoKVM-A to the host computer's ATX pins for remote power control.
 
-The NanoKVM image is built with the LicheeRV Nano SDK and MaixCDK. It is intended for NanoKVM hardware and is not a general-purpose KVM software package for other LicheeRV Nano or SG2002 products. If you want to build an HDMI input application on LicheeRV Nano or MaixCam, please contact us for technical support.
+The NanoKVM image is built with the LicheeRV Nano SDK. It is intended for NanoKVM hardware and is not a general-purpose KVM software package for other LicheeRV Nano or SG2002 products. If you want to build an HDMI input application on LicheeRV Nano or MaixCam, please contact us for technical support.
 
 > Note: Of the 256MB memory on SG2002, 158MB is currently allocated to the multimedia subsystem for video capture and processing.
 

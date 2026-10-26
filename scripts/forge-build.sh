@@ -11,18 +11,18 @@
 #   1. scripts/build-in-container.sh   kvm_system, libkvm.so, NanoKVM-Server
 #   2. web: pnpm install --frozen-lockfile && pnpm build
 #   3. scripts/package.sh <version>    nanokvm_<ver>.tar.gz + latest.json
-# plus an evidence bundle of the MaixCDK-built binaries and toolchain (published as
-# <version>/evidence/, not packaged; scripts/binprint.sh). MaixCDK downloads NOTHING: its
-# toolchain is the image's /opt/sg2002/host-tools and the build fails if anything is fetched.
-# and then publishes the result to /artifacts/<version>/. Everything is written
-# under $HOME (a private copy of the tree and of MaixCDK) and /artifacts.
+# plus an evidence bundle of the binaries and toolchain (published as <version>/evidence/,
+# not packaged; scripts/binprint.sh), and then publishes the result to /artifacts/<version>/.
+# MaixCDK is not used at all: the build fails if $HOME/MaixCDK exists, if the environment
+# points into a MaixCDK tree, or if the build log shows a download or a MaixCDK path.
+# Everything is written under $HOME (a private copy of the tree) and /artifacts.
 #
 # The toolchains are baked into the image at fixed paths and are NOT on its
 # default PATH (they are opt-in); this script puts them on PATH for this run:
 #   /opt/go-nanokvm         Go 1.26.0 (the pin of docker/Dockerfile)
 #   /opt/sg2002/host-tools  Sophgo riscv64-linux-musl gcc (cgo for the server)
 #   /opt/node               Node 22 + pnpm 11 (web/)
-#   /opt/maixcdk            MaixCDK at a pinned commit, with its python venv
+
 #
 # VERSION (first match wins):
 #   1. $NANOKVM_VERSION                       explicit override
@@ -48,7 +48,6 @@ if [ "${FORGE_SCOPE:-}" = scripts ]; then
     exec bash "$SRC/scripts/forge-sdimage.sh"
 fi
 
-MAIXCDK_SRC=/opt/maixcdk
 GO_ROOT=/opt/go-nanokvm
 HOST_TOOLS_BIN=/opt/sg2002/host-tools/gcc/riscv64-linux-musl-x86_64/bin
 NODE_ROOT=/opt/node
@@ -70,7 +69,7 @@ esac
 [ "$(id -u)" -ne 0 ] || die "refusing to run as root"
 
 for path in "$GO_ROOT/bin/go" "$HOST_TOOLS_BIN/riscv64-unknown-linux-musl-gcc" \
-            "$NODE_ROOT/bin/node" "$NODE_ROOT/bin/pnpm" "$MAIXCDK_SRC/bin/activate"; do
+            "$NODE_ROOT/bin/node" "$NODE_ROOT/bin/pnpm"; do
     [ -e "$path" ] || die "$path is missing: this is not forge-c >= 1.26 (the image carrying the NanoKVM toolchains)"
 done
 for tool in patchelf python3 openssl cmake git tar gzip; do
@@ -114,55 +113,34 @@ if [ -z "${SOURCE_DATE_EPOCH:-}" ] && ! git -C "$SRC" log -1 --format=%ct >/dev/
     fi
 fi
 
-# --- private working copies ----------------------------------------------------
-# support/sg2002/build resolves both trees through ~ (~/MaixCDK, ~/NanoKVM) and
-# writes into both (components are overlaid on MaixCDK; dist/ and kvmapp/ in the
-# source), so each gets a private copy under HOME. The MaixCDK venv stays at
-# /opt/maixcdk: it holds absolute paths, and activating it in place is what
-# docker/Dockerfile's `. bin/activate` does.
+# --- MaixCDK is gone: refuse to build if anything of it is in reach ------------------
+# Fail closed. No MaixCDK checkout under HOME, and no MaixCDK tree on PATH, VIRTUAL_ENV or
+# anywhere else in the environment (the image still carries /opt/maixcdk; this build does
+# not touch it).
+if [ -e "$HOME/MaixCDK" ]; then
+    die "$HOME/MaixCDK exists: this build does not use MaixCDK (fail closed)"
+fi
+env_hits="$(env | command grep -iE 'maixcdk' | cut -d= -f1 | tr '\n' ' ' || true)"
+if [ -n "$env_hits" ]; then
+    die "the environment references MaixCDK (fail closed): $env_hits"
+fi
+
+# --- private working copy ------------------------------------------------------
+# The build writes into the tree (dist/ and kvmapp/ in the source), so it gets a private
+# copy under HOME.
 WORK_NANOKVM="$HOME/NanoKVM"
-WORK_MAIXCDK="$HOME/MaixCDK"
-for d in "$WORK_NANOKVM" "$WORK_MAIXCDK"; do
-    case "$d" in
-        "$HOME"/*) rm -rf "$d" ;;
-        *) die "refusing to clear $d outside HOME" ;;
-    esac
-done
-log "copying the source tree and MaixCDK under $HOME"
+case "$WORK_NANOKVM" in
+    "$HOME"/*) rm -rf "$WORK_NANOKVM" ;;
+    *) die "refusing to clear $WORK_NANOKVM outside HOME" ;;
+esac
+log "copying the source tree under $HOME"
 cp -a "$SRC" "$WORK_NANOKVM"
-cp -a "$MAIXCDK_SRC" "$WORK_MAIXCDK"
-chmod -R u+rwX "$WORK_NANOKVM" "$WORK_MAIXCDK"
+chmod -R u+rwX "$WORK_NANOKVM"
 
-# --- MaixCDK's toolchain is the image's, not a download -------------------------------
-# platforms/maixcam.yaml names a 266 MiB host-tools tarball (url) and where its compiler
-# lands under dl/extracted (bin_path). tools/cmake/build.py downloads only when the
-# toolchain has a url, and tools/cmake/check_toolchain.py os.path.join()s bin_path onto
-# dl/extracted, so an absolute bin_path is used as is. The image's /opt/sg2002/host-tools is
-# byte-identical to that tarball's (evidence/toolchain of 2.6.36). Both lines are replaced
-# exactly once or the build stops. The yaml is in the private copy, not in /opt.
-MCDK_YAML="$WORK_MAIXCDK/platforms/maixcam.yaml"
-MCDK_URL_LINE='    url: https://github.com/sipeed/MaixCDK/releases/download/v0.0.0/host-tools-2025.7.28.tar.xz'
-MCDK_BIN_LINE='    bin_path: toolchains/maixcam/host-tools/gcc/riscv64-linux-musl-x86_64/bin'
-MCDK_TC_BIN="$(cd "$HOST_TOOLS_BIN" && pwd -P)" || die "$HOST_TOOLS_BIN is missing from the image"
-[ -x "$MCDK_TC_BIN/riscv64-unknown-linux-musl-gcc" ] || die "$MCDK_TC_BIN/riscv64-unknown-linux-musl-gcc is not executable"
-[ -f "$MCDK_YAML" ] || die "$MCDK_YAML is missing"
-n_url="$(command grep -cFx -e "$MCDK_URL_LINE" "$MCDK_YAML")" || true
-n_bin="$(command grep -cFx -e "$MCDK_BIN_LINE" "$MCDK_YAML")" || true
-[ "$n_url" = 1 ] && [ "$n_bin" = 1 ] || die "$MCDK_YAML is not the pinned MaixCDK's: url line x$n_url, bin_path line x$n_bin (want 1 each)"
-: > "$MCDK_YAML.new"
-while IFS= read -r line || [ -n "$line" ]; do
-    case "$line" in
-        "$MCDK_URL_LINE") printf '%s\n' '    url:' ;;
-        "$MCDK_BIN_LINE") printf '%s\n' "    bin_path: $MCDK_TC_BIN" ;;
-        *) printf '%s\n' "$line" ;;
-    esac
-done < "$MCDK_YAML" > "$MCDK_YAML.new"
-mv "$MCDK_YAML.new" "$MCDK_YAML"
-command grep -qFx -e "    bin_path: $MCDK_TC_BIN" "$MCDK_YAML" || die "bin_path was not rewritten in $MCDK_YAML"
-[ -z "$(command grep -F "host-tools-2025.7.28.tar.xz" "$MCDK_YAML" | command grep -v '^ *#' | command grep -v 'filename:')" ] || die "an active download url is left in $MCDK_YAML"
-log "MaixCDK toolchain: $MCDK_TC_BIN (no url, nothing to download)"
-
-# --- pinned middleware source ----------------------------------------------------
+# The image's Sophgo cross compiler (resolved, no symlinks).
+TOOLCHAIN_BIN="$(cd "$HOST_TOOLS_BIN" && pwd -P)" || die "$HOST_TOOLS_BIN is missing from the image"
+[ -x "$TOOLCHAIN_BIN/riscv64-unknown-linux-musl-gcc" ] || die "$TOOLCHAIN_BIN/riscv64-unknown-linux-musl-gcc is not executable"
+-------------------------------------------------
 # scpcom/sophgo-middleware @ 4e231ef5967f from the artifacts share, sha256-checked,
 # fail closed (scripts/fetch-middleware.sh). Fetched first so a missing or wrong
 # mirror stops the build before the long SDK compile. Landed at a fixed path.
@@ -205,23 +183,18 @@ CC=riscv64-unknown-linux-musl-gcc sh "$WORK_NANOKVM/tools/abicheck/abicheck.sh" 
 
 
 # --- riscv64 artifacts (what `make release-build` runs in the builder image) ---
-# build-in-container.sh needs HOME == $BUILD_HOME and the activated venv.
+# build-in-container.sh needs HOME == $BUILD_HOME.
 log "building riscv64 artifacts (kvm_system, libkvm.so, NanoKVM-Server)"
 export BUILD_HOME="$HOME"
-set +u
-# shellcheck disable=SC1091
-. "$MAIXCDK_SRC/bin/activate"
-set -u
-# Ask CMake (3.17+, from the environment) for compile_commands.json in every MaixCDK
-# project; it changes no flag, only writes the file for the evidence bundle below.
+# Ask CMake (3.17+, from the environment) for compile_commands.json in every project; it
+# changes no flag, only writes the file for the evidence bundle below.
 export CMAKE_EXPORT_COMPILE_COMMANDS=ON
-# kvm_system, libkvm_mmf.so and libkvm.so are built by support/sg2002/maixlite (no MaixCDK), in
-# these two CMake build trees and with the image's compiler. MaixCDK itself no longer builds
-# anything (its copy and venv above are unused; removing them is S7).
+# kvm_system, libkvm_mmf.so and libkvm.so are built by support/sg2002/maixlite, in these two
+# CMake build trees and with the image's compiler.
 MAIXLITE_BUILD="$HOME/maixlite-build"
 MAIXLITE_LIBS_BUILD="$HOME/maixlite-libs-build"
-export MAIXLITE_BUILD MAIXLITE_LIBS_BUILD MAIXLITE_TOOLCHAIN_BIN="$MCDK_TC_BIN"
-# The CMake build tree of a project (named as MaixCDK's projects were).
+export MAIXLITE_BUILD MAIXLITE_LIBS_BUILD MAIXLITE_TOOLCHAIN_BIN="$TOOLCHAIN_BIN"
+# The CMake build tree of a project (the golden flag files keep the project names).
 proj_bdir() {
     case "$1" in
         kvm_system) printf '%s' "$MAIXLITE_BUILD" ;;
@@ -234,23 +207,31 @@ proj_bdir() {
 cmake_compiler() {
     sed -n "s#^set(CMAKE_$2_COMPILER \"\\(.*\\)\")\$#\\1#p" "$1"/CMakeFiles/*/CMake"$2"Compiler.cmake | command grep .
 }
-MCDK_BUILD_LOG="$HOME/maixcdk-build.log"
-bash "$WORK_NANOKVM/scripts/build-in-container.sh" 2>&1 | tee "$MCDK_BUILD_LOG"
+BUILD_LOG="$HOME/build.log"
+bash "$WORK_NANOKVM/scripts/build-in-container.sh" 2>&1 | tee "$BUILD_LOG"
 unset CMAKE_EXPORT_COMPILE_COMMANDS
 
-# --- MaixCDK built nothing ---------------------------------------------------------------
-# No MaixCDK build runs any more (S6): the build log must not mention one, so a build step
-# that quietly went back through MaixCDK fails here (fail closed).
-log "check: no MaixCDK build ran"
-[ -s "$MCDK_BUILD_LOG" ] || die "check: the build log is empty, so the MaixCDK check could not see anything"
-command grep -q '^\[maixlite\] kvm_system staged' "$MCDK_BUILD_LOG" \
-    || die "check: the build log has no maixlite kvm_system staging line: the log is not the build's"
-command grep -q '^\[maixlite\] libkvm_mmf.so and libkvm.so staged' "$MCDK_BUILD_LOG" \
-    || die "check: the build log has no maixlite libraries staging line: the log is not the build's"
-if command grep -nE 'maixcdk build|Toolchain for platform maixcam|^-- (Downloading |Download [0-9]+%|Extracting )' "$MCDK_BUILD_LOG"; then
-    die "check: a MaixCDK build ran (lines above)"
+# --- the build fetched nothing and touched no MaixCDK -------------------------------------
+# Fail closed: the build log must show both maixlite stagings, no download line, and no
+# MaixCDK path or command; and no MaixCDK checkout may have appeared under HOME.
+log "check: nothing downloaded, no MaixCDK"
+[ -s "$BUILD_LOG" ] || die "check: the build log is empty, so the download check could not see anything"
+if ! command grep -q '^\[maixlite\] kvm_system staged' "$BUILD_LOG"; then
+    die "check: the build log has no maixlite kvm_system staging line: the log is not the build's"
 fi
-log "check: both maixlite builds staged, no MaixCDK line in $MCDK_BUILD_LOG ($(wc -l < "$MCDK_BUILD_LOG") lines)"
+if ! command grep -q '^\[maixlite\] libkvm_mmf.so and libkvm.so staged' "$BUILD_LOG"; then
+    die "check: the build log has no maixlite libraries staging line: the log is not the build's"
+fi
+if command grep -n 'Downloading' "$BUILD_LOG"; then
+    die "check: the build downloaded something (lines above)"
+fi
+if command grep -nEi '/opt/maixcdk|/MaixCDK|maixcdk build|Toolchain for platform maixcam' "$BUILD_LOG"; then
+    die "check: the build log references MaixCDK (lines above)"
+fi
+if [ -e "$HOME/MaixCDK" ]; then
+    die "check: $HOME/MaixCDK appeared during the build"
+fi
+log "check: both maixlite builds staged, no download and no MaixCDK line in $BUILD_LOG ($(wc -l < "$BUILD_LOG") lines)"
 
 log "check: the compilers the builds used resolve to /opt/sg2002/host-tools"
 for proj in kvm_system kvm_vision_test; do
@@ -264,21 +245,15 @@ for proj in kvm_system kvm_vision_test; do
         log "check: $proj CMAKE_${var}_COMPILER = $cc -> $real"
     done
 done
-# Leave the venv: the web build must not see the SDK's python on PATH first.
-set +u
-deactivate
-set -u
-
-# --- evidence bundle: what MaixCDK built, and with what -------------------------
-# So a later build without MaixCDK can be proven ABI-equivalent: a fingerprint of each
-# binary (scripts/binprint.sh), the compile and link flags MaixCDK's CMake generated for
-# kvm_system and kvm_vision_test, and the compilers MaixCDK resolved. Published next to
+# --- evidence bundle: what was built, and with what ---------------------------------
+# A fingerprint of each binary (scripts/binprint.sh), the compile and link flags CMake
+# generated for kvm_system and kvm_vision_test, and the compilers used. Published next to
 # the package as <version>/evidence/. Not part of the OTA tarball; a missing piece of the
 # bundle fails the build.
 EVIDENCE="$HOME/evidence"
 rm -rf "$EVIDENCE"
 mkdir -p "$EVIDENCE/binaries" "$EVIDENCE/flags" "$EVIDENCE/toolchain"
-log "evidence: fingerprinting the MaixCDK-built binaries"
+log "evidence: fingerprinting the built binaries"
 for bin in "$WORK_NANOKVM/kvmapp/kvm_system/kvm_system" \
            "$WORK_NANOKVM/kvmapp/server/dl_lib/libkvm.so" \
            "$WORK_NANOKVM/kvmapp/server/dl_lib/libkvm_mmf.so" \
@@ -292,7 +267,7 @@ bash "$WORK_NANOKVM/tools/binabi/check.sh" "$EVIDENCE/binaries" || die "binabi: 
 # Paths in the generated build files carry this build's HOME; replace them so two builds
 # diff cleanly.
 norm_paths() {
-    sed -e "s#$WORK_MAIXCDK#@MAIXCDK@#g" -e "s#$WORK_NANOKVM#@NANOKVM@#g" \
+    sed -e "s#$WORK_NANOKVM#@NANOKVM@#g" \
         -e "s#$MW_SRC#@MIDDLEWARE@#g" -e "s#$MMF_OUT#@MMF_OUT@#g" -e "s#$HOME#@HOME@#g"
 }
 log "evidence: compile and link flags of the maixlite projects"
@@ -333,7 +308,7 @@ log "evidence: the toolchain the builds compiled with"
         done
     done
 } > "$EVIDENCE/toolchain/compilers.txt" || die "could not record the compilers"
-"$MCDK_TC_BIN/riscv64-unknown-linux-musl-gcc" -v 2>&1 | norm_paths > "$EVIDENCE/toolchain/gcc-v.txt" || die "gcc -v failed"
+"$TOOLCHAIN_BIN/riscv64-unknown-linux-musl-gcc" -v 2>&1 | norm_paths > "$EVIDENCE/toolchain/gcc-v.txt" || die "gcc -v failed"
 
 # Complete or not at all: every binary has all its required prints, the compiler record
 # exists, and nothing is empty.
@@ -478,7 +453,7 @@ else
     install -m 0755 "$WORK_NANOKVM/tools/kvmgpio/kvmgpio" "$STAGE/emu/kvmgpio"
     (cd "$STAGE/emu" && sha256sum kvmgpio > kvmgpio.sha256)
     install -m 0755 "$WORK_NANOKVM/scripts/emu-image.sh" "$STAGE/emu/emu-image.sh"
-    # evidence/ is MaixCDK-build evidence only: NOT in the OTA tarball, NOT signed.
+    # evidence/ is build evidence only: NOT in the OTA tarball, NOT signed.
     cp -a "$EVIDENCE" "$STAGE/evidence"
     mv "$STAGE" "$DEST"
     log "published $DEST"
@@ -493,7 +468,7 @@ echo
 echo "version:   $VERSION"
 echo "artifacts: $DEST/{nanokvm_$VERSION.tar.gz,latest.json,nanokvm_$VERSION.tar.gz.sha256}"
 echo "emulator:  $DEST/emu/{NanoKVM-Server,NanoKVM-Server.sha256,emu-image.sh} (not signed, not for the update base)"
-echo "evidence:  $DEST/evidence/ (binary fingerprints, MaixCDK flags, compilers used; not in the package)"
+echo "evidence:  $DEST/evidence/ (binary fingerprints, compile flags, compilers used; not in the package)"
 echo "sha256:    $SHA256"
 echo "sign name: nanokvm-$VERSION-riscv64"
 echo "next:      keymaster_sign_digest kind=app name=nanokvm-$VERSION-riscv64 sha256=$SHA256"

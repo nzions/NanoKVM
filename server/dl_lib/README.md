@@ -10,8 +10,8 @@ them from the build, refusing a package that lacks one. No library comes from Ma
 
 | Library | Source |
 |---|---|
-| `libkvm.so` | `support/sg2002/additional/kvm` + `vision` (MaixCDK build, `./build kvm_vision`); links no OpenCV and no FreeType since 2.6.34: `vision` is a NanoKVM cut of MaixCDK's (frame holder plus the hardware JPEG encode), and `build-in-container.sh` / `forge-build.sh` fail the build if `libkvm.so` NEEDs a `libopencv*` or imports a `cv::` symbol, or if any `libopencv*` file is in the package |
-| `libkvm_mmf.so` | `support/sg2002/additional/kvm_mmf` (same build), linked against the libraries below only |
+| `libkvm.so` | `support/sg2002/additional/kvm` + `vision` (plain CMake, `support/sg2002/maixlite`); links no OpenCV and no FreeType since 2.6.34: `vision` is a NanoKVM cut of MaixCDK's (frame holder plus the hardware JPEG encode), and `build-in-container.sh` / `forge-build.sh` fail the build if `libkvm.so` NEEDs a `libopencv*` or imports a `cv::` symbol, or if any `libopencv*` file is in the package |
+| `libkvm_mmf.so` | `support/sg2002/additional/kvm_mmf` (same build, `support/sg2002/maixlite/libs/kvm_mmf/CMakeLists.txt`), linked against the libraries below only |
 | `libsys.so libcvi_bin.so libvpu.so libvenc.so libvdec.so libini.so` | `scpcom/sophgo-middleware@4e231ef5967f` (`scripts/fetch-middleware.sh`), built by `scripts/build-mmf.sh` with the pin's own `Makefile.param` and `modules/*/Makefile` and the riscv64 musl cross compiler. `libvpu` contains VI/VO/VPSS/GDC/RGN. Kernel uapi headers: the osdrv v2 tarball (scpcom `cbd9c582`; libvenc/libvdec: sophgo `1b3a4964`, v1) the 7.3 kernel is built from, sha256-pinned (`OSDRV_*` in `build-mmf.sh`) |
 
 `libcvi_bin` also needs the declarations of `cvi_json-c` and `cvi_miniz` (Sophgo's renamed json-c and
@@ -70,7 +70,7 @@ camera wrapper. The source tarball stays on the artifacts share, unused.
 
 ## Source availability (per middleware pin)
 
-Inventory of the 12 libraries `libkvm_mmf.so` links (`support/sg2002/additional/kvm_mmf/CMakeLists.txt`),
+Inventory of the 12 libraries `libkvm_mmf.so` links (`support/sg2002/maixlite/libs/kvm_mmf/CMakeLists.txt`),
 read from a checkout of each candidate pin of `scpcom/sophgo-middleware` (step 01k5spsan1).
 Both pins were reachable by their exact commit: `4e231ef5967f` (branch `licheervnano`, tree rooted
 at `v2/`) and `cd8bb74c94e1` (branch `maix_mmf-cvisdk`, tree rooted at the repo top).

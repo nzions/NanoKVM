@@ -1,12 +1,11 @@
 name: Builder Image
 
-# Builds the nanokvm-builder image (riscv64 musl toolchain, Go, and a MaixCDK
-# checkout patched with support/sg2002/additional) and publishes it to GHCR so
-# the release workflow does not have to rebuild the SDK on every tag.
+# Builds the nanokvm-builder image (riscv64 musl toolchain and Go) and publishes it
+# to GHCR so the release workflow does not have to rebuild it on every tag.
 #
 # The image is deliberately not rebuilt on every push: it only carries the
-# toolchain. Release builds re-sync support/sg2002/additional into MaixCDK and
-# recompile from the checked-out source, so a slightly stale image is harmless.
+# toolchain. Release builds recompile from the checked-out source, so a slightly
+# stale image is harmless.
 
 on:
   workflow_dispatch:
@@ -54,7 +53,7 @@ jobs:
           echo "ref=ghcr.io/$owner/nanokvm-builder" >> "$GITHUB_OUTPUT"
 
       # Logging in before the build means a credential or registry problem fails
-      # in seconds instead of after a full SDK build.
+      # in seconds instead of after a full image build.
       - name: Log in to GHCR
         env:
           GHCR_USER: ${{ github.actor }}
@@ -77,10 +76,8 @@ jobs:
 
       - name: Build image
         run: |
-          # The Dockerfile chowns MaixCDK to DOCKER_UID/DOCKER_GID and the
-          # entrypoint gosu's to the caller's ids, so bake in the ids the
-          # release job will actually run as. Otherwise the SDK tree belongs to
-          # 1000 and syncing components into it fails with permission denied.
+          # The entrypoint gosu's to the caller's ids, so bake in the ids the
+          # release job will actually run as.
           docker build \
             --build-arg DOCKER_UID="$(id -u)" \
             --build-arg DOCKER_GID="$(id -g)" \

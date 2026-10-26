@@ -83,7 +83,7 @@ manual download and does not change the on-device `latest.json` contract.
 forge (the estate build box) builds the same release without docker: the
 `build` profile in `.build.json` runs `scripts/forge-build.sh` in forge's `c`
 image (nzions/fleet `containers/forge-c`, 1.26 or newer), which carries the
-pinned toolchains at `/opt` (Sophgo host-tools, MaixCDK and its venv, Go 1.26.0,
+pinned toolchains at `/opt` (Sophgo host-tools, Go 1.26.0,
 Node 22 with pnpm 11). The pins match `docker/Dockerfile`.
 
 ```text
@@ -91,7 +91,7 @@ forge_build repo=nanokvm ref=<sha>
 ```
 
 The script runs `build-in-container.sh`, the `make web` steps and `package.sh`
-in private copies of the tree and MaixCDK under `$HOME`, then publishes
+in a private copy of the tree under `$HOME`, then publishes
 `nanokvm_<version>.tar.gz`, `latest.json` and `nanokvm_<version>.tar.gz.sha256`
 to `/artifacts/<version>/` (`/data/nfs/artifacts/nanokvm/<version>/` on beefy).
 A published version is never overwritten with different bytes. The version is
@@ -101,11 +101,10 @@ The same atomic publish also carries `emu/NanoKVM-Server` (a `-tags nokvm`
 `CGO_ENABLED=0` build), `emu/NanoKVM-Server.sha256` and `emu/emu-image.sh` for
 the qemu emulator. They are not in the OTA tarball, not signed, and never go to
 the update base.
-MaixCDK downloads nothing: its `platforms/maixcam.yaml` in the private copy is
-pointed at the image's `/opt/sg2002/host-tools` (no url, absolute `bin_path`), the
-`websocket` component (asio, websocketpp) is no longer required, and the build fails
-if MaixCDK prints a download line, leaves a file in `dl/pkgs`, or compiles with a
-compiler that does not resolve into `/opt/sg2002/host-tools`.
+No MaixCDK is used and nothing is downloaded. The build fails closed if `$HOME/MaixCDK`
+exists (before or after the build), if the environment references MaixCDK, or if the build
+log contains a `Downloading` line or a MaixCDK path; it also fails if a compiler does not
+resolve into `/opt/sg2002/host-tools`.
 
 The output is **unsigned**. The script prints the sha256 and the name to sign;
 a rook then calls

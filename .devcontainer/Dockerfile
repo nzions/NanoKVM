@@ -1,7 +1,7 @@
 # Dev container image for VS Code / the devcontainer CLI.
 #
 # The release builder image (docker/Dockerfile) stays the single source of
-# truth for the RISC-V cross toolchain, Go and MaixCDK. This layer only adds
+# truth for the RISC-V cross toolchain, Go. This layer only adds
 # the frontend toolchain on top: the builder image deliberately ships without
 # Node (`make web` runs on the host), but an IDE container should cover web
 # development as well.
