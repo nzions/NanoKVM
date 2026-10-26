@@ -575,17 +575,29 @@ void* hdmi_state_machine(void * arg)
     hdmi_int_edge_seen(int_fd, ops->int_edge);     // drop edges from before we started
     hdmi_post_resync();             // initial read of the chip
 
-    struct pollfd fds[2];
+    // The EDID tool is another process on this bus. When it ends a session that
+    // changed the chip it rewrites the lock file; that arrives here and is a
+    // resync request (the chip's EDID, and so its mode, may have changed). If
+    // the watch cannot be had the machine still runs on the INT line, and says so.
+    int watch_fd = lt6911_watch_open();
+    if(watch_fd < 0){
+        fprintf(stderr, "[hdmi]no EDID-change watch (%d): an EDID write is only seen on the next INT or resync\n", watch_fd);
+    }
+
+    struct pollfd fds[3];
     fds[0].fd = hdmi_wake_fd;
     fds[0].events = POLLIN;
     fds[1].fd = int_fd;
     fds[1].events = POLLIN;
+    fds[2].fd = watch_fd;       // -1 is ignored by poll()
+    fds[2].events = POLLIN;
 
     while(__atomic_load_n(&kvmv_cfg.try_exit_thread, __ATOMIC_ACQUIRE) == 0)
     {
         fds[0].revents = 0;
         fds[1].revents = 0;
-        if(poll(fds, 2, -1) < 0){
+        fds[2].revents = 0;
+        if(poll(fds, 3, -1) < 0){
             if(errno == EINTR) continue;
             debug("[hdmi]poll failed: %d\n", errno);
             break;
@@ -604,6 +616,16 @@ void* hdmi_state_machine(void * arg)
         }
         if(fds[1].revents & POLLIN){
             if(hdmi_int_edge_seen(int_fd, ops->int_edge)) probe_now = true;
+        }
+        if(fds[2].revents & POLLIN){
+            int changed = lt6911_watch_changed(watch_fd);
+            if(changed < 0){
+                fprintf(stderr, "[hdmi]EDID-change watch failed: %d\n", changed);
+            } else if(changed > 0){
+                debug("[hdmi]chip changed by another process: resync\n");
+                probe_now = true;
+                resync = true;
+            }
         }
 
         if(probe_now){
@@ -636,6 +658,7 @@ void* hdmi_state_machine(void * arg)
             }
         }
     }
+    if(watch_fd >= 0) close(watch_fd);
     close(int_fd);
     lt6911_close(&lt_dev);
     kvmv_cfg.thread_is_running = 0;

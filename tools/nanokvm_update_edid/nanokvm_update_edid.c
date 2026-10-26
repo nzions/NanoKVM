@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
@@ -33,8 +34,20 @@ int get_edid_from_file(const char *filename, uint8_t *edid_data, uint16_t *edid_
         return -1;
     }
 
-    *edid_size = fread(edid_data, 1, EDID_BUFFER_SIZE, file);
+    size_t got = fread(edid_data, 1, EDID_BUFFER_SIZE, file);
+    bool failed = ferror(file) != 0;
+    // Anything past EDID_BUFFER_SIZE makes the file the wrong size.
+    bool extra = !failed && fgetc(file) != EOF;
     fclose(file);
+    if (failed) {
+        fprintf(stderr, "Failed to read EDID file %s\n", filename);
+        return -1;
+    }
+    if (extra) {
+        fprintf(stderr, "EDID file %s is longer than %d bytes\n", filename, EDID_BUFFER_SIZE);
+        return -1;
+    }
+    *edid_size = (uint16_t)got;
 
     return 0;
 }
@@ -167,7 +180,7 @@ int lt6911uxc_edid_write(uint8_t *edid_data, uint16_t edid_size)
 
     // Start
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0xFF, 0x80) != 0) return -1;
-    lt6911_enable();
+    if (lt6911_enable() != 0) return -1;
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0x5E, 0xDF) != 0) return -1;
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0x58, 0x00) != 0) return -1;
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0x59, 0x51) != 0) return -1;
@@ -175,7 +188,7 @@ int lt6911uxc_edid_write(uint8_t *edid_data, uint16_t edid_size)
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0x5A, 0x00) != 0) return -1;
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0x58, 0x21) != 0) return -1;
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0xFF, 0x80) != 0) return -1;
-    lt6911_enable();
+    if (lt6911_enable() != 0) return -1;
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0x5A, 0x80) != 0) return -1;
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0x5A, 0x84) != 0) return -1;
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0x5A, 0x80) != 0) return -1;
@@ -196,7 +209,7 @@ int lt6911uxc_edid_write(uint8_t *edid_data, uint16_t edid_size)
     if (i2c_write_byte(LT6911_SYS3_OFFSET, 0x08, 0xEE) != 0) return -1;
     // Write
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0xFF, 0x80) != 0) return -1;
-    lt6911_enable();
+    if (lt6911_enable() != 0) return -1;
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0x5A, 0x84) != 0) return -1;
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0x5A, 0x80) != 0) return -1;
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0x5A, 0x84) != 0) return -1;
@@ -250,7 +263,7 @@ int lt6911uxc_edid_read(uint8_t *edid_data, uint16_t edid_size)
     fprintf(stdout, "Reading EDID...\n");
     // Read
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0xFF, 0x80) != 0) return -1;
-    lt6911_enable();
+    if (lt6911_enable() != 0) return -1;
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0x5A, 0x84) != 0) return -1;
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0x5A, 0x80) != 0) return -1;
     for (i = 0; i < wr_count; i++) {
@@ -280,27 +293,27 @@ int lt6911c_edid_write(uint8_t *edid_data, uint16_t edid_size)
     fprintf(stdout, "Writing EDID....\n");
 
     // Start
-    lt6911_enable();
+    if (lt6911_enable() != 0) return -1;
     if (i2c_read_bytes(LT6911_SYS4_OFFSET, 0x00, chip_data, 2) != 0) return -1;
     if (chip_data[0] != 0x16 || chip_data[1] != 0x05) {
         fprintf(stderr, "Unsupported chip version\n");
         return -1;
     }
-    lt6911_disable();
+    if (lt6911_disable() != 0) return -1;
 
     usleep(100000);
 
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0xFF, 0x80) != 0) return -1;
-    lt6911_enable();
+    if (lt6911_enable() != 0) return -1;
     if (i2c_read_bytes(LT6911_SYS4_OFFSET, 0x00, chip_data, 2) != 0) return -1;
     if (chip_data[0] != 0x16 || chip_data[1] != 0x05) {
         fprintf(stderr, "Unsupported chip version\n");
         return -1;
     }
-    lt6911_disable();
+    if (lt6911_disable() != 0) return -1;
 
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0xFF, 0x80) != 0) return -1;
-    lt6911_enable();
+    if (lt6911_enable() != 0) return -1;
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0x5A, 0x82) != 0) return -1;
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0x5E, 0xC0) != 0) return -1;
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0x58, 0x00) != 0) return -1;
@@ -309,7 +322,7 @@ int lt6911c_edid_write(uint8_t *edid_data, uint16_t edid_size)
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0x5A, 0x82) != 0) return -1;
 
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0xFF, 0x80) != 0) return -1;
-    lt6911_enable();
+    if (lt6911_enable() != 0) return -1;
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0x5A, 0x82) != 0) return -1;
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0x5A, 0x86) != 0) return -1;
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0x5A, 0x82) != 0) return -1;
@@ -329,7 +342,7 @@ int lt6911c_edid_write(uint8_t *edid_data, uint16_t edid_size)
     if (i2c_write_byte(LT6911_SYS2_OFFSET, 0x02, 0xDF) != 0) return -1;
     if (i2c_write_byte(LT6911_SYS2_OFFSET, 0x02, 0xFF) != 0) return -1;
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0xFF, 0x80) != 0) return -1;
-    lt6911_enable();
+    if (lt6911_enable() != 0) return -1;
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0x5A, 0x86) != 0) return -1;
 
     for (i = 0; i < wr_count; i++) {
@@ -372,7 +385,7 @@ int lt6911c_edid_read(uint8_t *edid_data, uint16_t edid_size)
     // Read
 
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0xFF, 0x80) != 0) return -1;
-    lt6911_enable();
+    if (lt6911_enable() != 0) return -1;
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0x5A, 0x86) != 0) return -1;
     if (i2c_write_byte(LT6911_SYS_OFFSET, 0x5A, 0x82) != 0) return -1;
 
@@ -729,21 +742,46 @@ int main(int argc, char *argv[]) {
     }
     fprintf(stdout, "EDID data loaded successfully from %s\n", argv[1]);
 
-    if (board->has_hdmi_reset && NanoKVM_HDMI_Reset(board) != 0) {
-        fprintf(stderr, "Failed to reset the LT6911 (%s)\n", board->hdmi_reset_line);
+    // The server's HDMI state machine (libkvm, another process) uses this bus
+    // and this chip. One session holds the cross-process lock from the first
+    // reset to the last, so nothing interleaves with the flash sequence; it
+    // ends "changed", which wakes the state machine to re-read the chip. The
+    // wait for the lock is bounded: a busy bus is an error, not a hang.
+    int sess_err = lt6911_session_begin(&lt6911);
+    if (sess_err != 0) {
+        fprintf(stderr, "Cannot take the LT6911 bus (%s)\n", strerror(-sess_err));
+        lt6911_close(&lt6911);
         return EXIT_FAILURE;
     }
 
-    // configure lt6911 edid
-    if (lt6911_edid_config(edid_data, edid_size) != 0) {
-        fprintf(stderr, "Failed to configure LT6911 EDID\n");
-        return EXIT_FAILURE;
-    }
-
+    int status = EXIT_SUCCESS;
     if (board->has_hdmi_reset && NanoKVM_HDMI_Reset(board) != 0) {
         fprintf(stderr, "Failed to reset the LT6911 (%s)\n", board->hdmi_reset_line);
-        return EXIT_FAILURE;
+        status = EXIT_FAILURE;
     }
+    // From here the chip's flash may be touched, so the session ends "changed"
+    // whatever happens: a half-written EDID is a state the server must see.
+    bool chip_touched = false;
+    if (status == EXIT_SUCCESS) {
+        chip_touched = true;
+        // configure lt6911 edid
+        if (lt6911_edid_config(edid_data, edid_size) != 0) {
+            fprintf(stderr, "Failed to configure LT6911 EDID\n");
+            status = EXIT_FAILURE;
+        }
+    }
+    if (status == EXIT_SUCCESS && board->has_hdmi_reset && NanoKVM_HDMI_Reset(board) != 0) {
+        fprintf(stderr, "Failed to reset the LT6911 (%s)\n", board->hdmi_reset_line);
+        status = EXIT_FAILURE;
+    }
+
+    sess_err = lt6911_session_end(&lt6911, chip_touched);
+    if (sess_err != 0) {
+        fprintf(stderr, "Failed to release the LT6911 bus or tell the server (%s)\n", strerror(-sess_err));
+        status = EXIT_FAILURE;
+    }
+    lt6911_close(&lt6911);
+    if (status != EXIT_SUCCESS) return status;
 
     print_success(board);
 

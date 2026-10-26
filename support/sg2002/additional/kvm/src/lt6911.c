@@ -12,12 +12,16 @@
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <linux/i2c-dev.h>
 #include <linux/i2c.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/file.h>
+#include <sys/inotify.h>
 #include <sys/ioctl.h>
+#include <time.h>
 #include <unistd.h>
 
 // ---- register map, per variant ---------------------------------------------
@@ -70,9 +74,92 @@ static const struct lt6911_res_regs lt6911d_regs     = { LT6911D_PAGE_RES, 0x8E,
 
 // ---- the lock ---------------------------------------------------------------
 
-// One process-wide lock for the bus and the chip's page register. Everything
-// that touches the bus holds it; the *_locked functions below require it.
+// Two locks, always taken together (see internal/lt6911.h): a mutex for the
+// threads of this process and an flock on LT6911_LOCK_PATH for the other
+// processes. The *_locked functions below require both. A thread that holds
+// them through a session sets tls_in_session, and the public functions then run
+// without taking them again.
 static pthread_mutex_t lt6911_lock = PTHREAD_MUTEX_INITIALIZER;
+static int lt6911_lock_fd = -1;                 // opened once, under lt6911_lock
+static __thread bool tls_in_session = false;
+
+#define LT6911_LOCK_RETRY_US     5000
+#define MS_PER_S                 1000
+#define NS_PER_MS                1000000
+
+static int64_t now_ms(void)
+{
+    struct timespec ts;
+    if(clock_gettime(CLOCK_MONOTONIC, &ts) < 0) return -1;
+    return (int64_t)ts.tv_sec * MS_PER_S + ts.tv_nsec / NS_PER_MS;
+}
+
+// Caller holds lt6911_lock.
+static int lock_file_open_locked(void)
+{
+    if(lt6911_lock_fd >= 0) return 0;
+    int fd = open(LT6911_LOCK_PATH, O_RDWR | O_CREAT | O_CLOEXEC, 0600);
+    if(fd < 0){
+        int err = errno;
+        fprintf(stderr, "[lt6911]open %s failed: %d\n", LT6911_LOCK_PATH, err);
+        return -err;
+    }
+    lt6911_lock_fd = fd;
+    return 0;
+}
+
+// flock(LOCK_EX), polled with LOCK_NB until the deadline. Caller holds lt6911_lock
+// and has the lock file open.
+static int flock_bounded(void)
+{
+    int64_t deadline = now_ms();
+    if(deadline < 0) return -errno;
+    deadline += LT6911_LOCK_TIMEOUT_MS;
+    for(;;){
+        if(flock(lt6911_lock_fd, LOCK_EX | LOCK_NB) == 0) return 0;
+        if(errno != EWOULDBLOCK && errno != EINTR){
+            int err = errno;
+            fprintf(stderr, "[lt6911]flock %s failed: %d\n", LT6911_LOCK_PATH, err);
+            return -err;
+        }
+        int64_t now = now_ms();
+        if(now < 0) return -errno;
+        if(now >= deadline){
+            fprintf(stderr, "[lt6911]bus busy: another process holds %s after %d ms\n",
+                    LT6911_LOCK_PATH, LT6911_LOCK_TIMEOUT_MS);
+            return -ETIMEDOUT;
+        }
+        usleep(LT6911_LOCK_RETRY_US);
+    }
+}
+
+static int lock_acquire(void)
+{
+    int r = pthread_mutex_lock(&lt6911_lock);
+    if(r != 0) return -r;
+    int err = lock_file_open_locked();
+    if(err == 0) err = flock_bounded();
+    if(err != 0){
+        int u = pthread_mutex_unlock(&lt6911_lock);
+        if(u != 0) fprintf(stderr, "[lt6911]mutex unlock failed: %d\n", u);
+    }
+    return err;
+}
+
+static int lock_release(void)
+{
+    int err = 0;
+    if(flock(lt6911_lock_fd, LOCK_UN) < 0){
+        err = -errno;
+        fprintf(stderr, "[lt6911]funlock %s failed: %d\n", LT6911_LOCK_PATH, -err);
+    }
+    int u = pthread_mutex_unlock(&lt6911_lock);
+    if(u != 0){
+        fprintf(stderr, "[lt6911]mutex unlock failed: %d\n", u);
+        if(err == 0) err = -u;
+    }
+    return err;
+}
 
 // ---- checked transfers -------------------------------------------------------
 
@@ -342,20 +429,89 @@ int lt6911_reg_read(struct lt6911_dev *dev, uint8_t page, uint8_t reg,
                     uint8_t *out, size_t len)
 {
     if(!usable(dev) || reg == LT6911_REG_PAGE) return -EINVAL;
-    pthread_mutex_lock(&lt6911_lock);
-    int r = read_locked(dev, page, reg, out, len);
-    pthread_mutex_unlock(&lt6911_lock);
-    return r;
+    if(tls_in_session) return read_locked(dev, page, reg, out, len);
+    int r = lock_acquire();
+    if(r != 0) return r;
+    r = read_locked(dev, page, reg, out, len);
+    int u = lock_release();
+    return r != 0 ? r : u;
 }
 
 int lt6911_reg_write(struct lt6911_dev *dev, uint8_t page, uint8_t reg,
                      const uint8_t *data, size_t len)
 {
     if(!usable(dev) || reg == LT6911_REG_PAGE) return -EINVAL;
-    pthread_mutex_lock(&lt6911_lock);
-    int r = write_locked(dev, page, reg, data, len);
-    pthread_mutex_unlock(&lt6911_lock);
-    return r;
+    if(tls_in_session) return write_locked(dev, page, reg, data, len);
+    int r = lock_acquire();
+    if(r != 0) return r;
+    r = write_locked(dev, page, reg, data, len);
+    int u = lock_release();
+    return r != 0 ? r : u;
+}
+
+int lt6911_session_begin(struct lt6911_dev *dev)
+{
+    if(!usable(dev)) return -EINVAL;
+    if(tls_in_session) return -EBUSY;
+    int r = lock_acquire();
+    if(r != 0) return r;
+    tls_in_session = true;
+    return 0;
+}
+
+int lt6911_session_end(struct lt6911_dev *dev, bool changed)
+{
+    (void)dev;
+    if(!tls_in_session) return -EINVAL;
+    tls_in_session = false;
+    int r = lock_release();
+    if(!changed) return r;
+    // After the unlock, so the state machine's probe does not queue behind us.
+    // Any write to the file is an IN_MODIFY for lt6911_watch fds; the content
+    // is only a changing stamp.
+    int64_t stamp = now_ms();
+    if(stamp < 0) return r != 0 ? r : -errno;
+    ssize_t w = pwrite(lt6911_lock_fd, &stamp, sizeof(stamp), 0);
+    int err = 0;
+    if(w < 0) err = -errno;
+    else if((size_t)w != sizeof(stamp)) err = -EIO;
+    if(err != 0) fprintf(stderr, "[lt6911]change notice on %s failed: %d\n", LT6911_LOCK_PATH, -err);
+    return r != 0 ? r : err;
+}
+
+int lt6911_watch_open(void)
+{
+    int r = pthread_mutex_lock(&lt6911_lock);
+    if(r != 0) return -r;
+    r = lock_file_open_locked();
+    int u = pthread_mutex_unlock(&lt6911_lock);
+    if(r != 0) return r;
+    if(u != 0) return -u;
+    int fd = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
+    if(fd < 0) return -errno;
+    if(inotify_add_watch(fd, LT6911_LOCK_PATH, IN_MODIFY) < 0){
+        int err = errno;
+        close(fd);
+        return -err;
+    }
+    return fd;
+}
+
+int lt6911_watch_changed(int fd)
+{
+    int seen = 0;
+    for(;;){
+        char buf[sizeof(struct inotify_event) + NAME_MAX + 1];
+        ssize_t n = read(fd, buf, sizeof(buf));
+        if(n > 0){
+            seen = 1;
+            continue;
+        }
+        if(n == 0) return seen;
+        if(errno == EINTR) continue;
+        if(errno == EAGAIN || errno == EWOULDBLOCK) return seen;
+        return -errno;
+    }
 }
 
 int lt6911_reg_read8(struct lt6911_dev *dev, uint8_t page, uint8_t reg, uint8_t *out)
@@ -377,8 +533,13 @@ int lt6911_probe(struct lt6911_dev *dev, struct lt6911_probe_result *out)
     const struct lt6911_ops *ops = dev->ops;
     if(ops->signal_present == NULL || ops->csi_res == NULL) return -ENOTSUP;
 
-    pthread_mutex_lock(&lt6911_lock);
+    bool own_lock = !tls_in_session;
     int result = 0;
+    if(own_lock) result = lock_acquire();
+    if(result != 0){
+        fprintf(stderr, "[lt6911]%s probe failed: %d\n", ops->name, result);
+        return result;
+    }
     if(ops->enable != NULL) result = ops->enable(dev);
     if(result == 0){
         bool present = false;
@@ -397,7 +558,10 @@ int lt6911_probe(struct lt6911_dev *dev, struct lt6911_probe_result *out)
         int d = ops->disable(dev);
         if(result == 0) result = d;
     }
-    pthread_mutex_unlock(&lt6911_lock);
+    if(own_lock){
+        int u = lock_release();
+        if(result == 0) result = u;
+    }
     if(result != 0){
         out->present = false;
         fprintf(stderr, "[lt6911]%s probe failed: %d\n", ops->name, result);

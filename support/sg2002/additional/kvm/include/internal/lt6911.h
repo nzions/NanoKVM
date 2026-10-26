@@ -114,8 +114,43 @@ void lt6911_close(struct lt6911_dev *dev);
 enum lt6911_variant lt6911_variant_parse(const char *text);
 const char *lt6911_variant_name(enum lt6911_variant variant);
 
-// Registers. Each call selects `page` itself. reg == LT6911_REG_PAGE is
-// refused (-EINVAL). len is 1..LT6911_MAX_BLOCK.
+// ---- who may talk to the chip ------------------------------------------------
+//
+// The bus and the chip's page register are shared by TWO processes: the server
+// (libkvm's HDMI state machine) and nanokvm_update_edid. Every transaction
+// therefore holds two locks, taken together: the process-wide mutex (threads of
+// one process) and an flock(LOCK_EX) on LT6911_LOCK_PATH (processes). A
+// dedicated file, not the /dev/i2c-4 fd: the lock must not depend on what the
+// driver's node does with flock, and the same file carries the change notice
+// below. The flock is taken with LOCK_NB and retried until
+// LT6911_LOCK_TIMEOUT_MS, so nobody waits forever on a crashed or stuck
+// holder (the kernel drops a dead process's flock): -ETIMEDOUT, not a hang.
+// The mutex is never recursive: a thread inside a session calls the same
+// functions below and they run under the session's locks without taking them.
+#define LT6911_LOCK_PATH         "/var/run/lt6911.lock"
+#define LT6911_LOCK_TIMEOUT_MS   10000
+
+// A multi-step sequence that must not interleave with anyone else's (the EDID
+// flash: erase, program, verify). Holds both locks until lt6911_session_end.
+// One session per thread: a nested begin is -EBUSY. -ETIMEDOUT: another
+// process still held the bus after LT6911_LOCK_TIMEOUT_MS.
+int lt6911_session_begin(struct lt6911_dev *dev);
+// Releases both locks. changed == true says the chip's own state was altered
+// (its EDID flash): once the locks are free the lock file is rewritten, which
+// wakes every lt6911_watch fd, so the HDMI state machine re-reads the chip.
+// Returns the first error (an unlock or notice that failed is not swallowed).
+int lt6911_session_end(struct lt6911_dev *dev, bool changed);
+
+// The listening side of that notice: an inotify fd (non-blocking, close-on-exec)
+// that becomes readable when another process ends a session with changed ==
+// true. lt6911_watch_changed drains it: 1 = a notice arrived, 0 = none, or a
+// negative errno.
+int lt6911_watch_open(void);
+int lt6911_watch_changed(int fd);
+
+// Registers. Each call selects `page` itself and holds the locks above (or runs
+// inside the caller's session). reg == LT6911_REG_PAGE is refused (-EINVAL).
+// len is 1..LT6911_MAX_BLOCK.
 int lt6911_reg_read(struct lt6911_dev *dev, uint8_t page, uint8_t reg,
                     uint8_t *out, size_t len);
 int lt6911_reg_write(struct lt6911_dev *dev, uint8_t page, uint8_t reg,

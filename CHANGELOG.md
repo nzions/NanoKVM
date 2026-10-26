@@ -1,3 +1,12 @@
+## 2.6.15 (2026-10-26)
+
+### Changes
+
+* LT6911 access is serialised across processes. `lt6911.c` takes the in-process mutex and an `flock(LOCK_EX)` on `/var/run/lt6911.lock` (a dedicated file, so it does not depend on what the i2c node does with flock) around every transaction; the flock is polled with `LOCK_NB` for at most 10 s and then fails with `-ETIMEDOUT` ("bus busy"), never a hang. New `lt6911_session_begin` / `lt6911_session_end(changed)` hold both locks across a multi-step sequence; the per-call functions run inside the session without retaking them (a thread-local flag, no recursive mutex; a nested begin is `-EBUSY`).
+* Resync after an EDID write: `lt6911_session_end(dev, true)` rewrites the lock file once the locks are free; the HDMI state machine (libkvm) watches it with inotify (`lt6911_watch_open` / `lt6911_watch_changed`) and treats it as a resync request, so it re-reads the chip and publishes. If the watch cannot be opened the state machine says so and falls back to INT/resync only.
+* `nanokvm_update_edid` runs reset, flash, verify and reset as one session and ends it "changed" even on failure; every `lt6911_enable()` / `lt6911_disable()` result is now checked; a read error or an over-long EDID file is an error. It keeps no page/offset cache and has no variable-length buffer (the library's `LT6911_MAX_BLOCK` buffer is fixed).
+* Not run on hardware (kvm1 offline); the lock, nested-begin and change notice were exercised on a host build.
+
 ## 2.6.14 (2026-10-26)
 
 ### Changes
