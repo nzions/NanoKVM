@@ -1,3 +1,9 @@
+## 2.6.19 (2026-10-26)
+
+### Changes
+
+* `scripts/forge-sdimage.sh` builds the Cube SD image on release 2.6.18 (tarball sha256 `ebd67e58a576...b0258f`) with kernel `-full` 1.2 (tag `k1.2`); the image carries `othbootargs` for `cvi_vc_drv` in `uEnv.txt`. No runtime change.
+
 ## 2.6.18 (2026-10-26)
 
 ### Changes
