@@ -1,3 +1,11 @@
+## 2.6.14 (2026-10-26)
+
+### Changes
+
+* kvm_mmf: `SAMPLE_COMM_VI_ParseIni` returns `CVI_SUCCESS` (0) when an ini parsed and `CVI_FAILURE` when none could be (it also fills the struct with defaults first). `_mmf_init` treated non-zero as success, logged "Parse complete" and went on; it now logs the failure and returns the error. `_try_release_sys` already returned on non-zero, but with a misleading message; fixed. Both zero `stIniCfg` first, and `_mmf_init` now checks `CVI_VI_SetDevNum`. A board with neither `/mnt/data/sensor_cfg.ini` nor the default ini now fails mmf init instead of running on defaults
+* kvm_mmf: the VB leak scan collected nothing and called `CVI_SYS_Exit` + `CVI_VB_Exit` once per pool, mid-scan. It now reads every pool first, tears down once (return values checked), then releases the leaked blocks. The ION leak scan called `mmf_deinit()` and returned in the middle of the scan on a failed `ionFree`; it now collects the VI_DMA_BUF entries, closes the file, frees them all, and calls `mmf_deinit()` once if any free failed. Both scans now check `ferror`/`fclose` and return -1 on any failure (the caller only logs it)
+* Not run on hardware (kvm1 offline)
+
 ## 2.6.13 (2026-10-26)
 
 ### Changes

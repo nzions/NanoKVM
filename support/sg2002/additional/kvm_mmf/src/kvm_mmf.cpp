@@ -344,6 +344,9 @@ static int _free_leak_memory_of_ion(void)
     #define MMF_SCAN_FIELD	"%19s"	/* sizeof the three buffers above, less the NUL */
     int alloc_buf_size;
 	uint64_t phy_addr;
+	#define MMF_LEAK_MAX 32
+	struct sys_ion_data_new leaks[MMF_LEAK_MAX];
+	int leak_cnt = 0, leak_overflow = 0, scan_failed = 0, free_failed = 0;
 
     fp = fopen("/sys/kernel/debug/ion/cvi_carveout_heap_dump/summary", "r");
     if (fp == NULL) {
@@ -358,6 +361,11 @@ static int _free_leak_memory_of_ion(void)
 			// server starts. Releasing it here makes SAMPLE_PLAT_VI_INIT fail.
 			if (strcmp(buffer_name, "VI_DMA_BUF"))
 				continue;
+			if (leak_cnt >= MMF_LEAK_MAX) {
+				printf("[ION] more than %d leaked VI_DMA_BUF entries, rest ignored\r\n", MMF_LEAK_MAX);
+				leak_overflow = 1;
+				continue;
+			}
 			struct sys_ion_data_new ion_data = {
 				.cached = 1,
 				.dmabuf_fd = (uint32_t)-1,
@@ -376,19 +384,34 @@ static int _free_leak_memory_of_ion(void)
 
 			printf("ion_data.size:%d, ion_data.addr_p:%#x, ion_data.name:%s\r\n", ion_data.size, (int)ion_data.addr_p, ion_data.name);
 
-			int res = ionFree(&ion_data);
-			if (res) {
-				printf("ionFree failed! res:%#x\r\n", res);
-				mmf_deinit();
-				return -1;
-			}
-
+			leaks[leak_cnt++] = ion_data;
         }
     }
 
-    fclose(fp);
+    if (ferror(fp)) {
+        fprintf(stderr, "Error reading ion summary\n");
+        scan_failed = 1;
+    }
+    if (fclose(fp) != 0) {
+        fprintf(stderr, "Error closing ion summary\n");
+        scan_failed = 1;
+    }
 
-	return 0;
+	/* Scan is over: free what was collected, then tear down once. */
+	for (int i = 0; i < leak_cnt; i++) {
+		int res = ionFree(&leaks[i]);
+		if (res) {
+			printf("ionFree failed! res:%#x\r\n", res);
+			free_failed = 1;
+		}
+	}
+
+	if (free_failed) {
+		mmf_deinit();
+		return -1;
+	}
+
+	return (scan_failed || leak_overflow) ? -1 : 0;
 }
 
 static int _free_leak_memory_of_vb(void) {
@@ -400,6 +423,15 @@ static int _free_leak_memory_of_vb(void) {
 	int blk_cnt = 0;
 	int blk_size = 0;
 	int free_cnt = 0;
+	#define MMF_VB_POOL_MAX 64
+	struct {
+		int pool_id;
+		uint64_t phy_addr;
+		int blk_cnt;
+		int blk_size;
+		int free_cnt;
+	} pools[MMF_VB_POOL_MAX];
+	int pool_cnt = 0, scan_failed = 0;
 
     fp = fopen("/proc/cvitek/vb", "r");
     if (fp == NULL) {
@@ -420,27 +452,60 @@ static int _free_leak_memory_of_vb(void) {
         } else if (strstr(line, "Free      :")) {
             sscanf(line, "%*s      : %d", &free_cnt);
 
-			CVI_SYS_Exit();
-			CVI_VB_Exit();
-
-			if (free_cnt != blk_cnt) {
-				printf("relese PoolId: %d, PhysAddr: 0x%lx, BlkSize: %d, BlkCnt: %d Free: %d\n",
-					pool_id, phy_addr, blk_size, blk_cnt, free_cnt);
-				for (int i = 0; i < blk_cnt; i ++) {
-					uint64_t try_release_phy_addr = phy_addr + i * blk_size;
-					printf("try release poolid:%d phy:%#lx\r\n", pool_id, try_release_phy_addr);
-					VB_BLK blk = CVI_VB_PhysAddr2Handle(try_release_phy_addr);
-					if (0 != CVI_VB_ReleaseBlock(blk)) {
-						printf("release poolid:%d phy:%#lx failed!\r\n", pool_id, try_release_phy_addr);
-					}
-				}
+			/* Collect only; tear down once after the whole scan. */
+			if (pool_cnt >= MMF_VB_POOL_MAX) {
+				printf("more than %d VB pools, rest ignored\r\n", MMF_VB_POOL_MAX);
+				scan_failed = 1;
+				continue;
 			}
+			pools[pool_cnt].pool_id = pool_id;
+			pools[pool_cnt].phy_addr = phy_addr;
+			pools[pool_cnt].blk_size = blk_size;
+			pools[pool_cnt].blk_cnt = blk_cnt;
+			pools[pool_cnt].free_cnt = free_cnt;
+			pool_cnt++;
         }
     }
 
-    fclose(fp);
+    if (ferror(fp)) {
+        fprintf(stderr, "Error reading /proc/cvitek/vb\n");
+        scan_failed = 1;
+    }
+    if (fclose(fp) != 0) {
+        fprintf(stderr, "Error closing /proc/cvitek/vb\n");
+        scan_failed = 1;
+    }
 
-	return 0;
+	if (pool_cnt > 0) {
+		CVI_S32 ret = CVI_SYS_Exit();
+		if (ret != CVI_SUCCESS) {
+			printf("CVI_SYS_Exit failed with %#x\r\n", ret);
+			scan_failed = 1;
+		}
+		ret = CVI_VB_Exit();
+		if (ret != CVI_SUCCESS) {
+			printf("CVI_VB_Exit failed with %#x\r\n", ret);
+			scan_failed = 1;
+		}
+	}
+
+	for (int p = 0; p < pool_cnt; p++) {
+		if (pools[p].free_cnt == pools[p].blk_cnt)
+			continue;
+		printf("relese PoolId: %d, PhysAddr: 0x%lx, BlkSize: %d, BlkCnt: %d Free: %d\n",
+			pools[p].pool_id, pools[p].phy_addr, pools[p].blk_size, pools[p].blk_cnt, pools[p].free_cnt);
+		for (int i = 0; i < pools[p].blk_cnt; i ++) {
+			uint64_t try_release_phy_addr = pools[p].phy_addr + i * pools[p].blk_size;
+			printf("try release poolid:%d phy:%#lx\r\n", pools[p].pool_id, try_release_phy_addr);
+			VB_BLK blk = CVI_VB_PhysAddr2Handle(try_release_phy_addr);
+			if (0 != CVI_VB_ReleaseBlock(blk)) {
+				printf("release poolid:%d phy:%#lx failed!\r\n", pools[p].pool_id, try_release_phy_addr);
+				scan_failed = 1;
+			}
+		}
+	}
+
+	return scan_failed ? -1 : 0;
 }
 
 static inline CVI_VOID VENC_GetPicBufferConfig2(CVI_U32 u32Width, CVI_U32 u32Height,
@@ -677,8 +742,11 @@ static int _try_release_sys(void)
 	CVI_S32 s32Ret = CVI_FAILURE;
 	SAMPLE_INI_CFG_S	   	stIniCfg;
 	SAMPLE_VI_CONFIG_S 		stViConfig;
-	if (SAMPLE_COMM_VI_ParseIni(&stIniCfg)) {
-		SAMPLE_PRT("Parse complete\n");
+	memset(&stIniCfg, 0, sizeof(stIniCfg));
+	memset(&stViConfig, 0, sizeof(stViConfig));
+	/* 0 = CVI_SUCCESS, non-zero = CVI_FAILURE (ini unparsable) */
+	if (SAMPLE_COMM_VI_ParseIni(&stIniCfg) != CVI_SUCCESS) {
+		SAMPLE_PRT("SAMPLE_COMM_VI_ParseIni failed\n");
 		return s32Ret;
 	}
 
@@ -974,12 +1042,19 @@ static CVI_S32 _mmf_init(void)
 	CVI_LOG_SetLevelConf(&log_conf);
 
 	// Get config from ini if found.
-	if (SAMPLE_COMM_VI_ParseIni(&stIniCfg)) {
-		SAMPLE_PRT("Parse complete\n");
+	memset(&stIniCfg, 0, sizeof(stIniCfg));
+	s32Ret = SAMPLE_COMM_VI_ParseIni(&stIniCfg);
+	if (s32Ret != CVI_SUCCESS) {
+		SAMPLE_PRT("SAMPLE_COMM_VI_ParseIni failed with %#x\n", s32Ret);
+		return s32Ret;
 	}
 
 	//Set sensor number
-	CVI_VI_SetDevNum(stIniCfg.devNum);
+	s32Ret = CVI_VI_SetDevNum(stIniCfg.devNum);
+	if (s32Ret != CVI_SUCCESS) {
+		SAMPLE_PRT("CVI_VI_SetDevNum failed with %#x\n", s32Ret);
+		return s32Ret;
+	}
 
 	/************************************************
 	 * step1:  Config VI
