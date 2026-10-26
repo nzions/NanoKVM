@@ -1,3 +1,7 @@
+## 2.5.15 (2026-10-26)
+
+* bump-only release to exercise OTA on hardware
+
 ## 2.5.14 (2026-10-26)
 
 ### Features
