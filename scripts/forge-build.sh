@@ -130,6 +130,17 @@ cp -a "$SRC" "$WORK_NANOKVM"
 cp -a "$MAIXCDK_SRC" "$WORK_MAIXCDK"
 chmod -R u+rwX "$WORK_NANOKVM" "$WORK_MAIXCDK"
 
+# --- pinned middleware source ----------------------------------------------------
+# scpcom/sophgo-middleware @ 4e231ef5967f from the artifacts share, sha256-checked,
+# fail closed (scripts/fetch-middleware.sh). Fetched first so a missing or wrong
+# mirror stops the build before the long SDK compile. Landed at a fixed path; the
+# kvm_mmf CMake reads it only when NANOKVM_MIDDLEWARE_SRC is exported, which this
+# script does not do yet (the link still uses MaixCDK's middleware; step 01k5spsnba).
+MW_SRC="$HOME/mw-src/sophgo-middleware-4e231ef"
+log "fetching the pinned middleware source (4e231ef5967f)"
+NANOKVM_SRC_MIRROR="$ARTIFACTS/src" bash "$WORK_NANOKVM/scripts/fetch-middleware.sh" "$MW_SRC"
+[ "$(cat "$MW_SRC/.pin")" = 4e231ef5967f8f7d77cecd65d9e2052a6f92f18c ] || die "$MW_SRC does not carry the pin"
+
 # --- riscv64 artifacts (what `make release-build` runs in the builder image) ---
 # build-in-container.sh needs HOME == $BUILD_HOME and the activated venv.
 log "building riscv64 artifacts (kvm_system, libkvm.so, NanoKVM-Server)"

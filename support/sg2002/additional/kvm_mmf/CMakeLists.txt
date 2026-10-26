@@ -4,6 +4,15 @@ list(APPEND ADD_INCLUDE "include")
 
 # sophgo-middleware
 set(middleware_src_path "${CMAKE_CURRENT_SOURCE_DIR}/../3rd_party/sophgo-middleware/sophgo-middleware")
+# NANOKVM_MIDDLEWARE_SRC points at the pinned scpcom/sophgo-middleware tree
+# (scripts/fetch-middleware.sh <dir>; the tree is under <dir>/v2). It replaces the
+# path above for headers, sources and libs alike. Unset = MaixCDK's copy.
+if(DEFINED ENV{NANOKVM_MIDDLEWARE_SRC})
+    set(middleware_src_path "$ENV{NANOKVM_MIDDLEWARE_SRC}")
+    if(NOT EXISTS "${middleware_src_path}/v2/include")
+        message(FATAL_ERROR "NANOKVM_MIDDLEWARE_SRC=${middleware_src_path} has no v2/include")
+    endif()
+endif()
 
 
 set(source_dir "src")

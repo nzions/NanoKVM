@@ -1,3 +1,11 @@
+## 2.6.21 (2026-10-26)
+
+### Changes
+
+* The forge build fetches the middleware source of record, scpcom/sophgo-middleware `4e231ef5967f` (licheervnano, tree under `v2/`), from the artifacts share instead of GitHub: `scripts/fetch-middleware.sh` reads `<share>/src/sophgo-middleware-4e231ef5967f.tar.gz` (git archive of that commit, sha256 `a431a22dac1c...350b`), checks the pinned sha256 and extracts it to `$HOME/mw-src/sophgo-middleware-4e231ef`. A missing file, an unset mirror or any other hash aborts the build before the SDK compile; there is no fallback.
+* `kvm_mmf`'s CMake takes `NANOKVM_MIDDLEWARE_SRC` to point `middleware_src_path` at that tree. Nothing exports it yet, so headers, sources and the link are still MaixCDK's middleware: 4e231ef has no `v2/include/isp/cv181x` and no `v2/uapi`, so the include set cannot be switched on its own. Linking our own built libs is the next step.
+* Not run on hardware
+
 ## 2.6.20 (2026-10-26)
 
 ### Changes
