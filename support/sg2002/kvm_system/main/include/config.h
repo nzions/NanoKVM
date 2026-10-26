@@ -24,7 +24,6 @@
 #include "system_init.h"
 #include "oled_ctrl.h"
 #include "oled_ui.h"
-#include "hdmi.h"
 
 #define IP_Change_time 				5000
 #define QR_Change_time 				5000

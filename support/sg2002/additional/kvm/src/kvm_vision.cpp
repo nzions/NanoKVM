@@ -15,6 +15,7 @@
 
 #include <errno.h>
 #include <stdarg.h>
+#include <string.h>
 #include <sys/stat.h>
 
 #define default_venc_chn        1
@@ -59,17 +60,6 @@
 
 pthread_mutex_t vi_mutex;
 pthread_mutex_t hdmi_signal_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-static char NanoKVM_edit[] = {
-	0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0x41,0x0C,0x33,0xC2,0x66,0xBA,0x00,0x00,
-	0x2B,0x1F,0x01,0x04,0xA5,0x50,0x22,0x78,0x3B,0xCC,0xE5,0xAB,0x51,0x48,0xA6,0x26,
-	0x0C,0x50,0x54,0xBF,0xEF,0x00,0xD1,0xC0,0xB3,0x00,0x95,0x00,0x81,0x80,0x81,0x40,
-	0x81,0xC0,0x01,0x01,0x01,0x01,0xD8,0x59,0x00,0x60,0xA3,0x38,0x28,0x40,0xA0,0x10,
-	0x3A,0x10,0x20,0x4F,0x31,0x00,0x00,0x1A,0x00,0x00,0x00,0xFF,0x00,0x55,0x4B,0x30,
-	0x32,0x31,0x34,0x33,0x30,0x34,0x37,0x37,0x31,0x38,0x00,0x00,0x00,0xFC,0x00,0x50,
-	0x48,0x4C,0x20,0x33,0x34,0x32,0x45,0x32,0x0A,0x20,0x20,0x20,0x00,0x00,0x00,0xFD,
-	0x00,0x30,0x4B,0x63,0x63,0x1E,0x01,0x0A,0x20,0x20,0x20,0x20,0x20,0x20,0x01,0x8E
-};
 
 using namespace maix;
 using namespace maix::sys;
@@ -509,21 +499,32 @@ uint8_t auto_try_res()
 */
 uint8_t chack_ion()
 {
-    // cat /sys/kernel/debug/ion/cvi_carveout_heap_dump/summary | grep "usage rate:" | awk -F '[:%]' '{print $2}'
-	uint8_t RW_Data[10];
+    // Reads the first "usage rate:" line of the ion summary and takes its
+    // second whitespace-separated field, as the former
+    // `grep "usage rate:" | awk '{print $2}'` pipeline printed it.
+    static const char ion_summary_path[] = "/sys/kernel/debug/ion/cvi_carveout_heap_dump/summary";
+    char line[256];
+    char RW_Data[10] = {0};
     uint8_t ATOI_Data[3] = {0};
     uint8_t ion_usage_rate;
-    char Cmd[150]={0};
-    // sprintf( Cmd, "cat /sys/kernel/debug/ion/cvi_carveout_heap_dump/summary | grep \"usage rate:\" | awk -F '[:%]' '{print $2}'");
-    sprintf( Cmd, "cat /sys/kernel/debug/ion/cvi_carveout_heap_dump/summary | grep \"usage rate:\" | awk '{print $2}'");
-    FILE* fp = popen( Cmd, "r" );
+    FILE* fp = fopen(ion_summary_path, "r");
     if ( NULL == fp )
     {
-        pclose(fp);
         return 0;
     }
-    fgets((char*)RW_Data, 8, fp);
-    pclose(fp);
+    while (fgets(line, sizeof(line), fp) != NULL)
+    {
+        if (strstr(line, "usage rate:") == NULL) continue;
+        const char *p = line;
+        p += strspn(p, " \t\r\n");
+        p += strcspn(p, " \t\r\n");
+        p += strspn(p, " \t\r\n");
+        size_t n = strcspn(p, " \t\r\n");
+        // awk printed the field plus a newline; the old read kept at most 7 chars of it
+        snprintf(RW_Data, 8, "%.*s\n", (int)n, p);
+        break;
+    }
+    fclose(fp);
     RW_Data[8] = 0;
     if (RW_Data[6] == '&') return 1;
     else {
@@ -575,37 +576,6 @@ void lt6911_disable()
 	buf[0] = 0xee;
 	buf[1] = 0x00;
 	LT6911_i2c.writeto(LT6911_ADDR, buf, 2);
-}
-
-void lt6911_get_hdmi_errer()
-{
-	uint8_t buf[6];
-
-	buf[0] = 0xff;
-	buf[1] = 0xC0;
-	LT6911_i2c.writeto(LT6911_ADDR, buf, 2);
-
-	buf[0] = 0x20;
-	buf[1] = 0x01;
-	LT6911_i2c.writeto(LT6911_ADDR, buf, 2);
-
-	time::sleep_ms(100);
-
-	buf[0] = 0x24;
-	LT6911_i2c.writeto(LT6911_ADDR, buf, 1);
-
-	maix::Bytes *dat = LT6911_i2c.readfrom(LT6911_ADDR, 6);
-
-	buf[0] = 0x20;
-	buf[1] = 0x07;
-	LT6911_i2c.writeto(LT6911_ADDR, buf, 2);
-
-	for(int i = 0; i < 6; i++){
-		buf[i] = (uint8_t)dat->data[i];
-	}
-	delete dat;
-
-	debug("hdmi_errer_code = %x, %x, %x, %x, %x, %x\n", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]);
 }
 
 uint8_t lt6911_get_hdmi_res()
@@ -718,47 +688,6 @@ uint8_t lt6911_get_hdmi_res()
     } else {
         return 0;
     }
-}
-
-void lt6911_get_hdmi_clk()
-{
-	uint8_t buf[2];
-	uint8_t revbuf[3];
-	uint32_t clk;
-
-	buf[0] = 0xff;
-	buf[1] = 0xa0;
-	LT6911_i2c.writeto(LT6911_ADDR, buf, 2);
-
-	buf[0] = 0x34;
-	buf[1] = 0x0b;
-	LT6911_i2c.writeto(LT6911_ADDR, buf, 2);
-
-	time::sleep_ms(50);
-
-	// clk
-	buf[0] = 0xff;
-	buf[1] = 0xb8;
-	LT6911_i2c.writeto(LT6911_ADDR, buf, 2);
-
-	buf[0] = 0xb1;
-	LT6911_i2c.writeto(LT6911_ADDR, buf, 1);
-	maix::Bytes *dat0 = LT6911_i2c.readfrom(LT6911_ADDR, 3);
-
-	revbuf[0] = (uint8_t)dat0->data[0];
-	revbuf[1] = (uint8_t)dat0->data[1];
-	revbuf[2] = (uint8_t)dat0->data[2];
-	revbuf[0] &= 0x07;
-
-	clk = revbuf[0];
-	clk <<= 8;
-	clk |= revbuf[1];
-	clk <<= 8;
-	clk |= revbuf[2];
-
-	debug("[hdmi]HDMI CLK = %d\n", clk);
-
-	delete dat0;
 }
 
 uint8_t lt6911_get_csi_res(uint16_t *p_width, uint16_t *p_height)
@@ -928,195 +857,6 @@ uint8_t lt6911_read_one_reg(uint8_t reg)
 
 	delete dat;
 	return ret;
-}
-
-void lt6911_write_edid(void)
-{
-	uint8_t i, j;
-	uint8_t buf[2];
-	lt6911_enable();
-
-	// to 90
-	lt6911_write_reg(0xff, 0x90);
-	buf[0] = lt6911_read_one_reg(0x02);
-	buf[0] &= 0xDF;
-	lt6911_write_reg(0x02, buf[0]);
-	buf[0] |= 0x20;
-	lt6911_write_reg(0x02, buf[0]);
-
-	// to 80
-	lt6911_write_reg(0xff, 0x80);
-	// wren enable
-	lt6911_write_reg(0x5A, 0x86);
-	lt6911_write_reg(0x5A, 0x82);
-
-	for(i = 0; i < 16; i++){
-		// 写wren命令(为一个pulse，此时不需要考虑wrrd_mode，spi_paddr[1:0]的值)
-		lt6911_write_reg(0x5A, 0x86);
-		lt6911_write_reg(0x5A, 0x82);
-
-		// 配置spi_len[3:0]= 15，可配置，spi内部加1，即配置一次写入16个字节
-		lt6911_write_reg(0x5E, 0xEF);
-		lt6911_write_reg(0x5A, 0xA2);
-		lt6911_write_reg(0x5A, 0x82);
-
-		lt6911_write_reg(0x58, 0x01);
-
-		if(i < 8) {
-			for(j = 0; j < 16; j++){
-				lt6911_write_reg(0x59, NanoKVM_edit[i*16+j]);
-			}
-		} else {
-			for(j = 0; j < 16; j++){
-				lt6911_write_reg(0x59, 0x00);
-			}
-		}
-
-		// 把fifo数据写到flash(当wrrd_mode = 1，spi_paddr= 2’b10,addr[23:0](地址在写入过程中需要保持不变)准备好的情况下，给一个spi_sta的pulse，就开始写入flash)
-		lt6911_write_reg(0x5B, 0x00);
-		lt6911_write_reg(0x5C, 0x21);
-		lt6911_write_reg(0x5D, i*16);
-		lt6911_write_reg(0x5E, 0xE0);
-		lt6911_write_reg(0x5A, 0x92);
-		lt6911_write_reg(0x5A, 0x82);
-
-	}
-
-	lt6911_write_reg(0x5A, 0x8A);
-	lt6911_write_reg(0x5A, 0x82);
-
-	lt6911_disable();
-	debug("[hdmi]lt6911_write_edid OK\n");
-}
-
-void lt6911_read_edid(void)
-{
-	uint8_t i, j;
-	lt6911_enable();
-
-	// to 80
-	lt6911_write_reg(0xff, 0x80);
-	lt6911_write_reg(0xEE, 0x01);
-
-	// configure parameter
-	lt6911_write_reg(0x5A, 0x80);
-	lt6911_write_reg(0x5E, 0xC0);
-	lt6911_write_reg(0x58, 0x00);
-	lt6911_write_reg(0x59, 0x51);
-	lt6911_write_reg(0x5A, 0x90);
-	time::sleep_ms(1);
-	lt6911_write_reg(0x5A, 0x80);
-
-	for(i = 0; i < 16; i++){
-		// to 90
-		lt6911_write_reg(0xff, 0x90);
-		// fifo rst_n
-		lt6911_write_reg(0x02, 0xdf);
-		time::sleep_ms(1);
-		lt6911_write_reg(0x02, 0xff);
-
-		// wren
-		// to 80
-		lt6911_write_reg(0xff, 0x80);
-		// fifo rst_n
-		lt6911_write_reg(0x5A, 0x84);
-		time::sleep_ms(1);
-		lt6911_write_reg(0x5A, 0x80);
-
-		// flash to fifo
-		lt6911_write_reg(0x5E, 0x6F);
-		lt6911_write_reg(0x5A, 0xA0);
-		time::sleep_ms(1);
-		lt6911_write_reg(0x5A, 0x80);
-		lt6911_write_reg(0x5B, 0x00);
-		lt6911_write_reg(0x5C, 0x21);
-		lt6911_write_reg(0x5D, 16*i);
-		lt6911_write_reg(0x5A, 0x90);
-		time::sleep_ms(5);
-		lt6911_write_reg(0x5A, 0x80);
-		lt6911_write_reg(0x58, 0x01);
-
-		// for(j = 0; j < 16; j++){
-		debug("[hdmi] EDID: ");
-		lt6911_read_reg(0x5F);
-		// }
-		time::sleep_ms(10);
-	}
-
-	// wrdi
-	lt6911_write_reg(0x5A, 0x88);
-	time::sleep_ms(1);
-	lt6911_write_reg(0x5A, 0x80);
-
-	lt6911_disable();
-	debug("[hdmi]lt6911_read_edid OK\n");
-}
-
-void lt6911_read_fw(void)
-{
-	uint32_t i, j;
-	uint8_t buf[3];
-	lt6911_enable();
-
-	// to 80
-	lt6911_write_reg(0xff, 0x80);
-	lt6911_write_reg(0xEE, 0x01);
-
-	// configure parameter
-	lt6911_write_reg(0x5A, 0x80);
-	lt6911_write_reg(0x5E, 0xC0);
-	lt6911_write_reg(0x58, 0x00);
-	lt6911_write_reg(0x59, 0x51);
-	lt6911_write_reg(0x5A, 0x90);
-	time::sleep_ms(1);
-	lt6911_write_reg(0x5A, 0x80);
-
-	for(i = 0x1; i < 50000; i++){
-		buf[0] = ((i*16) & 0xFF0000) >> 16;
-		buf[1] = ((i*16) & 0xFF00) >> 8;
-		buf[2] = ((i*16) & 0xFF);
-		// to 90
-		lt6911_write_reg(0xff, 0x90);
-		// fifo rst_n
-		lt6911_write_reg(0x02, 0xdf);
-		time::sleep_ms(1);
-		lt6911_write_reg(0x02, 0xff);
-
-		// wren
-		// to 80
-		lt6911_write_reg(0xff, 0x80);
-		// fifo rst_n
-		lt6911_write_reg(0x5A, 0x84);
-		time::sleep_ms(1);
-		lt6911_write_reg(0x5A, 0x80);
-
-		// flash to fifo
-		lt6911_write_reg(0x5E, 0x6F);
-		lt6911_write_reg(0x5A, 0xA0);
-		time::sleep_ms(1);
-		lt6911_write_reg(0x5A, 0x80);
-		lt6911_write_reg(0x5B, buf[0]);
-		lt6911_write_reg(0x5C, buf[1]);
-		lt6911_write_reg(0x5D, buf[2]);
-		lt6911_write_reg(0x5A, 0x90);
-		time::sleep_ms(5);
-		lt6911_write_reg(0x5A, 0x80);
-		lt6911_write_reg(0x58, 0x01);
-
-		// for(j = 0; j < 16; j++){
-		debug("[hdmi]REG %6x: ", i*16);
-		lt6911_read_reg(0x5F);
-		// }
-		time::sleep_ms(10);
-	}
-
-	// wrdi
-	lt6911_write_reg(0x5A, 0x88);
-	time::sleep_ms(1);
-	lt6911_write_reg(0x5A, 0x80);
-
-	lt6911_disable();
-	debug("[hdmi]lt6911_read_edid OK\n");
 }
 
 // ==============================================================
@@ -1451,58 +1191,6 @@ void* vi_subsystem_detection(void * arg)
     return NULL;
 }
 
-int sync_vi_res()
-{
-    int res = 0;
-    uint8_t RW_Data[35];
-    FILE *fp;
-    int file_size;
-    uint16_t tmp16;
-
-    // vi_width:
-    if (access(vi_width_path, F_OK) != 0){
-        kvmv_cfg.vi_width = default_vi_width;
-        kvmv_cfg.vi_height = default_vi_height;
-        res = -1;
-        return res;
-    } else {
-        fp = fopen(vi_width_path, "r");
-        fseek(fp, 0, SEEK_END);
-        file_size = ftell(fp);
-        fseek(fp, 0, SEEK_SET);
-        fread(RW_Data, sizeof(char), file_size, fp);
-        fclose(fp);
-        RW_Data[file_size] = 0;
-        tmp16 = atoi((char*)RW_Data);
-        if(tmp16 != kvmv_cfg.vi_width){
-            kvmv_cfg.vi_width = tmp16;
-            debug("[hdmi] Get new HDMI width = %d\r\n", kvmv_cfg.vi_width);
-            res = 1;
-        }
-    }
-    // vi_height:
-    if (access(vi_height_path, F_OK) != 0){
-        kvmv_cfg.vi_height = default_vi_height;
-        res = -1;
-        return res;
-    } else {
-        fp = fopen(vi_height_path, "r");
-        fseek(fp, 0, SEEK_END);
-        file_size = ftell(fp);
-        fseek(fp, 0, SEEK_SET);
-        fread(RW_Data, sizeof(char), file_size, fp);
-        fclose(fp);
-        RW_Data[file_size] = 0;
-        tmp16 = atoi((char*)RW_Data);
-        if(tmp16 != kvmv_cfg.vi_height){
-            kvmv_cfg.vi_height = tmp16;
-            debug("[hdmi] Get new HDMI height = %d\r\n", kvmv_cfg.vi_height);
-            res = 1;
-        }
-    }
-    return res;
-}
-
 uint8_t frame_changed(image::Image *raw)
 {
     static int raw_size = 0;
@@ -1743,7 +1431,6 @@ uint8_t check_kvmv(uint8_t _try_num)
         debug("[kvmv]try_num >= KVMV_MAX_TRY_NUM!\n");
         return 0;
     }
-    // if(sync_vi_res() != 0){
     if(kvmv_cfg.reopen_cam_flag == 1){
         // vi size changed
         kvmv_cfg.reopen_cam_flag = 0;
