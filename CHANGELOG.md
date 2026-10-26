@@ -1,3 +1,9 @@
+## 2.6.4 (2026-10-26)
+
+### Fixes
+
+* scripts/sd-image.sh: `--kernel-fit` put the DTB's `/memreserve/` line at the wrong place (a GNU sed range that starts at line 1 runs to the end of the file); it is inserted after `/dts-v1/;` with awk. Found by the first forge run. No device code changed
+
 ## 2.6.3 (2026-10-26)
 
 ### Changes

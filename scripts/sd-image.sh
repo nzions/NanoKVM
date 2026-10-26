@@ -512,11 +512,11 @@ if [ "$KFIT" = 1 ]; then
     if [ $((FW_RESERVE)) -gt 0 ]; then
         dtc -I dtb -O dts -o "$FITDIR/kernel.dts" "$KDTB" 2>"$FITDIR/dtc.err" || die "dtc cannot decompile $KDTB: $(cat "$FITDIR/dtc.err")"
         grep -q '^/memreserve/' "$FITDIR/kernel.dts" && die "$KDTB already has /memreserve/ entries; refusing to add another"
-        {
-            sed -n '1,/^\/dts-v1\/;/p' "$FITDIR/kernel.dts"
-            printf '/memreserve/ 0x80000000 %s;\n' "$FW_RESERVE"
-            sed '1,/^\/dts-v1\/;/d' "$FITDIR/kernel.dts"
-        } >"$FITDIR/kernel-res.dts"
+        awk -v size="$FW_RESERVE" '
+            { print }
+            /^\/dts-v1\/;$/ && !done { print ""; print "/memreserve/ 0x80000000 " size ";"; done = 1 }
+            END { if (!done) exit 1 }' "$FITDIR/kernel.dts" >"$FITDIR/kernel-res.dts" ||
+            die "$KDTB decompiles without a /dts-v1/; line"
         dtc -I dts -O dtb -o "$FITDIR/kernel.dtb" "$FITDIR/kernel-res.dts" 2>"$FITDIR/dtc.err" || die "dtc cannot compile the DTB with /memreserve/: $(cat "$FITDIR/dtc.err")"
         dtc -I dtb -O dts -o "$FITDIR/kernel.check.dts" "$FITDIR/kernel.dtb" 2>/dev/null || die "dtc cannot re-read the new DTB"
         grep -q "^/memreserve/ 0x80000000 $FW_RESERVE;" "$FITDIR/kernel.check.dts" ||
