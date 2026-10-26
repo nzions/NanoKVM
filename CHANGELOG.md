@@ -1,3 +1,11 @@
+## 2.6.40 (2026-10-26)
+
+### Changes
+
+* `kvm_system` is built without MaixCDK. `support/sg2002/maixlite/` is a trimmed vendor copy of the MaixCDK sources it compiled (pinned commit `30f4b8b7e3f6`: components `basic`, `peripheral`, `ini`, `ntp_client`, `yaml`; 153 unmodified files plus the Apache-2.0 `LICENSE`, each sha256 in `UPSTREAM.sha256` and checked before every build) with a plain CMake build (`CMakeLists.txt`, `toolchain.cmake`) of the same sources, defines, include order, flags and link line, and static `global_config.h` / `global_build_info_version.h` in place of the generated ones. `scripts/build-maixlite.sh` builds it, strips it as MaixCDK's `gen_binary.cmake` did and stages `kvmapp/kvm_system/kvm_system`; `scripts/build-in-container.sh` calls it instead of `./build kvm_system`. `libkvm.so` and `libkvm_mmf.so` still go through MaixCDK (S6).
+* Flags-drift check: `tools/binabi/flags.sh` compares every generated `flags.make` and `link.txt` of the maixlite build with `tools/binabi/golden/kvm_system.flags` (the MaixCDK ones from the 2.6.39 evidence, paths normalised) and fails the build on any difference. The golden ABI check (`tools/binabi/check.sh`) now holds the maixlite `kvm_system`. The evidence bundle's `flags/kvm_system` is the maixlite build's (`flags.make`, `link.txt`, `CMakeCache.txt`, `compile_commands.json`, normalised).
+* Not run on hardware
+
 ## 2.6.39 (2026-10-26)
 
 ### Changes

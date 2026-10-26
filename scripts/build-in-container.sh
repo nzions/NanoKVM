@@ -65,9 +65,14 @@ cd "$NANOKVM_PATH/support/sg2002"
 ./build update_lib
 echo "::endgroup::"
 
-echo "::group::support: build kvm_system"
-./build kvm_system
-./build kvm_system add_to_kvmapp
+# kvm_system is built without MaixCDK: support/sg2002/maixlite, the vendored subset of the
+# MaixCDK sources it compiled, with the same flags and link line (scripts/build-maixlite.sh
+# holds them to the MaixCDK golden). libkvm.so below still goes through MaixCDK (S6).
+echo "::group::support: build kvm_system (maixlite)"
+MAIXLITE_BUILD="${MAIXLITE_BUILD:-$HOME/maixlite-build}"
+MAIXLITE_TOOLCHAIN_BIN="${MAIXLITE_TOOLCHAIN_BIN:-$(cd -P "$(dirname "$(command -v riscv64-unknown-linux-musl-gcc)")" && pwd)}"
+export MAIXLITE_TOOLCHAIN_BIN
+bash "$NANOKVM_PATH/scripts/build-maixlite.sh" "$NANOKVM_PATH" "$MAIXLITE_BUILD"
 echo "::endgroup::"
 
 echo "::group::support: build kvm_vision (libkvm.so)"

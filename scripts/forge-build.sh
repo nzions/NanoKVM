@@ -215,6 +215,17 @@ set -u
 # Ask CMake (3.17+, from the environment) for compile_commands.json in every MaixCDK
 # project; it changes no flag, only writes the file for the evidence bundle below.
 export CMAKE_EXPORT_COMPILE_COMMANDS=ON
+# kvm_system is built by support/sg2002/maixlite (no MaixCDK), in this CMake build tree and
+# with the image's compiler; libkvm.so and libkvm_mmf.so still go through MaixCDK (S6).
+MAIXLITE_BUILD="$HOME/maixlite-build"
+export MAIXLITE_BUILD MAIXLITE_TOOLCHAIN_BIN="$MCDK_TC_BIN"
+# The CMake build tree of a project: maixlite's for kvm_system, MaixCDK's for the rest.
+proj_bdir() {
+    case "$1" in
+        kvm_system) printf '%s' "$MAIXLITE_BUILD" ;;
+        *) printf '%s' "$WORK_NANOKVM/support/sg2002/$1/build" ;;
+    esac
+}
 # The compiler CMake settled on (CMakeCache.txt has no CMAKE_<LANG>_COMPILER here: MaixCDK
 # sets it in a variable): "set(CMAKE_<LANG>_COMPILER "<path>")" in CMake<LANG>Compiler.cmake.
 cmake_compiler() {
@@ -247,7 +258,7 @@ log "check: no 'Downloading'/'Download n%'/'Extracting' line in $MCDK_BUILD_LOG 
 log "check: the compilers MaixCDK used resolve to /opt/sg2002/host-tools"
 for proj in kvm_system kvm_vision_test; do
     for var in C CXX; do
-        cc="$(cmake_compiler "$WORK_NANOKVM/support/sg2002/$proj/build" "$var")" || die "check: $proj: no CMAKE_${var}_COMPILER in the build's CMake${var}Compiler.cmake"
+        cc="$(cmake_compiler "$(proj_bdir "$proj")" "$var")" || die "check: $proj: no CMAKE_${var}_COMPILER in the build's CMake${var}Compiler.cmake"
         real="$(realpath "$cc")" || die "check: $cc does not resolve"
         case "$real" in
             /opt/sg2002/host-tools/*) ;;
@@ -277,7 +288,8 @@ for bin in "$WORK_NANOKVM/kvmapp/kvm_system/kvm_system" \
            "$WORK_NANOKVM/server/NanoKVM-Server"; do
     bash "$WORK_NANOKVM/scripts/binprint.sh" "$bin" "$EVIDENCE/binaries" || die "binprint failed on $bin"
 done
-# Hold the three MaixCDK-built binaries to the 2.6.38 golden ABI manifest (tools/binabi).
+# Hold the three binaries to the 2.6.38 golden ABI manifest (tools/binabi): kvm_system is now
+# built by maixlite, the two libraries by MaixCDK.
 bash "$WORK_NANOKVM/tools/binabi/check.sh" "$EVIDENCE/binaries" || die "binabi: ABI differs from the golden manifest"
 
 # Paths in the generated build files carry this build's HOME; replace them so two builds
@@ -288,8 +300,8 @@ norm_paths() {
 }
 log "evidence: compile and link flags of the MaixCDK projects"
 for proj in kvm_system kvm_vision_test; do
-    bdir="$WORK_NANOKVM/support/sg2002/$proj/build"
-    [ -d "$bdir" ] || die "$bdir is missing: MaixCDK built $proj elsewhere?"
+    bdir="$(proj_bdir "$proj")"
+    [ -d "$bdir" ] || die "$bdir is missing: $proj was built elsewhere?"
     fdir="$EVIDENCE/flags/$proj"
     mkdir -p "$fdir"
     nflags=0
@@ -319,7 +331,7 @@ log "evidence: the toolchain MaixCDK compiled with"
 {
     for proj in kvm_system kvm_vision_test; do
         for var in C CXX; do
-            cc="$(cmake_compiler "$WORK_NANOKVM/support/sg2002/$proj/build" "$var")"
+            cc="$(cmake_compiler "$(proj_bdir "$proj")" "$var")"
             printf '%s CMAKE_%s_COMPILER %s -> %s\n' "$proj" "$var" "$cc" "$(realpath "$cc")"
         done
     done

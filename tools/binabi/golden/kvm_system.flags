@@ -1,0 +1,90 @@
+=== CMakeFiles%kvm_system.dir%flags.make
+
+# compile C with /opt/sg2002/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-gcc
+C_DEFINES = -DDEBUG=0 -DPLATFORM_MAIXCAM=1 -DRELEASE=1
+
+C_INCLUDES = -I@NANOKVM@/support/sg2002/kvm_system/main/include -I@NANOKVM@/support/sg2002/kvm_system/main/lib/libqr -I@NANOKVM@/support/sg2002/kvm_system/main/lib/system_ctrl -I@NANOKVM@/support/sg2002/kvm_system/main/lib/system_state -I@NANOKVM@/support/sg2002/kvm_system/main/lib/system_init -I@NANOKVM@/support/sg2002/kvm_system/main/lib/oled_ctrl -I@NANOKVM@/support/sg2002/kvm_system/main/lib/oled_ui -I@CONFIG@ -I@MAIXLITE@/components/basic/include -I@MAIXLITE@/components/3rd_party/ini/inifile2/src -I@MAIXLITE@/components/3rd_party/yaml/yaml-cpp/src -I@MAIXLITE@/components/3rd_party/yaml/yaml-cpp/include -I@MAIXLITE@/components/3rd_party/ntp_client/ntp_client -I@MAIXLITE@/components/peripheral/include
+
+C_FLAGS = -mcpu=c906fdv -march=rv64imafdcv0p7xthead -mcmodel=medany -mabi=lp64d -Wall -fPIC -Os -DNDEBUG
+
+=== CMakeFiles%kvm_system.dir%link.txt
+/opt/sg2002/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-g++ -mcpu=c906fdv -march=rv64imafdcv0p7xthead -mcmodel=medany -mabi=lp64d -Wall -fPIC -std=c++17 -Os -DNDEBUG -Wl,-rpath=$ORIGIN/dl_lib CMakeFiles/kvm_system.dir/exe_src.c.o -o kvm_system  main/libmain.a peripheral/libperipheral.a basic/libbasic.a -lpthread -lstdc++fs ini/libini.a yaml/libyaml.a ntp_client/libntp_client.a
+=== basic%CMakeFiles%basic.dir%flags.make
+
+# compile CXX with /opt/sg2002/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-g++
+CXX_DEFINES = -DDEBUG=0 -DPLATFORM_MAIXCAM=1 -DRELEASE=1
+
+CXX_INCLUDES = -I@MAIXLITE@/components/basic/include -I@CONFIG@ -I@MAIXLITE@/components/3rd_party/ini/inifile2/src -I@MAIXLITE@/components/3rd_party/yaml/yaml-cpp/src -I@MAIXLITE@/components/3rd_party/yaml/yaml-cpp/include -I@MAIXLITE@/components/3rd_party/ntp_client/ntp_client
+
+CXX_FLAGS = -mcpu=c906fdv -march=rv64imafdcv0p7xthead -mcmodel=medany -mabi=lp64d -Wall -fPIC -std=c++17 -Os -DNDEBUG
+
+=== basic%CMakeFiles%basic.dir%link.txt
+/opt/sg2002/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-ar qc libbasic.a CMakeFiles/basic.dir/src/maix_app.cpp.o CMakeFiles/basic.dir/src/maix_err.cpp.o CMakeFiles/basic.dir/src/maix_fs.cpp.o CMakeFiles/basic.dir/src/maix_i18n.cpp.o CMakeFiles/basic.dir/src/maix_log.cpp.o CMakeFiles/basic.dir/src/maix_protocol.cpp.o CMakeFiles/basic.dir/src/maix_sys.cpp.o CMakeFiles/basic.dir/src/maix_time.cpp.o CMakeFiles/basic.dir/src/maix_util.cpp.o CMakeFiles/basic.dir/port/maixcam/maix_sys_maixcam.cpp.o CMakeFiles/basic.dir/port/maixcam/maix_thread_maixcam.cpp.o CMakeFiles/basic.dir/port/maixcam/maix_util_maixcam.cpp.o
+/opt/sg2002/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-ranlib libbasic.a
+=== ini%CMakeFiles%ini.dir%flags.make
+
+# compile CXX with /opt/sg2002/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-g++
+CXX_DEFINES = -DDEBUG=0 -DPLATFORM_MAIXCAM=1 -DRELEASE=1
+
+CXX_INCLUDES = -I@MAIXLITE@/components/3rd_party/ini/inifile2/src -I@CONFIG@
+
+CXX_FLAGS = -mcpu=c906fdv -march=rv64imafdcv0p7xthead -mcmodel=medany -mabi=lp64d -Wall -fPIC -std=c++17 -Os -DNDEBUG
+
+=== ini%CMakeFiles%ini.dir%link.txt
+/opt/sg2002/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-ar qc libini.a CMakeFiles/ini.dir/inifile2/src/inifile.cpp.o
+/opt/sg2002/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-ranlib libini.a
+=== main%CMakeFiles%main.dir%flags.make
+
+# compile C with /opt/sg2002/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-gcc
+# compile CXX with /opt/sg2002/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-g++
+C_DEFINES = -DDEBUG=0 -DPLATFORM_MAIXCAM=1 -DRELEASE=1
+
+C_INCLUDES = -I@NANOKVM@/support/sg2002/kvm_system/main/include -I@NANOKVM@/support/sg2002/kvm_system/main/lib/libqr -I@NANOKVM@/support/sg2002/kvm_system/main/lib/system_ctrl -I@NANOKVM@/support/sg2002/kvm_system/main/lib/system_state -I@NANOKVM@/support/sg2002/kvm_system/main/lib/system_init -I@NANOKVM@/support/sg2002/kvm_system/main/lib/oled_ctrl -I@NANOKVM@/support/sg2002/kvm_system/main/lib/oled_ui -I@NANOKVM@/support/sg2002/additional/kvm/include -I@CONFIG@ -I@MAIXLITE@/components/basic/include -I@MAIXLITE@/components/3rd_party/ini/inifile2/src -I@MAIXLITE@/components/3rd_party/yaml/yaml-cpp/src -I@MAIXLITE@/components/3rd_party/yaml/yaml-cpp/include -I@MAIXLITE@/components/3rd_party/ntp_client/ntp_client -I@MAIXLITE@/components/peripheral/include
+
+C_FLAGS = -mcpu=c906fdv -march=rv64imafdcv0p7xthead -mcmodel=medany -mabi=lp64d -Wall -fPIC -Os -DNDEBUG
+
+CXX_DEFINES = -DDEBUG=0 -DPLATFORM_MAIXCAM=1 -DRELEASE=1
+
+CXX_INCLUDES = -I@NANOKVM@/support/sg2002/kvm_system/main/include -I@NANOKVM@/support/sg2002/kvm_system/main/lib/libqr -I@NANOKVM@/support/sg2002/kvm_system/main/lib/system_ctrl -I@NANOKVM@/support/sg2002/kvm_system/main/lib/system_state -I@NANOKVM@/support/sg2002/kvm_system/main/lib/system_init -I@NANOKVM@/support/sg2002/kvm_system/main/lib/oled_ctrl -I@NANOKVM@/support/sg2002/kvm_system/main/lib/oled_ui -I@NANOKVM@/support/sg2002/additional/kvm/include -I@CONFIG@ -I@MAIXLITE@/components/basic/include -I@MAIXLITE@/components/3rd_party/ini/inifile2/src -I@MAIXLITE@/components/3rd_party/yaml/yaml-cpp/src -I@MAIXLITE@/components/3rd_party/yaml/yaml-cpp/include -I@MAIXLITE@/components/3rd_party/ntp_client/ntp_client -I@MAIXLITE@/components/peripheral/include
+
+CXX_FLAGS = -mcpu=c906fdv -march=rv64imafdcv0p7xthead -mcmodel=medany -mabi=lp64d -Wall -fPIC -std=c++17 -Os -DNDEBUG
+
+=== main%CMakeFiles%main.dir%link.txt
+/opt/sg2002/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-ar qc libmain.a CMakeFiles/main.dir/src/main.cpp.o CMakeFiles/main.dir/lib/libqr/qr.c.o CMakeFiles/main.dir/lib/libqr/qrcmd.c.o CMakeFiles/main.dir/lib/libqr/qrcnv.c.o CMakeFiles/main.dir/lib/libqr/qrcnv_bmp.c.o CMakeFiles/main.dir/lib/system_ctrl/system_ctrl.cpp.o CMakeFiles/main.dir/lib/system_state/system_state.cpp.o CMakeFiles/main.dir/lib/system_init/system_init.cpp.o CMakeFiles/main.dir/lib/oled_ctrl/oled_ctrl.cpp.o CMakeFiles/main.dir/lib/oled_ui/oled_ui.cpp.o
+/opt/sg2002/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-ranlib libmain.a
+=== ntp_client%CMakeFiles%ntp_client.dir%flags.make
+
+# compile C with /opt/sg2002/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-gcc
+C_DEFINES = -DDEBUG=0 -DPLATFORM_MAIXCAM=1 -DRELEASE=1
+
+C_INCLUDES = -I@MAIXLITE@/components/3rd_party/ntp_client/ntp_client -I@CONFIG@
+
+C_FLAGS = -mcpu=c906fdv -march=rv64imafdcv0p7xthead -mcmodel=medany -mabi=lp64d -Wall -fPIC -Os -DNDEBUG
+
+=== ntp_client%CMakeFiles%ntp_client.dir%link.txt
+/opt/sg2002/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-ar qc libntp_client.a CMakeFiles/ntp_client.dir/ntp_client/ntp_client.c.o CMakeFiles/ntp_client.dir/ntp_client/xtime.c.o
+/opt/sg2002/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-ranlib libntp_client.a
+=== peripheral%CMakeFiles%peripheral.dir%flags.make
+
+# compile CXX with /opt/sg2002/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-g++
+CXX_DEFINES = -DDEBUG=0 -DPLATFORM_MAIXCAM=1 -DRELEASE=1
+
+CXX_INCLUDES = -I@MAIXLITE@/components/peripheral/include -I@MAIXLITE@/components/peripheral/port/linux_common -I@MAIXLITE@/components/peripheral/port/maixcam -I@CONFIG@ -I@MAIXLITE@/components/basic/include -I@MAIXLITE@/components/3rd_party/ini/inifile2/src -I@MAIXLITE@/components/3rd_party/yaml/yaml-cpp/src -I@MAIXLITE@/components/3rd_party/yaml/yaml-cpp/include -I@MAIXLITE@/components/3rd_party/ntp_client/ntp_client
+
+CXX_FLAGS = -mcpu=c906fdv -march=rv64imafdcv0p7xthead -mcmodel=medany -mabi=lp64d -Wall -fPIC -std=c++17 -Os -DNDEBUG
+
+=== peripheral%CMakeFiles%peripheral.dir%link.txt
+/opt/sg2002/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-ar qc libperipheral.a CMakeFiles/peripheral.dir/port/linux_common/maix_gpio.cpp.o CMakeFiles/peripheral.dir/port/linux_common/maix_i2c.cpp.o CMakeFiles/peripheral.dir/port/linux_common/maix_pwm.cpp.o CMakeFiles/peripheral.dir/port/linux_common/maix_spi.cpp.o CMakeFiles/peripheral.dir/port/linux_common/maix_timer.cpp.o CMakeFiles/peripheral.dir/port/linux_common/maix_uart.cpp.o CMakeFiles/peripheral.dir/port/linux_common/maix_wdt.cpp.o CMakeFiles/peripheral.dir/port/maixcam/maix_adc.cpp.o CMakeFiles/peripheral.dir/port/maixcam/maix_gpio_port.cpp.o CMakeFiles/peripheral.dir/port/maixcam/maix_hid.cpp.o CMakeFiles/peripheral.dir/port/maixcam/maix_i2c.cpp.o CMakeFiles/peripheral.dir/port/maixcam/maix_key.cpp.o CMakeFiles/peripheral.dir/port/maixcam/maix_pinmap.cpp.o CMakeFiles/peripheral.dir/port/maixcam/maix_spi_port.cpp.o CMakeFiles/peripheral.dir/port/maixcam/maix_uart_port.cpp.o
+/opt/sg2002/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-ranlib libperipheral.a
+=== yaml%CMakeFiles%yaml.dir%flags.make
+
+# compile CXX with /opt/sg2002/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-g++
+CXX_DEFINES = -DDEBUG=0 -DPLATFORM_MAIXCAM=1 -DRELEASE=1
+
+CXX_INCLUDES = -I@MAIXLITE@/components/3rd_party/yaml/yaml-cpp/src -I@MAIXLITE@/components/3rd_party/yaml/yaml-cpp/include -I@CONFIG@
+
+CXX_FLAGS = -mcpu=c906fdv -march=rv64imafdcv0p7xthead -mcmodel=medany -mabi=lp64d -Wall -fPIC -std=c++17 -Os -DNDEBUG
+
+=== yaml%CMakeFiles%yaml.dir%link.txt
+/opt/sg2002/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-ar qc libyaml.a "CMakeFiles/yaml.dir/yaml-cpp/src/binary.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/convert.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/depthguard.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/directives.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/emit.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/emitfromevents.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/emitter.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/emitterstate.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/emitterutils.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/exceptions.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/exp.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/memory.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/node.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/node_data.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/nodebuilder.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/nodeevents.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/null.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/ostream_wrapper.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/parse.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/parser.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/regex_yaml.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/scanner.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/scanscalar.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/scantag.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/scantoken.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/simplekey.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/singledocparser.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/stream.cpp.o" "CMakeFiles/yaml.dir/yaml-cpp/src/tag.cpp.o"
+/opt/sg2002/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl-ranlib libyaml.a
