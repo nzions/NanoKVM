@@ -1,7 +1,5 @@
 package hdmi_state
 
-import "time"
-
 type viewerSource struct {
 	count   int
 	version uint64
@@ -12,7 +10,7 @@ type State struct {
 	viewerCount     int
 	leaseCount      int
 	sources         map[string]viewerSource
-	readyAt         time.Time
+	warmAfterSeq    uint64
 	needsFreshFrame bool
 }
 
@@ -66,18 +64,21 @@ func (s *State) LeaseCount() int {
 	return s.leaseCount
 }
 
-func (s *State) MarkWarming(readyAt time.Time) {
-	s.readyAt = readyAt
+// MarkWarming records that capture was just (re)enabled. afterSeq is the HDMI
+// snapshot seq current at that moment: capture is warm once a snapshot above
+// it reports Streaming or NoSignal.
+func (s *State) MarkWarming(afterSeq uint64) {
+	s.warmAfterSeq = afterSeq
 	s.needsFreshFrame = true
 }
 
-func (s *State) ClearReadyAt() {
-	s.readyAt = time.Time{}
+func (s *State) ClearWarming() {
+	s.warmAfterSeq = 0
 	s.needsFreshFrame = false
 }
 
-func (s *State) ReadyAt() time.Time {
-	return s.readyAt
+func (s *State) WarmAfterSeq() uint64 {
+	return s.warmAfterSeq
 }
 
 func (s *State) NeedsFreshFrame() bool {

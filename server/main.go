@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"NanoKVM-Server/logger"
 	"NanoKVM-Server/middleware"
 	"NanoKVM-Server/router"
+	"NanoKVM-Server/service/hdmi"
 	"NanoKVM-Server/service/vm"
 	"NanoKVM-Server/service/vm/jiggler"
 	"NanoKVM-Server/utils"
@@ -48,6 +50,18 @@ func initialize() {
 
 	// init screen parameters
 	_ = common.GetScreen()
+
+	// HDMI state: libkvm publishes every transition, the hub fans it out to
+	// the websocket clients and, over a unix socket, to kvm_system. Started
+	// before capture is switched so no transition is missed.
+	hdmiCtx, stopHdmi := context.WithCancel(context.Background())
+	stopHdmiState = stopHdmi
+	go hdmi.Default().Run(hdmiCtx, common.GetKvmVision().WaitHDMI)
+	go func() {
+		if err := hdmi.Default().ServeSocket(hdmiCtx, hdmi.SocketPath); err != nil {
+			log.Printf("ERROR: hdmi state socket: %v", err)
+		}
+	}()
 
 	// init HDMI
 	vm.DisableHdmiCapture()
@@ -148,6 +162,10 @@ func run() {
 	log.Fatalf("%v", <-failed)
 }
 
+// stopHdmiState ends the HDMI hub loop and its socket.
+var stopHdmiState = func() {}
+
 func dispose() {
+	stopHdmiState()
 	common.GetKvmVision().Close()
 }

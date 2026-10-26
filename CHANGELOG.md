@@ -1,3 +1,16 @@
+## 2.6.10 (2026-10-26)
+
+### Changes
+
+* HDMI state is pushed, not polled or filed. libkvm publishes one immutable snapshot `{state, width, height, seq}` per state machine transition (`kvm_hdmi_snapshot`, `kvm_hdmi.h`) and `kvmv_hdmi_wait(last_seq, &out, timeout_ms)` blocks on a condvar until a newer one exists (a timeout only means nothing changed; `kvmv_deinit` releases every waiter). `kvmv_hdmi_signal_active` is gone
+* The VI init no longer reads `/kvmapp/kvm/width` and `/kvmapp/kvm/height` (written with `system("echo")` + `sync`, truncate-first race, read into a 35-byte buffer): `/kvmapp/kvm/width`, `/kvmapp/kvm/height` and `/kvmapp/kvm/state` do not exist any more. libkvm hands a `struct kvm_resolution` to the sensor code (`SAMPLE_COMM_SNS_SetCustomSize`) before it restarts the VI chain
+* Server: new `service/hdmi` package owns the state: `Hub` (typed `Snapshot`, fan-out with one-slot latest-wins subscriptions, a late subscriber gets the current snapshot), fed by a goroutine blocked in `kvmv_hdmi_wait`. It feeds the existing websocket channel (event `hdmi-state`, the current snapshot on connect), `GET /api/vm/hdmi` (adds `snapshot`; `signal` is `enabled && state == streaming`), `GET /api/vm/input-resolution`, and a unix socket `/var/run/kvmhdmi.sock` (one JSON line per transition) for kvm_system
+* The 1 s capture warm-up sleep is gone: after capture is switched on, a capture reader waits for libkvm's next Streaming or NoSignal snapshot (bounded by the request context); the answer to a resync is always published, even when it changes nothing
+* kvm_system reads the resolution from that socket in a blocking thread; its state-file writer and width/height readers are removed
+* Web: `hdmi-state` websocket events feed `hdmiSnapshotAtom`; the HDMI settings entry shows the live resolution and no longer flips its switch after a 1 s timer
+* `build-in-container.sh` links the server against the freshly built `libkvm.so` and `libkvm_mmf.so` (the tracked copies lack the new exports)
+* Not run on hardware (kvm1 offline)
+
 ## 2.6.9 (2026-10-26)
 
 ### Changes

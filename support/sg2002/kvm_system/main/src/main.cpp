@@ -165,7 +165,6 @@ void* thread_sys_handle(void * arg)
 			kvm_update_usb_state();
 			kvm_update_hdmi_state();
 			kvm_update_stream_fps();
-			kvm_update_hdmi_res();
 			kvm_update_stream_type();
 			kvm_update_stream_qlty();
 			kvm_wifi_web_config_process();
@@ -228,6 +227,9 @@ int main(int argc, char* argv[])
 			kvm_sys_state.sys_thread_running = 0;
 			printf("[kvms]create thread failed!\r\n");
 		}
+	}
+	if(kvm_sys_state.sys_thread_running == 1){
+		kvm_start_hdmi_client();
 	}
 	if(OLED_state == 1 && kvm_sys_state.oled_thread_running == 0){
 		kvm_sys_state.oled_thread_running = 1;

@@ -7,14 +7,13 @@ import (
 
 	"NanoKVM-Server/common"
 	"NanoKVM-Server/proto"
+	"NanoKVM-Server/service/hdmi"
 	hdmistate "NanoKVM-Server/service/vm/hdmi_state"
 	"NanoKVM-Server/utils"
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 )
-
-const hdmiCaptureWarmupDuration = time.Second
 
 var (
 	hdmiMutex           sync.Mutex
@@ -24,11 +23,41 @@ var (
 	hdmiDemand          = hdmistate.New()
 	hdmiStoppedForIdle  bool
 
-	setHDMI            = func(enabled bool) { common.GetKvmVision().SetHDMI(enabled) }
+	// setHDMI reports whether libkvm switched capture (kvmv_hdmi_control
+	// returns 0 on success).
+	setHDMI            = func(enabled bool) bool { return common.GetKvmVision().SetHDMI(enabled) == 0 }
 	isHdmiDisabled     = utils.IsHdmiDisabled
 	getHdmiIdleTimeout = utils.GetHDMIIdleTimeout
-	getHdmiSignal      = func() bool { return common.GetKvmVision().HasHDMISignal() }
+	hdmiHub            = hdmi.Default()
 )
+
+// hdmiSnapshot is the latest HDMI state libkvm published; the zero Snapshot
+// (no signal, 0x0) until the first one.
+func hdmiSnapshot() hdmi.Snapshot {
+	snapshot, _ := hdmiHub.Current()
+	return snapshot
+}
+
+// CurrentHdmiSnapshot is the HDMI state as the hub holds it.
+func CurrentHdmiSnapshot() hdmi.Snapshot {
+	return hdmiSnapshot()
+}
+
+// setHdmiLocked switches capture and, when libkvm accepted a switch to on,
+// marks capture as warming: it is warm once libkvm publishes a snapshot
+// newer than the one current right now that reports Streaming or NoSignal.
+// The seq is read before the switch, so the answer to it cannot be missed.
+func setHdmiLocked(enabled bool) {
+	afterSeq := hdmiSnapshot().Seq
+	ok := setHDMI(enabled)
+	if !enabled {
+		hdmiDemand.ClearWarming()
+		return
+	}
+	if ok {
+		hdmiDemand.MarkWarming(afterSeq)
+	}
+}
 
 func (s *Service) ResetHdmi(c *gin.Context) {
 	var rsp proto.Response
@@ -66,10 +95,12 @@ func (s *Service) GetHdmiState(c *gin.Context) {
 	var rsp proto.Response
 	enabled := !isHdmiDisabled()
 
+	snapshot := hdmiSnapshot()
 	rsp.OkRspWithData(c, &proto.GetGetHdmiStateRsp{
 		Enabled:     enabled,
-		Signal:      enabled && getHdmiSignal(),
+		Signal:      enabled && snapshot.State == hdmi.Streaming,
 		IdleTimeout: getHdmiIdleTimeout(),
+		Snapshot:    snapshot,
 	})
 
 	log.Debug("get hdmi state")
@@ -79,8 +110,7 @@ func EnableHdmiCapture() {
 	hdmiMutex.Lock()
 	defer hdmiMutex.Unlock()
 
-	setHDMI(true)
-	hdmiDemand.MarkWarming(time.Now().Add(hdmiCaptureWarmupDuration))
+	setHdmiLocked(true)
 	hdmiStoppedForIdle = false
 	hdmiIdleGeneration++
 	stopHdmiIdleTimerLocked()
@@ -91,8 +121,7 @@ func DisableHdmiCapture() {
 	hdmiMutex.Lock()
 	defer hdmiMutex.Unlock()
 
-	setHDMI(false)
-	hdmiDemand.ClearReadyAt()
+	setHdmiLocked(false)
 	hdmiStoppedForIdle = false
 	hdmiIdleGeneration++
 	stopHdmiIdleTimerLocked()
@@ -171,7 +200,7 @@ func updateHdmiViewerSnapshotLocked(source string, count int, version uint64) {
 // consumer, such as an MCP screenshot, is active. The returned release is
 // safe to call more than once.
 func AcquireHdmiCaptureLease() func() {
-	release, _ := acquireHdmiCaptureLease()
+	release, _, _ := acquireHdmiCaptureLease()
 	return release
 }
 
@@ -180,15 +209,13 @@ func AcquireHdmiCaptureLease() func() {
 // frame. The returned claim function is consumed only by the first successful
 // reader, so concurrent readers do not all discard a frame.
 func AcquireHdmiCaptureLeaseForRead(ctx context.Context) (func(), func() bool, error) {
-	release, readyAt := acquireHdmiCaptureLease()
-	if wait := time.Until(readyAt); wait > 0 {
-		timer := time.NewTimer(wait)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
+	release, warmAfterSeq, warming := acquireHdmiCaptureLease()
+	if warming {
+		// Capture was just switched on: wait for libkvm to report what the
+		// input looks like now. No timer; the context bounds the wait.
+		if _, err := hdmiHub.WaitSettled(ctx, warmAfterSeq); err != nil {
 			release()
-			return nil, nil, ctx.Err()
-		case <-timer.C:
+			return nil, nil, err
 		}
 	}
 	select {
@@ -221,11 +248,17 @@ func AcquireHdmiCaptureLeaseForRead(ctx context.Context) (func(), func() bool, e
 	return releaseRead, claimFresh, nil
 }
 
-func acquireHdmiCaptureLease() (func(), time.Time) {
+// acquireHdmiCaptureLease returns the release func, and whether capture is
+// still warming and the snapshot seq it is warming after.
+func acquireHdmiCaptureLease() (func(), uint64, bool) {
 	hdmiMutex.Lock()
 	hdmiDemand.AcquireLease()
 	reconcileHdmiCaptureDemandLocked()
-	readyAt := hdmiDemand.ReadyAt()
+	warmAfterSeq := hdmiDemand.WarmAfterSeq()
+	// Only a hub that has published can answer; without one (no libkvm)
+	// there is nothing to wait for.
+	_, published := hdmiHub.Current()
+	warming := hdmiDemand.NeedsFreshFrame() && published
 	hdmiMutex.Unlock()
 
 	var once sync.Once
@@ -240,7 +273,7 @@ func acquireHdmiCaptureLease() (func(), time.Time) {
 			reconcileHdmiCaptureDemandLocked()
 		})
 	}
-	return release, readyAt
+	return release, warmAfterSeq, warming
 }
 
 func reconcileHdmiCaptureDemandLocked() {
@@ -289,15 +322,13 @@ func scheduleHdmiIdleTimerLocked() {
 		}
 
 		hdmiIdleTimer = nil
-		setHDMI(false)
-		hdmiDemand.ClearReadyAt()
+		setHdmiLocked(false)
 		hdmiStoppedForIdle = true
 		log.Debugf("disabled hdmi capture after %d minutes without viewers", minutes)
 	})
 }
 
 func resumeHdmiCaptureLocked() {
-	setHDMI(true)
-	hdmiDemand.MarkWarming(time.Now().Add(hdmiCaptureWarmupDuration))
+	setHdmiLocked(true)
 	log.Debug("resumed hdmi capture after viewer connected")
 }

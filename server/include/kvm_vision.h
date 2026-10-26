@@ -15,6 +15,8 @@ extern "C" {
 #include <pthread.h>
 #include <time.h>
 
+#include "kvm_hdmi.h"
+
 #define IMG_BUFFER_FULL			-3
 #define IMG_VENC_ERROR			-2
 #define IMG_NOT_EXIST			-1
@@ -66,7 +68,20 @@ void set_h264_gop(uint8_t _gop);
 void set_frame_detact(uint8_t _frame_detact);
 void kvmv_deinit();
 uint8_t kvmv_hdmi_control(uint8_t _en);
-uint8_t kvmv_hdmi_signal_active(void);
+
+/**********************************************************************************
+ * @name    kvmv_hdmi_wait
+ * @brief   Block until the HDMI state changes. Every transition of the state
+ *          machine publishes one snapshot with seq one above the last.
+ * @param	_last_seq			@input: 	seq of the snapshot already held (0: none, returns the current one)
+ * @param	_p_out				@output: 	the newest snapshot, written only when 1 is returned
+ * @param	_timeout_ms			@input: 	give up after this long, -1: never
+ * @return
+         1: *_p_out holds a snapshot newer than _last_seq
+         0: timed out, nothing changed (not a state of the HDMI path)
+        -1: libkvm is shut down
+ **********************************************************************************/
+int kvmv_hdmi_wait(uint64_t _last_seq, struct kvm_hdmi_snapshot* _p_out, int _timeout_ms);
 
 #ifdef __cplusplus
 }

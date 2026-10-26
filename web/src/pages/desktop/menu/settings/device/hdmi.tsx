@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
 import { InputNumber, Switch } from 'antd';
-import { useAtom } from 'jotai';
+import { useAtom, useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
 import * as api from '@/api/vm.ts';
-import { isHdmiEnabledAtom } from '@/jotai/screen.ts';
+import { hdmiSnapshotAtom, isHdmiEnabledAtom } from '@/jotai/screen.ts';
+import { HdmiState } from '@/pages/desktop/hdmi-state';
 
 export const Hdmi = () => {
   const { t } = useTranslation();
 
   const [isHdmiEnabled, setIsHdmiEnabled] = useAtom(isHdmiEnabledAtom);
+  const hdmiSnapshot = useAtomValue(hdmiSnapshotAtom);
 
   const [isPcie, setIsPcie] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -83,10 +85,9 @@ export const Hdmi = () => {
       return;
     }
 
-    setTimeout(() => {
-      setIsHdmiEnabled(enabled);
-      setIsLoading(false);
-    }, 1000);
+    // the signal itself is reported by the pushed hdmi-state snapshots
+    setIsHdmiEnabled(enabled);
+    setIsLoading(false);
   }
 
   return (
@@ -95,7 +96,12 @@ export const Hdmi = () => {
         <div className="flex flex-col space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex flex-col space-y-1">
-              <span>HDMI</span>
+              <span>
+                HDMI
+                {isHdmiEnabled && hdmiSnapshot?.state === HdmiState.Streaming
+                  ? ` ${hdmiSnapshot.width} x ${hdmiSnapshot.height}`
+                  : ''}
+              </span>
 
               <span className="text-xs text-neutral-500">
                 {t('settings.device.hdmi.description')}

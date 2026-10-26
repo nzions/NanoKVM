@@ -48,9 +48,6 @@
 
 #define kvmv_data_buffer_size   4
 
-#define vi_width_path           "/kvmapp/kvm/width"
-#define vi_height_path          "/kvmapp/kvm/height"
-#define hdmi_signal_file_path   "/kvmapp/kvm/state"
 #define watchdog_mode_path      "/etc/kvm/watchdog"
 #define watchdog_temp_path      "/tmp/watchdog"
 #define watchdog_file           "/tmp/nanokvm_wd"
@@ -60,7 +57,6 @@
 #define LT6911_WRITE 	0x00
 
 pthread_mutex_t vi_mutex;
-pthread_mutex_t hdmi_signal_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 using namespace maix;
 using namespace maix::sys;
@@ -113,81 +109,12 @@ kvmv_data_t kvmv_data_buffer[kvmv_data_buffer_size];
 uint8_t kvmv_data_buffer_index = 0;
 
 uint8_t debug_en = 0;
-uint8_t hdmi_capture_enabled = 0;
-uint8_t hdmi_signal_active = 0;
 
 void debug(const char *format, ...);
-
-static bool write_hdmi_signal_file(uint8_t active)
-{
-    char temp_path[] = "/kvmapp/kvm/.state.tmp.XXXXXX";
-    const char *state = active != 0 ? "1\n" : "0\n";
-    const size_t state_size = 2;
-    int fd = mkstemp(temp_path);
-    if(fd < 0){
-        debug("[hdmi] failed to create state file: %d\n", errno);
-        return false;
-    }
-
-    int failure = 0;
-    if(fchmod(fd, 0644) != 0){
-        failure = errno;
-    }
-
-    size_t written = 0;
-    while(failure == 0 && written < state_size){
-        ssize_t result = write(fd, state + written, state_size - written);
-        if(result > 0){
-            written += (size_t)result;
-        } else if(result < 0 && errno == EINTR){
-            continue;
-        } else {
-            failure = result < 0 ? errno : EIO;
-        }
-    }
-
-    if(failure == 0 && fsync(fd) != 0){
-        failure = errno;
-    }
-    if(close(fd) != 0 && failure == 0){
-        failure = errno;
-    }
-    if(failure == 0 && rename(temp_path, hdmi_signal_file_path) != 0){
-        failure = errno;
-    }
-    if(failure != 0){
-        unlink(temp_path);
-        debug("[hdmi] failed to publish state file: %d\n", failure);
-        return false;
-    }
-    return true;
-}
-
-static void set_hdmi_signal_state(uint8_t active)
-{
-    pthread_mutex_lock(&hdmi_signal_mutex);
-    uint8_t enabled = __atomic_load_n(&hdmi_capture_enabled, __ATOMIC_ACQUIRE);
-    uint8_t next = enabled != 0 && active != 0 ? 1 : 0;
-    uint8_t previous = __atomic_exchange_n(&hdmi_signal_active, next, __ATOMIC_ACQ_REL);
-    if(previous != next){
-        write_hdmi_signal_file(next);
-    }
-    pthread_mutex_unlock(&hdmi_signal_mutex);
-}
-
-static void set_hdmi_capture_enabled(uint8_t enabled)
-{
-    pthread_mutex_lock(&hdmi_signal_mutex);
-    __atomic_store_n(&hdmi_capture_enabled, enabled != 0 ? 1 : 0, __ATOMIC_RELEASE);
-    __atomic_store_n(&hdmi_signal_active, 0, __ATOMIC_RELEASE);
-    write_hdmi_signal_file(0);
-    pthread_mutex_unlock(&hdmi_signal_mutex);
-}
 
 static void set_hdmi_detection_state(uint8_t active)
 {
     __atomic_store_n(&kvmv_cfg.hdmi_cable_state, active != 0 ? 1 : 0, __ATOMIC_RELEASE);
-    set_hdmi_signal_state(active);
 }
 
 void debug(const char *format, ...)
@@ -270,15 +197,6 @@ uint8_t check_res(uint16_t _width, uint16_t _height)
     return UNKNOWN_RES;
 }
 
-void write_res_to_file(uint16_t _width, uint16_t _height)
-{
-	char Cmd[100]={0};
-    sprintf(Cmd, "echo %d > %s", _width, vi_width_path);
-    system(Cmd);
-    sprintf(Cmd, "echo %d > %s", _height, vi_height_path);
-    system(Cmd);
-    system("sync");
-}
 
 uint8_t watchdog_sf_is_open(void)
 {
@@ -435,8 +353,6 @@ uint8_t lt6911_get_hdmi_res()
         if (Vactive != 0 && Hactive != 0){
             return 1;
         } else {
-            // system("echo 0 > %s", vi_height_path);
-            // system("echo 0 > %s", vi_width_path);
             return 0;
         }
     } else if (kvmv_cfg.hdmi_version == 1){
@@ -720,6 +636,10 @@ extern kvm_venc_t kvm_venc;
 // kvmv_read_img holds for the whole of a read, so a read never touches a
 // channel that is being torn down and a restart never runs mid-read.
 //
+// Every transition publishes one immutable snapshot {state, resolution, seq}
+// (hdmi_publish_locked); kvmv_hdmi_wait blocks the Go server on it. Nothing is
+// written to a file.
+//
 //   NO_SIGNAL  --probe: signal--------> LOCKING   (new resolution to init)
 //   NO_SIGNAL  --probe: signal--------> STREAMING (VI already at that res)
 //   LOCKING    --chain re-inited------> STREAMING
@@ -733,13 +653,6 @@ extern kvm_venc_t kvm_venc;
 // cannot be opened the thread logs it and ends: nothing probes the chip and
 // the cable state is never set to connected.
 
-typedef enum {
-    HDMI_NO_SIGNAL = 0,
-    HDMI_LOCKING,
-    HDMI_STREAMING,
-    HDMI_RES_CHANGE,
-} hdmi_state_t;
-
 typedef struct {
     bool present;
     uint8_t res_type;
@@ -748,15 +661,83 @@ typedef struct {
 } hdmi_probe_t;
 
 // Written only under vi_mutex by the state machine thread.
-static hdmi_state_t hdmi_state = HDMI_NO_SIGNAL;
+static enum kvm_hdmi_state hdmi_state = KVM_HDMI_NO_SIGNAL;
 // Resolution the VI/CSI chain was last initialised at (0 = never).
-static uint16_t vi_inited_width = 0;
-static uint16_t vi_inited_height = 0;
+static struct kvm_resolution vi_inited = {0, 0};
+
+// The published snapshot and whoever waits for the next one. Lock order:
+// vi_mutex, then snap_mutex; kvmv_hdmi_wait takes snap_mutex alone.
+static pthread_mutex_t snap_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t snap_cond;
+static pthread_once_t snap_once = PTHREAD_ONCE_INIT;
+static struct kvm_hdmi_snapshot snap = {KVM_HDMI_NO_SIGNAL, {0, 0}, 1};
+static uint8_t snap_closed = 0;
+
+// The wait deadline is on CLOCK_MONOTONIC, so the condvar is too.
+static void snap_init(void)
+{
+    pthread_condattr_t attr;
+    pthread_condattr_init(&attr);
+    pthread_condattr_setclock(&attr, CLOCK_MONOTONIC);
+    pthread_cond_init(&snap_cond, &attr);
+    pthread_condattr_destroy(&attr);
+}
+
+// Publish hdmi_state with `res` as a new snapshot. A repeat of the snapshot
+// already out is not a transition and publishes nothing, unless `force`: the
+// answer to a resync request, which the server waits for even when it changed
+// nothing. Caller holds vi_mutex, which is what orders hdmi_state.
+static void hdmi_publish_locked(struct kvm_resolution res, bool force)
+{
+    pthread_once(&snap_once, snap_init);
+    pthread_mutex_lock(&snap_mutex);
+    if(force || snap.state != (uint8_t)hdmi_state ||
+       snap.res.width != res.width || snap.res.height != res.height){
+        snap.state = (uint8_t)hdmi_state;
+        snap.res = res;
+        snap.seq++;
+        pthread_cond_broadcast(&snap_cond);
+    }
+    pthread_mutex_unlock(&snap_mutex);
+}
+
+int kvmv_hdmi_wait(uint64_t _last_seq, struct kvm_hdmi_snapshot* _p_out, int _timeout_ms)
+{
+    pthread_once(&snap_once, snap_init);
+    struct timespec deadline;
+    if(_timeout_ms >= 0){
+        clock_gettime(CLOCK_MONOTONIC, &deadline);
+        deadline.tv_sec += _timeout_ms / 1000;
+        deadline.tv_nsec += (long)(_timeout_ms % 1000) * 1000000L;
+        if(deadline.tv_nsec >= 1000000000L){
+            deadline.tv_sec += 1;
+            deadline.tv_nsec -= 1000000000L;
+        }
+    }
+
+    pthread_mutex_lock(&snap_mutex);
+    while(snap.seq <= _last_seq && !snap_closed){
+        if(_timeout_ms < 0){
+            pthread_cond_wait(&snap_cond, &snap_mutex);
+        } else if(pthread_cond_timedwait(&snap_cond, &snap_mutex, &deadline) == ETIMEDOUT){
+            break;
+        }
+    }
+    int ret = 0;
+    if(snap_closed){
+        ret = -1;
+    } else if(snap.seq > _last_seq){
+        *_p_out = snap;
+        ret = 1;
+    }
+    pthread_mutex_unlock(&snap_mutex);
+    return ret;
+}
 
 // Held for the whole of an LT6911 register sequence, and by
 // kvmv_hdmi_control around hdmi_stopped (chip held in reset: do not read).
 static pthread_mutex_t lt_mutex = PTHREAD_MUTEX_INITIALIZER;
-static uint8_t hdmi_stopped = 0;
+static uint8_t hdmi_stopped = 0;     // written under lt_mutex; read atomically
 
 static pthread_t hdmi_thread;
 static uint8_t hdmi_thread_started = 0;
@@ -792,26 +773,31 @@ static hdmi_probe_t lt6911_probe(void)
 }
 
 // Caller holds vi_mutex. VENC first, then VPSS and VI/CSI.
-static void vi_chain_reinit_locked(uint16_t _width, uint16_t _height)
+static void vi_chain_reinit_locked(struct kvm_resolution res)
 {
     mmf_del_venc_channel(kvm_venc.mmf_venc_chn);
     kvm_venc.enc_h264_init = 0;
     mmf_enc_jpg_deinit(0);
 
-    kvmv_cfg.vi_width = _width;
-    kvmv_cfg.vi_height = _height;
-    write_res_to_file(_width, _height);
+    kvmv_cfg.vi_width = res.width;
+    kvmv_cfg.vi_height = res.height;
+    // The VI init reads the size from the sensor code, not from a file.
+    SAMPLE_COMM_SNS_SetCustomSize(&res);
     cam->restart(default_vpss_width, default_vpss_height, image::FMT_YVU420SP);
-    vi_inited_width = _width;
-    vi_inited_height = _height;
+    vi_inited = res;
 }
 
-static void hdmi_apply(const hdmi_probe_t &p)
+// `resync`: this probe answers a resync request, so it publishes even when
+// the result equals the last snapshot.
+static void hdmi_apply(const hdmi_probe_t &p, bool resync)
 {
     if(!p.present){
         set_hdmi_detection_state(0);
         pthread_mutex_lock(&vi_mutex);
-        hdmi_state = HDMI_NO_SIGNAL;
+        if(!__atomic_load_n(&hdmi_stopped, __ATOMIC_ACQUIRE)){
+            hdmi_state = KVM_HDMI_NO_SIGNAL;
+            hdmi_publish_locked(vi_inited, resync);
+        }
         pthread_mutex_unlock(&vi_mutex);
         return;
     }
@@ -830,20 +816,31 @@ static void hdmi_apply(const hdmi_probe_t &p)
     }
 
     pthread_mutex_lock(&vi_mutex);
+    // kvmv_hdmi_control(0) ran while this probe was in flight: the chip is in
+    // reset and the state is NO_SIGNAL, the result is stale.
+    if(__atomic_load_n(&hdmi_stopped, __ATOMIC_ACQUIRE)){
+        pthread_mutex_unlock(&vi_mutex);
+        return;
+    }
     kvmv_cfg.hdmi_res_type = res_type == UNSUPPORT_RES ? UNSUPPORT_RES : NORMAL_RES;
     kvmv_cfg.hdmi_res_err = res_err;
     if(res_type == UNSUPPORT_RES || res_err != NORMAL_RES){
         // Reads report -6 / -7 from the two fields above; the chain is left alone.
+        // A resync request is still answered, with the state as it stands.
+        hdmi_publish_locked(vi_inited, resync);
         pthread_mutex_unlock(&vi_mutex);
         return;
     }
-    if(p.width != vi_inited_width || p.height != vi_inited_height){
-        hdmi_state = hdmi_state == HDMI_NO_SIGNAL ? HDMI_LOCKING : HDMI_RES_CHANGE;
+    struct kvm_resolution res = {p.width, p.height};
+    if(res.width != vi_inited.width || res.height != vi_inited.height){
+        hdmi_state = hdmi_state == KVM_HDMI_NO_SIGNAL ? KVM_HDMI_LOCKING : KVM_HDMI_RES_CHANGE;
         debug("[hdmi] state %s: re-init chain at %d * %d\n",
-              hdmi_state == HDMI_LOCKING ? "LOCKING" : "RES_CHANGE", p.width, p.height);
-        vi_chain_reinit_locked(p.width, p.height);
+              hdmi_state == KVM_HDMI_LOCKING ? "LOCKING" : "RES_CHANGE", res.width, res.height);
+        hdmi_publish_locked(res, false);
+        vi_chain_reinit_locked(res);
     }
-    hdmi_state = HDMI_STREAMING;
+    hdmi_state = KVM_HDMI_STREAMING;
+    hdmi_publish_locked(res, resync);
     pthread_mutex_unlock(&vi_mutex);
 }
 
@@ -889,13 +886,17 @@ void* hdmi_state_machine(void * arg)
             break;
         }
         bool probe_now = false;
+        bool resync = false;
         if(fds[0].revents & POLLIN){
             uint64_t v;
             ssize_t r = read(hdmi_wake_fd, &v, sizeof(v));
             (void)r;
         }
         if(__atomic_load_n(&kvmv_cfg.try_exit_thread, __ATOMIC_ACQUIRE) != 0) break;
-        if(__atomic_exchange_n(&hdmi_resync, 0, __ATOMIC_ACQ_REL) != 0) probe_now = true;
+        if(__atomic_exchange_n(&hdmi_resync, 0, __ATOMIC_ACQ_REL) != 0){
+            probe_now = true;
+            resync = true;
+        }
         if(fds[1].revents & POLLIN){
             if(hdmi_int_edge_seen(int_fd, kvmv_cfg.hdmi_version)) probe_now = true;
         }
@@ -904,15 +905,15 @@ void* hdmi_state_machine(void * arg)
             if(kvmv_cfg.hdmi_version == 2){
                 // No register read for this chip: assume the default mode.
                 hdmi_probe_t assumed = {true, NORMAL_RES, default_vi_width, default_vi_height};
-                hdmi_apply(assumed);
+                hdmi_apply(assumed, resync);
             } else {
                 pthread_mutex_lock(&lt_mutex);
-                bool stopped = hdmi_stopped != 0;
+                bool stopped = __atomic_load_n(&hdmi_stopped, __ATOMIC_ACQUIRE) != 0;
                 hdmi_probe_t p = {false, UNKNOWN_RES, 0, 0};
                 if(!stopped) p = lt6911_probe();
                 pthread_mutex_unlock(&lt_mutex);
                 // Held in reset: wait for kvmv_hdmi_control(1) to resync.
-                if(!stopped) hdmi_apply(p);
+                if(!stopped) hdmi_apply(p, resync);
             }
         }
     }
@@ -1119,6 +1120,10 @@ int8_t raw_to_h264(image::Image *raw, kvmv_data_t* ret_stream, uint16_t _qlty)
 void kvmv_init(uint8_t _debug_info_en)
 {
     pthread_t thread;
+    pthread_once(&snap_once, snap_init);
+    pthread_mutex_lock(&snap_mutex);
+    snap_closed = 0;
+    pthread_mutex_unlock(&snap_mutex);
     pthread_mutex_init(&vi_mutex, NULL);
     if(hdmi_wake_fd < 0) hdmi_wake_fd = eventfd(0, EFD_CLOEXEC);
     if(_debug_info_en == 0) debug_en = 0;
@@ -1228,11 +1233,11 @@ int kvmv_read_img(uint16_t _width, uint16_t _height, uint8_t _type, uint16_t _ql
     }
     // hdmi_state is written only under vi_mutex, which we hold: the VI
     // channel cannot be torn down while this read uses it.
-    if (hdmi_state == HDMI_NO_SIGNAL){
+    if (hdmi_state == KVM_HDMI_NO_SIGNAL){
         pthread_mutex_unlock(&vi_mutex);
         return IMG_NOT_EXIST;
     }
-    if (hdmi_state != HDMI_STREAMING){
+    if (hdmi_state != KVM_HDMI_STREAMING){
         pthread_mutex_unlock(&vi_mutex);
         return -4;
     }
@@ -1414,7 +1419,6 @@ void free_all_kvmv_data()
 
 void kvmv_deinit()
 {
-    set_hdmi_capture_enabled(0);
     // Stop the state machine first: it is the only other user of vi_mutex
     // and of the VI channel.
     __atomic_store_n(&kvmv_cfg.try_exit_thread, 1, __ATOMIC_RELEASE);
@@ -1423,6 +1427,12 @@ void kvmv_deinit()
         pthread_join(hdmi_thread, NULL);
         hdmi_thread_started = 0;
     }
+    // Release every kvmv_hdmi_wait: no snapshot follows.
+    pthread_once(&snap_once, snap_init);
+    pthread_mutex_lock(&snap_mutex);
+    snap_closed = 1;
+    pthread_cond_broadcast(&snap_cond);
+    pthread_mutex_unlock(&snap_mutex);
     pthread_mutex_destroy(&vi_mutex);
     cam->close();
     mmf_deinit();
@@ -1431,10 +1441,6 @@ void kvmv_deinit()
 
 uint8_t kvmv_hdmi_control(uint8_t _en)
 {
-    if(_en == 0){
-        set_hdmi_capture_enabled(0);
-    }
-
     if(kvmv_cfg.hw_version == 0){
 
         FILE *fp;
@@ -1454,11 +1460,23 @@ uint8_t kvmv_hdmi_control(uint8_t _en)
             }
         }
     }
+    if(_en == 0){
+        // Capture off: there is no signal. On the hardware that resets the
+        // LT6911 hdmi_stopped is set first, so a probe already in flight
+        // cannot overwrite this with a stale result (hdmi_apply checks it
+        // under vi_mutex).
+        if(kvmv_cfg.hw_version == 'p'){
+            pthread_mutex_lock(&lt_mutex);
+            __atomic_store_n(&hdmi_stopped, 1, __ATOMIC_RELEASE);
+            pthread_mutex_unlock(&lt_mutex);
+        }
+        pthread_mutex_lock(&vi_mutex);
+        hdmi_state = KVM_HDMI_NO_SIGNAL;
+        hdmi_publish_locked(vi_inited, false);
+        pthread_mutex_unlock(&vi_mutex);
+    }
     if(kvmv_cfg.hw_version != 'p'){
         debug("[kvmv]Hardware not support!\n");
-        if(_en != 0){
-            set_hdmi_capture_enabled(1);
-        }
         return -1;
     }
     // The LT6911 reset line is "hdmi-rst" (DT line name), owned by the
@@ -1468,9 +1486,6 @@ uint8_t kvmv_hdmi_control(uint8_t _en)
         // lt_mutex is held by the state machine for the whole of an LT6911
         // read, so taking it here waits for a read in flight and keeps the
         // machine off the bus while the chip is held in reset.
-        pthread_mutex_lock(&lt_mutex);
-        hdmi_stopped = 1;
-        pthread_mutex_unlock(&lt_mutex);
         if(nk_gpio_set_held("hdmi-rst", 451, 0) != 0){
             fprintf(stderr, "[kvmv]hdmi-rst: cannot hold the LT6911 in reset\n");
             return -1;
@@ -1482,24 +1497,16 @@ uint8_t kvmv_hdmi_control(uint8_t _en)
             return -1;
         }
         pthread_mutex_lock(&lt_mutex);
-        hdmi_stopped = 0;
+        __atomic_store_n(&hdmi_stopped, 0, __ATOMIC_RELEASE);
         pthread_mutex_unlock(&lt_mutex);
 
         // Keep the existing VI channel and consume queued frames after idle.
         // Reopening it here or from kvmv_read_img can exhaust the carveout
         // heap while the HDMI detector is transitioning.
         kvmv_cfg.fresh_frame_count = fresh_frame_discard_count;
-        set_hdmi_capture_enabled(1);
         // The chip came out of reset: have the state machine re-read it.
         hdmi_post_resync();
         return 0;
     }
     return -1;
-}
-
-uint8_t kvmv_hdmi_signal_active()
-{
-    uint8_t enabled = __atomic_load_n(&hdmi_capture_enabled, __ATOMIC_ACQUIRE);
-    uint8_t active = __atomic_load_n(&hdmi_signal_active, __ATOMIC_ACQUIRE);
-    return enabled != 0 && active != 0 ? 1 : 0;
 }

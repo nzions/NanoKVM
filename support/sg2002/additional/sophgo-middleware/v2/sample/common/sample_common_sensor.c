@@ -17,12 +17,24 @@
 #include "cvi_comm_isp.h"
 #include "sample_comm.h"
 #include "ini.h"
+#include "kvm_hdmi.h"
 
 #define INI_FILE_PATH	"/mnt/data/sensor_cfg.ini"
 #define INI_DEF_PATH	"/mnt/system/usr/bin/sensor_cfg.ini"
 #define SNSCFGPATH_SIZE 100
 
 static CVI_CHAR g_snsCfgPath[SNSCFGPATH_SIZE];
+
+/* VI size of PIC_CUSTOMIZE (LONTIUM_LT6911): width << 16 | height. Written by
+ * libkvm before every VI chain restart, read here while the chain comes up. */
+static uint32_t g_custom_size = (1920u << 16) | 1080u;
+
+void SAMPLE_COMM_SNS_SetCustomSize(const struct kvm_resolution *res)
+{
+	if (res == NULL || res->width == 0 || res->height == 0)
+		return;
+	__atomic_store_n(&g_custom_size, ((uint32_t)res->width << 16) | res->height, __ATOMIC_RELEASE);
+}
 
 ISP_PUB_ATTR_S ISP_PUB_ATTR_SAMPLE = { { 0, 0, 1920, 1080 }, { 1920, 1080 }, 30, BAYER_RGGB, WDR_MODE_NONE, 0};
 
@@ -690,43 +702,11 @@ CVI_S32 SAMPLE_COMM_SNS_GetPicSize(PIC_SIZE_E enPicSize, SIZE_S *pstSize)
 		break;
 	case PIC_CUSTOMIZE:  /* env * env */
 	{
-		uint8_t RW_Data[35];
-		FILE *fp;
-		int file_size;
-		if(access("/kvmapp/kvm/width", F_OK) == 0){
-			fp = fopen("/kvmapp/kvm/width", "r");
-			fseek(fp, 0, SEEK_END);
-			file_size = ftell(fp); 
-			fseek(fp, 0, SEEK_SET);
-			fread(RW_Data, sizeof(char), file_size, fp);
-			fclose(fp);
-			RW_Data[file_size] = 0;
-			pstSize->u32Width = atoi((char*)RW_Data);
-		} else {
-			pstSize->u32Width = 1920;
-		}
-		if(access("/kvmapp/kvm/height", F_OK) == 0){
-			fp = fopen("/kvmapp/kvm/height", "r");
-			fseek(fp, 0, SEEK_END);
-			file_size = ftell(fp); 
-			fseek(fp, 0, SEEK_SET);
-			fread(RW_Data, sizeof(char), file_size, fp);
-			fclose(fp);
-			RW_Data[file_size] = 0;
-			pstSize->u32Height = atoi((char*)RW_Data);
-		} else {
-			pstSize->u32Height = 1080;
-		}
+		/* the size libkvm handed over with SAMPLE_COMM_SNS_SetCustomSize() */
+		uint32_t packed = __atomic_load_n(&g_custom_size, __ATOMIC_ACQUIRE);
+		pstSize->u32Width = packed >> 16;
+		pstSize->u32Height = packed & 0xffff;
 
-		// if(getenv("KVM_CSI_HEIGHT") == NULL || getenv("KVM_CSI_WIDTH") == NULL){
-		// 	pstSize->u32Width  = 1920;
-		// 	pstSize->u32Height = 1080;
-		// 	printf("KVM_CSI_H/W = NULL%d\n");
-		// } else {
-		// 	pstSize->u32Width  = atoi(getenv("KVM_CSI_HEIGHT"));
-		// 	pstSize->u32Height = atoi(getenv("KVM_CSI_WIDTH"));
-		// }
-		
 		printf("pstSize->u32Width = %d\n", pstSize->u32Width);
 		printf("pstSize->u32Height = %d\n", pstSize->u32Height);
 		break;

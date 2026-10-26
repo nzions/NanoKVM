@@ -2,6 +2,7 @@
 #define __KVM_MMF_HPP__
 
 #include "stdint.h"
+#include "kvm_hdmi.h"
 
 typedef struct {
     uint8_t *data[8];

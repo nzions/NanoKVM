@@ -87,7 +87,14 @@ riscv64-unknown-linux-musl-gcc -march=rv64gc -O2 \
     "$NANOKVM_PATH/tools/nanokvm_update_edid/nanokvm_update_edid.c"
 echo "::endgroup::"
 
+# NanoKVM-Server links libkvm.so by name from server/dl_lib (-L../dl_lib -lkvm).
+# The tracked copies there predate every export added since (kvmv_hdmi_wait in
+# libkvm.so, SAMPLE_COMM_SNS_SetCustomSize in libkvm_mmf.so, which libkvm.so
+# needs), so link against the pair just built.
 echo "::group::server: cross-compile NanoKVM-Server"
+for lib in libkvm.so libkvm_mmf.so; do
+    cp -f "$NANOKVM_PATH/kvmapp/server/dl_lib/$lib" "$NANOKVM_PATH/server/dl_lib/$lib"
+done
 cd "$NANOKVM_PATH/server"
 ./build.sh
 echo "::endgroup::"
@@ -114,11 +121,11 @@ if [ "$missing" -ne 0 ]; then
     exit 1
 fi
 
-# NanoKVM-Server is cgo-linked against the tracked server/dl_lib/libkvm.so
-# (server/common/kvm_vision.go: -L../dl_lib -lkvm), but the package ships the
-# freshly built one from kvm_vision. Those are different files, so confirm the
-# shipped library still exports every symbol the binary actually imports from
-# it. Without this a dropped symbol only shows up as a crash on a real device.
+# NanoKVM-Server is cgo-linked against server/dl_lib/libkvm.so (server/common/
+# kvm_vision.go: -L../dl_lib -lkvm), which was just replaced by the freshly built
+# one, and the package ships that same build. Confirm the shipped library still
+# exports every symbol the binary actually imports from it, so a dropped symbol
+# cannot first show up as a crash on a real device.
 echo "[INFO] verifying shipped libkvm.so satisfies NanoKVM-Server"
 if ! command -v readelf >/dev/null 2>&1; then
     echo "[WARN] readelf unavailable, skipping ABI check"

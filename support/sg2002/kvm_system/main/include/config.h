@@ -61,8 +61,8 @@ typedef struct {
 	int8_t  rndis_state = -1;		// (exist?) /sys/kernel/config/usb_gadget/g0/configs/c.1/rndis.usb0
 	int8_t  udisk_state = -1;		// (exist?) /sys/kernel/config/usb_gadget/g0/configs/c.1/mass_storage.disk0
 	int8_t  host_pwr_state = -1;	// cat /sys/class/gpio/gpio504/value
-	int16_t hdmi_width = 0;			// cat /kvmapp/kvm/width
-	int16_t hdmi_height = 0;		// cat /kvmapp/kvm/height
+	int16_t hdmi_width = 0;			// pushed by the server (kvm_start_hdmi_client)
+	int16_t hdmi_height = 0;		// pushed by the server (kvm_start_hdmi_client)
 	int8_t type = 0;				// cat /kvmapp/kvm/type
 	int8_t now_fps = 0;				// cat /kvmapp/kvm/now_fps
 	int16_t qlty = 0;				// cat /kvmapp/kvm/qlty
@@ -94,8 +94,8 @@ typedef struct {
 	int8_t  rndis_state = -1;		// (exist?) /sys/kernel/config/usb_gadget/g0/configs/c.1/rndis.usb0
 	int8_t  udisk_state = -1;		// (exist?) /sys/kernel/config/usb_gadget/g0/configs/c.1/mass_storage.disk0
 	int8_t  host_pwr_state = -1;	// cat /sys/class/gpio/gpio504/value
-	int16_t hdmi_width = -1;		// cat /kvmapp/kvm/width
-	int16_t hdmi_height = -1;		// cat /kvmapp/kvm/height
+	int16_t hdmi_width = -1;		// shown value, from kvm_sys_state
+	int16_t hdmi_height = -1;		// shown value, from kvm_sys_state
 	int8_t type = -1;				// cat /kvmapp/kvm/type
 	int8_t now_fps = -1;			// cat /kvmapp/kvm/now_fps
 	int16_t qlty = -1;				// cat /kvmapp/kvm/qlty

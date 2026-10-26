@@ -12,6 +12,8 @@ import (
 	"sync"
 	"unsafe"
 
+	"NanoKVM-Server/service/hdmi"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -118,14 +120,36 @@ func (k *KvmVision) SetHDMI(enable bool) int {
 	return result
 }
 
-func (k *KvmVision) HasHDMISignal() bool {
+// hdmiWaitIntervalMs bounds one blocking wait. It is not a poll period: the
+// wait returns the moment libkvm publishes a snapshot, and a timeout only
+// means nothing changed.
+const hdmiWaitIntervalMs = 10000
+
+// WaitHDMI blocks until libkvm publishes an HDMI snapshot newer than lastSeq.
+// It does not hold k.mutex while blocked: Close must be able to run, and its
+// kvmv_deinit is what releases the wait with WaitClosed.
+func (k *KvmVision) WaitHDMI(lastSeq uint64) (hdmi.Snapshot, hdmi.WaitResult) {
 	k.mutex.RLock()
-	defer k.mutex.RUnlock()
-	if k.closed {
-		return false
+	closed := k.closed
+	k.mutex.RUnlock()
+	if closed {
+		return hdmi.Snapshot{}, hdmi.WaitClosed
 	}
 
-	return C.kvmv_hdmi_signal_active() != 0
+	var snap C.struct_kvm_hdmi_snapshot
+	switch C.kvmv_hdmi_wait(C.uint64_t(lastSeq), &snap, C.int(hdmiWaitIntervalMs)) {
+	case 1:
+		return hdmi.Snapshot{
+			State:  hdmi.State(snap.state),
+			Width:  uint16(snap.res.width),
+			Height: uint16(snap.res.height),
+			Seq:    uint64(snap.seq),
+		}, hdmi.WaitChanged
+	case 0:
+		return hdmi.Snapshot{}, hdmi.WaitTimeout
+	default:
+		return hdmi.Snapshot{}, hdmi.WaitClosed
+	}
 }
 
 func (k *KvmVision) SetGop(gop uint8) {

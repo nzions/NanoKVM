@@ -3,7 +3,6 @@ package hdmi_state
 import (
 	"sync"
 	"testing"
-	"time"
 )
 
 func TestUpdateViewerIgnoresOlderSnapshot(t *testing.T) {
@@ -21,12 +20,11 @@ func TestUpdateViewerIgnoresOlderSnapshot(t *testing.T) {
 	}
 }
 
-func TestCaptureReadyAtTracksWarmup(t *testing.T) {
+func TestCaptureWarmupTracksSnapshotSeq(t *testing.T) {
 	state := New()
-	readyAt := time.Now().Add(time.Second)
-	state.MarkWarming(readyAt)
-	if got := state.ReadyAt(); !got.Equal(readyAt) {
-		t.Fatalf("readyAt=%v, want %v", got, readyAt)
+	state.MarkWarming(7)
+	if got := state.WarmAfterSeq(); got != 7 {
+		t.Fatalf("warmAfterSeq=%d, want 7", got)
 	}
 	if !state.NeedsFreshFrame() {
 		t.Fatal("warmup did not require a fresh frame")
@@ -37,16 +35,16 @@ func TestCaptureReadyAtTracksWarmup(t *testing.T) {
 	if state.NeedsFreshFrame() || state.ClaimFreshFrame() {
 		t.Fatal("fresh frame requirement was not cleared after the first claim")
 	}
-	state.MarkWarming(readyAt)
-	state.ClearReadyAt()
-	if !state.ReadyAt().IsZero() || state.NeedsFreshFrame() {
-		t.Fatalf("readyAt=%v needsFresh=%t, want zero/false", state.ReadyAt(), state.NeedsFreshFrame())
+	state.MarkWarming(7)
+	state.ClearWarming()
+	if state.WarmAfterSeq() != 0 || state.NeedsFreshFrame() {
+		t.Fatalf("warmAfterSeq=%d needsFresh=%t, want 0/false", state.WarmAfterSeq(), state.NeedsFreshFrame())
 	}
 }
 
 func TestClaimFreshFrameOnlySucceedsOnce(t *testing.T) {
 	state := New()
-	state.MarkWarming(time.Now())
+	state.MarkWarming(1)
 
 	if !state.ClaimFreshFrame() {
 		t.Fatal("first reader did not claim the fresh frame")

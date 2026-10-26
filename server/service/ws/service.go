@@ -37,6 +37,7 @@ func (s *Service) Connect(c *gin.Context) {
 	manager.AddClient(ws, client)
 	defer manager.RemoveClient(ws)
 
+	sendHdmiStateSnapshot(client)
 	sendCaptureStatusSnapshot(client)
 	sendH264ModeStatusSnapshot(client)
 	sendKeyboardLedStatusSnapshot(client)

@@ -22,6 +22,7 @@ import {
 import { Head } from '@/components/head.tsx';
 
 import { CaptureStatusOverlay, useCaptureStatus } from './capture-status';
+import { useHdmiState } from './hdmi-state';
 import { Keyboard } from './keyboard';
 import { Menu } from './menu';
 import { Mouse } from './mouse';
@@ -57,6 +58,7 @@ export const Desktop = () => {
   const [activeVideoMode] = useState(getVideoMode);
   const [picoclawSidebarWidth, setPicoclawSidebarWidth] = useState(420);
   const captureStatus = useCaptureStatus(activeVideoMode);
+  useHdmiState();
 
   const [videoMode, setVideoMode] = useAtom(videoModeAtom);
   const [resolution, setResolution] = useAtom(resolutionAtom);

@@ -1,8 +1,12 @@
 import { atom } from 'jotai';
 
+import type { HdmiSnapshot } from '@/pages/desktop/hdmi-state/model.ts';
 import { ControlRegionMode, InputRegion, Resolution } from '@/types';
 
 export const isHdmiEnabledAtom = atom(true);
+
+// latest HDMI state the device pushed (null until the first one arrives)
+export const hdmiSnapshotAtom = atom<HdmiSnapshot | null>(null);
 
 // video mode
 // direct: stream H.264 over HTTP

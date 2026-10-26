@@ -9,6 +9,8 @@ package common
 import (
 	"sync"
 
+	"NanoKVM-Server/service/hdmi"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -40,8 +42,9 @@ func (k *KvmVision) SetHDMI(enable bool) int {
 	return -1
 }
 
-func (k *KvmVision) HasHDMISignal() bool {
-	return false
+// WaitHDMI: there is no libkvm, so no snapshot will ever come.
+func (k *KvmVision) WaitHDMI(lastSeq uint64) (hdmi.Snapshot, hdmi.WaitResult) {
+	return hdmi.Snapshot{}, hdmi.WaitClosed
 }
 
 func (k *KvmVision) SetGop(gop uint8) {}

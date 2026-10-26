@@ -2,8 +2,11 @@
 #include "system_state.h"
 #include "vi_state_shared.hpp"
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
+#include <pthread.h>
+#include <unistd.h>
 
 using namespace maix;
 using namespace maix::sys;
@@ -367,29 +370,96 @@ void kvm_update_stream_qlty(void)
 	}
 }
 
-void kvm_update_hdmi_res(void)
+// ---- HDMI state pushed by NanoKVM-Server -------------------------------------
+// The server writes one JSON line per HDMI transition to a unix socket:
+//   {"state":2,"width":1920,"height":1080,"seq":7}
+// (server/service/hdmi Snapshot). The current state is the first line of every
+// connection. A thread blocks in read; nothing is polled and no file is read.
+
+#define HDMI_SOCKET_PATH		"/var/run/kvmhdmi.sock"
+#define HDMI_SOCKET_RETRY_US	1000000		// pause before reconnecting; not a state
+
+enum hdmi_snapshot_state_t {
+	HDMI_SNAPSHOT_NO_SIGNAL = 0,
+	HDMI_SNAPSHOT_LOCKING = 1,
+	HDMI_SNAPSHOT_STREAMING = 2,
+	HDMI_SNAPSHOT_RES_CHANGE = 3,
+};
+
+typedef struct {
+	hdmi_snapshot_state_t state;
+	uint16_t width;
+	uint16_t height;
+	uint64_t seq;
+} hdmi_snapshot_t;
+
+static bool parse_hdmi_snapshot(const char *line, hdmi_snapshot_t *out)
 {
-	FILE *fp;
-	int file_size;
-	uint8_t RW_Data[10];
-	// HDMI width
-	fp = fopen("/kvmapp/kvm/width", "r");
-	fseek(fp, 0, SEEK_END);
-	file_size = ftell(fp); 
-	fseek(fp, 0, SEEK_SET);
-	fread(RW_Data, sizeof(char), file_size, fp);
-	fclose(fp);
-	RW_Data[file_size] = 0;
-	kvm_sys_state.hdmi_width = atoi((char*)RW_Data);
-	// HDMI height
-	fp = fopen("/kvmapp/kvm/height", "r");
-	fseek(fp, 0, SEEK_END);
-	file_size = ftell(fp); 
-	fseek(fp, 0, SEEK_SET);
-	fread(RW_Data, sizeof(char), file_size, fp);
-	fclose(fp);
-	RW_Data[file_size] = 0;
-	kvm_sys_state.hdmi_height = atoi((char*)RW_Data);
+	unsigned int state, width, height;
+	unsigned long long seq;
+	if (sscanf(line, "{\"state\":%u,\"width\":%u,\"height\":%u,\"seq\":%llu}",
+			&state, &width, &height, &seq) != 4) {
+		return false;
+	}
+	if (state > HDMI_SNAPSHOT_RES_CHANGE || width > 0xFFFF || height > 0xFFFF) {
+		return false;
+	}
+	out->state = (hdmi_snapshot_state_t)state;
+	out->width = (uint16_t)width;
+	out->height = (uint16_t)height;
+	out->seq = (uint64_t)seq;
+	return true;
+}
+
+static void* thread_hdmi_snapshots(void *arg)
+{
+	while (kvm_sys_state.sys_thread_running) {
+		int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+		if (fd < 0) {
+			usleep(HDMI_SOCKET_RETRY_US);
+			continue;
+		}
+		struct sockaddr_un addr;
+		memset(&addr, 0, sizeof(addr));
+		addr.sun_family = AF_UNIX;
+		strncpy(addr.sun_path, HDMI_SOCKET_PATH, sizeof(addr.sun_path) - 1);
+		if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
+			close(fd);
+			usleep(HDMI_SOCKET_RETRY_US);	// the server is not up (yet)
+			continue;
+		}
+
+		FILE *fp = fdopen(fd, "r");
+		if (fp == NULL) {
+			close(fd);
+			usleep(HDMI_SOCKET_RETRY_US);
+			continue;
+		}
+		char line[128];
+		while (fgets(line, sizeof(line), fp) != NULL) {
+			hdmi_snapshot_t snapshot;
+			if (!parse_hdmi_snapshot(line, &snapshot)) {
+				fprintf(stderr, "[kvm_system] malformed hdmi snapshot line: %s", line);
+				continue;
+			}
+			// The resolution is the last one the VI chain was set to; it stays
+			// shown when the signal drops.
+			kvm_sys_state.hdmi_width = snapshot.width;
+			kvm_sys_state.hdmi_height = snapshot.height;
+		}
+		fclose(fp);		// the server closed the socket: connect again
+	}
+	return NULL;
+}
+
+void kvm_start_hdmi_client(void)
+{
+	pthread_t thread;
+	if (0 != pthread_create(&thread, NULL, thread_hdmi_snapshots, NULL)) {
+		fprintf(stderr, "[kvm_system] cannot start the hdmi snapshot thread\n");
+		return;
+	}
+	pthread_detach(thread);
 }
 
 void kvm_update_eth_state(void)

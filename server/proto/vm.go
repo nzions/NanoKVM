@@ -1,5 +1,7 @@
 package proto
 
+import "NanoKVM-Server/service/hdmi"
+
 type IP struct {
 	Name    string `json:"name"`
 	Addr    string `json:"addr"`
@@ -98,9 +100,10 @@ type GetOLEDRsp struct {
 }
 
 type GetGetHdmiStateRsp struct {
-	Enabled     bool `json:"enabled"`
-	Signal      bool `json:"signal"`
-	IdleTimeout int  `json:"idleTimeout"`
+	Enabled     bool          `json:"enabled"`
+	Signal      bool          `json:"signal"`
+	IdleTimeout int           `json:"idleTimeout"`
+	Snapshot    hdmi.Snapshot `json:"snapshot"`
 }
 
 type SetHdmiIdleTimeoutReq struct {
