@@ -39,6 +39,12 @@ set -o pipefail
 SRC="$(cd "$(dirname "$0")/.." && pwd)"
 ARTIFACTS="${ARTIFACTS_DIR:-/artifacts}"
 
+# scope `scripts` (forge_build repo=nanokvm scope=["scripts"]) is not the release: it
+# builds the Cube's first-boot microSD image with our kernel (scripts/forge-sdimage.sh)
+if [ "${FORGE_SCOPE:-}" = scripts ]; then
+    exec bash "$SRC/scripts/forge-sdimage.sh"
+fi
+
 MAIXCDK_SRC=/opt/maixcdk
 GO_ROOT=/opt/go-nanokvm
 HOST_TOOLS_BIN=/opt/sg2002/host-tools/gcc/riscv64-linux-musl-x86_64/bin

@@ -299,7 +299,7 @@ replaces only `BOOT.SD` with a FIT of OUR Image and DTB (fleet
 Stock U-Boot's `sdboot` loads `BOOT.SD` to 0x81800000 and runs
 `bootm ${uImage_addr}#config-sg2002_licheervnano_sd`, so that configuration name is kept.
 Needs mkimage, dumpimage, dtc, mtools (mdir mcopy mdel) and xz besides the tools above. The
-forge build is fleet's native entry `nanokvm-cube-sd-image`.
+forge build is `forge_build repo=nanokvm ref=<sha> scope=["scripts"]` (see below).
 
 * The FIT has no ramdisk (our DTB's bootargs name `root=/dev/mmcblk0p2`; U-Boot's own bootargs
   win anyway and carry the same root).
@@ -314,3 +314,10 @@ forge build is fleet's native entry `nanokvm-cube-sd-image`.
   U-Boot's `loadenvcmd`) can override `othbootargs`, for example `loglevel=7`, without a rebuild.
 * The result is checked structurally only (FIT listing, FAT read-back, kernel extracted from the
   FIT and compared). It cannot be booted under QEMU.
+
+On forge: the `build` profile with scope `scripts` runs `scripts/forge-sdimage.sh` instead of
+the release build. Its pins (release version, kernel Image/DTB, base image, Debian .debs for
+mkimage/dtc/mtools/e2fsprogs) are at the top of that script, every download is sha256-checked,
+and the result lands in `/artifacts/sdimg/nanokvm-cube-<userspace>-<kernel tag>/` (image `.xz`,
+`.sha256` of the raw image, `build.log`, `verify.txt` from `scripts/sdimage-verify.sh`). A
+published directory is never overwritten. Nothing is flashed.

@@ -1,3 +1,9 @@
+## 2.6.3 (2026-10-26)
+
+### Changes
+
+* scripts/forge-sdimage.sh: the forge build of the Cube's first-boot SD image (`forge_build repo=nanokvm scope=["scripts"]`; scripts/forge-build.sh dispatches on `FORGE_SCOPE=scripts`). Downloads the pinned kernel pair, base image and Debian .debs (mkimage, dtc, mtools, e2fsprogs; forge-c lacks them), checks every sha256, runs `sd-image.sh --kernel-fit --no-stock-ko`, reads the result back with scripts/sdimage-verify.sh (MBR, FAT listing, FIT listing, kernel decompressed from the FIT compared with the input Image, DTB, S00kmod, e2fsck) and publishes `/artifacts/sdimg/nanokvm-cube-<ver>-<kernel>/`. No device code changed
+
 ## 2.6.2 (2026-10-26)
 
 ### Changes
