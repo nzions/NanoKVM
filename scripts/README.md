@@ -121,7 +121,7 @@ together; the device refuses an update without a valid `.sig`.
 |---|---|
 | `version` | the requested version |
 | `server/NanoKVM-Server` | `server/build.sh` (BoringCrypto, RPATH `$ORIGIN/dl_lib`) |
-| `server/dl_lib/` | whatever the `kvm_vision` build emits, with any library it does not emit backfilled from the tracked `server/dl_lib/` |
+| `server/dl_lib/` | libkvm.so, libkvm_mmf.so (the `kvm_vision` build), OpenCV 4.9.0 core/imgproc/imgcodecs and json-c (`scripts/build-deps.sh`, pinned sha256 sources); the remaining vendor SDK libraries are backfilled from the tracked `server/dl_lib/` (see its README.md) |
 | `server/web/` | `web/dist/` |
 | `kvm_system/kvm_system` | `support/sg2002` `build kvm_system` |
 | `system/tool/` | prebuilt binaries in `tools/nanokvm_update_edid/` |
@@ -134,11 +134,11 @@ long-standing behaviour, not something these scripts introduce.
 
 ## The two copies of libkvm.so
 
-`NanoKVM-Server` is cgo-linked against the **tracked** `server/dl_lib/libkvm.so`
-(`server/common/kvm_vision.go`: `-L../dl_lib -lkvm`), but the package ships the
-library the `kvm_vision` build just produced. Those are two different files, and
-the tracked one can lag well behind — published releases have shipped this
-mismatch for a long time.
+`NanoKVM-Server` is cgo-linked against `server/dl_lib/libkvm.so`
+(`server/common/kvm_vision.go`: `-L../dl_lib -lkvm`). That file is no longer
+tracked: `build-in-container.sh` copies the freshly built libkvm.so (and the other
+built libraries) there before linking, so the link-time and shipped libraries are
+the same build.
 
 Because a symbol the binary imports could in principle be absent from the
 shipped library, and that would only surface as a crash on a real device,

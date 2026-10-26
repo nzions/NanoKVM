@@ -1,3 +1,11 @@
+## 2.6.16 (2026-10-26)
+
+### Changes
+
+* No library we build is tracked in git any more. `server/dl_lib` loses `libkvm.so`, `libkvm_mmf.so` (both already replaced by the forge build in every package), `libopencv_core/imgproc/imgcodecs.so.409` and `libjson-c.so.5`. `scripts/build-deps.sh` builds OpenCV 4.9.0 (core, imgproc, imgcodecs; bundled libjpeg-turbo, libpng, zlib) and json-c 0.15-20200726 from sha256-pinned source tarballs with the riscv64 musl T-Head compiler and the MaixCDK `-march` flags; a mismatch aborts the build. `build-in-container.sh` stages them in `kvmapp/server/dl_lib` and copies them to `server/dl_lib` for the server link; `package.sh` refuses a package missing any of the six, or with one that is not riscv64, instead of backfilling from git.
+* `server/dl_lib/README.md` lists every remaining file and its source: all vendor Sophgo/CVITEK SDK blobs plus MaixCDK's unused OpenCV highgui. libkvm's FreeType and HarfBuzz were already built from source by MaixCDK. `libtinyalsa.so` is Sophgo's modified build, not upstream, so it stays a vendor blob.
+* Not run on hardware (kvm1 offline). The OpenCV build is configured from scratch (no CPU dispatch, OpenMP and pthread parallel framework as before); libkvm still compiles against MaixCDK's 4.9.0 headers.
+
 ## 2.6.15 (2026-10-26)
 
 ### Changes

@@ -70,6 +70,9 @@ require_riscv64() {
     fi
 }
 
+# Libraries built from source by this repo's build (never tracked in server/dl_lib).
+BUILT_LIBS="libkvm.so libkvm_mmf.so libopencv_core.so.409 libopencv_imgproc.so.409 libopencv_imgcodecs.so.409 libjson-c.so.5"
+
 require_file "$ROOT/server/NanoKVM-Server" "run: make app"
 require_file "$ROOT/kvmapp/kvm_system/kvm_system" "run: make support"
 require_file "$ROOT/web/dist/index.html" "run: make web"
@@ -113,6 +116,7 @@ mkdir -p "$STAGE/server/dl_lib"
 for lib in "$ROOT"/server/dl_lib/*; do
     [ -e "$lib" ] || continue
     name="$(basename "$lib")"
+    [ "$name" = README.md ] && continue
     if [ ! -e "$STAGE/server/dl_lib/$name" ]; then
         cp -a "$lib" "$STAGE/server/dl_lib/$name"
     fi
@@ -122,8 +126,16 @@ done
 #    day add or rename a library (e.g. an soname bump leaving both .409 and
 #    .410 behind) and we would ship a library set nobody reviewed. Require the
 #    shipped names to be exactly the tracked set, and fail loudly otherwise.
+#    The libraries we build (BUILT_LIBS) are NOT in git: each must come from this
+#    build's kvmapp/server/dl_lib, never from a tracked copy, so their absence
+#    there is an error even if a stray file sits in server/dl_lib.
+for name in $BUILT_LIBS; do
+    [ -f "$ROOT/kvmapp/server/dl_lib/$name" ] \
+        || { echo "[ERROR] built library $name is missing from kvmapp/server/dl_lib (make vision / scripts/build-deps.sh)" >&2; exit 1; }
+    require_riscv64 "$ROOT/kvmapp/server/dl_lib/$name"
+done
 staged_libs=$(cd "$STAGE/server/dl_lib" && ls -1 | LC_ALL=C sort)
-tracked_libs=$(cd "$ROOT/server/dl_lib" && ls -1 | LC_ALL=C sort)
+tracked_libs=$( { cd "$ROOT/server/dl_lib" && ls -1 | command grep -v '^README\.md$'; printf '%s\n' $BUILT_LIBS; } | LC_ALL=C sort -u)
 if [ "$staged_libs" != "$tracked_libs" ]; then
     echo "[ERROR] shipped server/dl_lib does not match the tracked library set" >&2
     echo "        unexpected (in package, not tracked):" >&2
