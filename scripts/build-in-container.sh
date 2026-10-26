@@ -109,8 +109,8 @@ done
 mmf_cc=riscv64-unknown-linux-musl-gcc
 bash "$NANOKVM_PATH/scripts/check-mmf-closure.sh" --lib "${mmf_files[@]}" "$mmf_dl/libkvm_mmf.so" \
     --system "$($mmf_cc -print-file-name=libc.so)" "$($mmf_cc -print-file-name=libstdc++.so.6)" \
-    "$($mmf_cc -print-file-name=libgcc_s.so.1)"
-echo "[INFO] libkvm_mmf.so NEEDED (readelf -d):"
+    "$($mmf_cc -print-file-name=libgcc_s.so.1)" "$($mmf_cc -print-file-name=libatomic.so.1)"
+echo "[INFO] libkvm_mmf.so NEEDED (readelf -d), build log of the pinned MMF link:"
 readelf -d "$mmf_dl/libkvm_mmf.so" | command grep -E 'NEEDED|SONAME|RPATH|RUNPATH'
 echo "::endgroup::"
 

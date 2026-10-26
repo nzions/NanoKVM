@@ -1,3 +1,10 @@
+## 2.6.24 (2026-10-26)
+
+### Changes
+
+* Build fix for 2.6.23 (red on forge, nothing shipped): the closure check found libsys's one undefined symbol, `__atomic_compare_exchange_1`, which the MaixCDK libsys leaves undefined too; `libkvm.so` NEEDs `libatomic.so.1`, which defines it. libatomic is now a system library of the check.
+* Not run on hardware
+
 ## 2.6.23 (2026-10-26)
 
 ### Changes

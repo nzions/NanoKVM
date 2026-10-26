@@ -155,8 +155,11 @@ echo "[build-mmf] link set (sha256, name, origin):"; cat "$OUT/MANIFEST"
 # --- closure: NEEDED and undefined symbols of the set ---------------------------------
 libc="$($CC -print-file-name=libc.so)"; cpp="$($CC -print-file-name=libstdc++.so.6)"
 gcc_s="$($CC -print-file-name=libgcc_s.so.1)"
-for f in "$libc" "$cpp" "$gcc_s"; do [ -f "$f" ] || die "toolchain has no $f"; done
+# libsys leaves __atomic_compare_exchange_1 (riscv has no byte CAS) undefined, exactly as the
+# MaixCDK build did; libkvm.so NEEDs libatomic.so.1, which satisfies it from the global scope.
+atomic="$($CC -print-file-name=libatomic.so.1)"
+for f in "$libc" "$cpp" "$gcc_s" "$atomic"; do [ -f "$f" ] || die "toolchain has no $f"; done
 set_files=()
 for l in $OURS $PINBLOBS 3rd/libini.so; do set_files+=("$OUT/lib/$l"); done
-bash "$HERE/check-mmf-closure.sh" --lib "${set_files[@]}" --system "$libc" "$cpp" "$gcc_s"
+bash "$HERE/check-mmf-closure.sh" --lib "${set_files[@]}" --system "$libc" "$cpp" "$gcc_s" "$atomic"
 log "done: $OUT/lib"
