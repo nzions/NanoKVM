@@ -1,3 +1,9 @@
+## 2.5.13 (2026-10-26)
+
+### Features
+
+* First boot: an operator-supplied seed. If `/boot/initial.pass` (the FAT boot partition, writable from a Mac) exists when the owner account is first created and holds at least 12 characters (one trailing newline is trimmed), it is the admin seed instead of a random one. It is also set as root's, the first web login still forces a password change, and the file is removed from `/boot` (and synced) as soon as it is consumed. A seed that is too short or unreadable is ignored with a log line (never the value) and the random seed is used; if the file cannot be removed the device carries on and logs it loudly. With no file the random seed and OLED flow is unchanged
+
 ## 2.5.12 (2026-10-25)
 
 ### Features

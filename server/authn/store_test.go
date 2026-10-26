@@ -321,3 +321,109 @@ func TestLegacyReversiblePasswordIsRetired(t *testing.T) {
 		t.Fatalf("seed password must log in: ok=%v err=%v", ok, err)
 	}
 }
+
+// bootSeededStore returns a store whose boot-partition seed file holds content.
+func bootSeededStore(t *testing.T, content string) *Store {
+	t.Helper()
+	dir := t.TempDir()
+	store := NewStore(filepath.Join(dir, "pwd"))
+	store.bootSeedPath = filepath.Join(dir, "boot-initial.pass")
+	if err := os.WriteFile(store.bootSeedPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return store
+}
+
+func TestBootSeedSeedsOwnerAndIsConsumed(t *testing.T) {
+	const want = "operator-chosen-seed"
+	store := bootSeededStore(t, want+"\n")
+
+	seeded, err := store.Init()
+	if err != nil || seeded != want {
+		t.Fatalf("Init seeded %q err=%v, want the boot seed", seeded, err)
+	}
+	if _, err = os.Stat(store.bootSeedPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("boot seed must be removed once consumed: %v", err)
+	}
+	data, err := os.ReadFile(store.seedPath)
+	if err != nil || strings.TrimSpace(string(data)) != want {
+		t.Fatalf("seed file holds %q, err=%v", data, err)
+	}
+	user, ok, err := store.Authenticate("admin", want)
+	if err != nil || !ok || !user.MustChangePassword {
+		t.Fatalf("boot seed login: user=%+v ok=%v err=%v", user, ok, err)
+	}
+}
+
+func TestBootSeedWithoutNewlineAndCRLF(t *testing.T) {
+	for name, content := range map[string]string{"bare": "abcdefghijkl", "crlf": "abcdefghijkl\r\n"} {
+		store := bootSeededStore(t, content)
+		seeded, err := store.Init()
+		if err != nil || seeded != "abcdefghijkl" {
+			t.Fatalf("%s: seeded %q err=%v", name, seeded, err)
+		}
+	}
+}
+
+func TestShortBootSeedIsIgnored(t *testing.T) {
+	store := bootSeededStore(t, "elevenchars\n")
+	seeded, err := store.Init()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if seeded == "" || seeded == "elevenchars" || len(seeded) != seedPasswordLength {
+		t.Fatalf("short boot seed must fall back to a random seed, got %q", seeded)
+	}
+	if _, err = os.Stat(store.bootSeedPath); err != nil {
+		t.Fatalf("an ignored boot seed is left in place: %v", err)
+	}
+}
+
+func TestBootSeedDoesNotOverrideExistingAccountOrSeedFile(t *testing.T) {
+	store := bootSeededStore(t, "operator-chosen-seed\n")
+	if err := os.WriteFile(store.seedPath, []byte("button-reset-seed\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	seeded, err := store.Init()
+	if err != nil || seeded != "button-reset-seed" {
+		t.Fatalf("an existing seed file wins: seeded %q err=%v", seeded, err)
+	}
+	if _, err = os.Stat(store.bootSeedPath); err != nil {
+		t.Fatalf("boot seed not consumed, so it stays: %v", err)
+	}
+
+	// the account exists now: a boot seed dropped later changes nothing
+	if err = os.WriteFile(store.bootSeedPath, []byte("late-operator-seed\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	seeded, err = store.Init()
+	if err != nil || seeded != "" {
+		t.Fatalf("second Init: seeded=%q err=%v, want empty", seeded, err)
+	}
+	if _, ok, err := store.Authenticate("admin", "late-operator-seed"); err != nil || ok {
+		t.Fatalf("late boot seed must not become a password: ok=%v err=%v", ok, err)
+	}
+}
+
+func TestUnreadableBootSeedFallsBackToRandom(t *testing.T) {
+	dir := t.TempDir()
+	store := NewStore(filepath.Join(dir, "pwd"))
+	store.bootSeedPath = filepath.Join(dir, "boot-initial.pass")
+	if err := os.Mkdir(store.bootSeedPath, 0o755); err != nil { // reading a directory fails
+		t.Fatal(err)
+	}
+	seeded, err := store.Init()
+	if err != nil || len(seeded) != seedPasswordLength {
+		t.Fatalf("seeded %q err=%v, want a random seed", seeded, err)
+	}
+}
+
+func TestAbsentBootSeedKeepsRandomSeed(t *testing.T) {
+	dir := t.TempDir()
+	store := NewStore(filepath.Join(dir, "pwd"))
+	store.bootSeedPath = filepath.Join(dir, "missing")
+	seeded, err := store.Init()
+	if err != nil || len(seeded) != seedPasswordLength {
+		t.Fatalf("seeded %q err=%v, want a random seed", seeded, err)
+	}
+}

@@ -22,7 +22,13 @@ const (
 	// SeedPasswordFile holds the first-boot (or button-reset) password of the
 	// device owner. It is 0600 and shown on the device's own screen by
 	// kvm_system; it is removed once the owner changes the password.
-	SeedPasswordFile   = "/etc/kvm/initial.pass"
+	SeedPasswordFile = "/etc/kvm/initial.pass"
+	// BootSeedFile is an optional operator-supplied first-boot seed on the FAT
+	// boot partition (writable from a Mac). If present when the owner is created
+	// and at least minBootSeedLength characters, it replaces the random seed and
+	// is removed once consumed.
+	BootSeedFile       = "/boot/initial.pass"
+	minBootSeedLength  = 12
 	currentFileVersion = 1
 	defaultUsername    = "admin"
 	// legacyDefaultPassword is the password older releases shipped with. It is
@@ -88,6 +94,9 @@ type legacyAccount struct {
 type Store struct {
 	path     string
 	seedPath string
+	// bootSeedPath is the operator-supplied first-boot seed on the FAT boot
+	// partition; it is consumed (removed) when it seeds a new owner.
+	bootSeedPath string
 	// seeded is the password the last Init generated for a new owner account
 	seeded string
 	mutex  sync.RWMutex
@@ -97,7 +106,11 @@ var DefaultStore = NewStore(AccountFile)
 
 // NewStore keeps the seed password file next to the account file.
 func NewStore(path string) *Store {
-	return &Store{path: path, seedPath: filepath.Join(filepath.Dir(path), filepath.Base(SeedPasswordFile))}
+	return &Store{
+		path:         path,
+		seedPath:     filepath.Join(filepath.Dir(path), filepath.Base(SeedPasswordFile)),
+		bootSeedPath: BootSeedFile,
+	}
 }
 
 func IsValidRole(role Role) bool {
@@ -534,17 +547,77 @@ func (s *Store) seedPassword(persist bool) (string, error) {
 			return password, nil
 		}
 	}
-	password, err := randomPassword(seedPasswordLength)
-	if err != nil {
-		return "", err
+	bootPassword, fromBoot := s.bootSeed()
+	if fromBoot && !persist {
+		return bootPassword, nil
+	}
+	password := bootPassword
+	if !fromBoot {
+		var err error
+		if password, err = randomPassword(seedPasswordLength); err != nil {
+			return "", err
+		}
 	}
 	if persist {
-		if err = writeFile0600(s.seedPath, []byte(password+"\n")); err != nil {
+		if err := writeFile0600(s.seedPath, []byte(password+"\n")); err != nil {
 			return "", err
 		}
 		s.seeded = password
+		if fromBoot {
+			s.consumeBootSeed()
+		}
 	}
 	return password, nil
+}
+
+// bootSeed reads the operator-supplied first-boot seed from the FAT boot
+// partition (BootSeedFile). It returns false when the file is absent or unusable;
+// an unusable one is logged by reason only, never by value, and the caller falls
+// back to a random seed.
+func (s *Store) bootSeed() (string, bool) {
+	if s.bootSeedPath == "" {
+		return "", false
+	}
+	data, err := os.ReadFile(s.bootSeedPath)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", false
+	}
+	if err != nil {
+		log.Errorf("first-boot seed %s unreadable (%v): using a random seed", s.bootSeedPath, err)
+		return "", false
+	}
+	password := strings.TrimSuffix(string(data), "\n")
+	password = strings.TrimSuffix(password, "\r")
+	if len([]byte(password)) < minBootSeedLength {
+		log.Errorf("first-boot seed %s ignored: it must be at least %d characters; using a random seed", s.bootSeedPath, minBootSeedLength)
+		return "", false
+	}
+	if err = ValidatePassword(password); err != nil {
+		log.Errorf("first-boot seed %s ignored: %v; using a random seed", s.bootSeedPath, err)
+		return "", false
+	}
+	log.Infof("first-boot seed taken from %s", s.bootSeedPath)
+	return password, true
+}
+
+// consumeBootSeed removes the boot-partition seed file and flushes the removal.
+// The same value is already in the 0600 seed file, so a failure here is loud but
+// not fatal.
+func (s *Store) consumeBootSeed() {
+	if err := os.Remove(s.bootSeedPath); err != nil {
+		log.Errorf("SECURITY: could not remove the first-boot seed %s (%v): the plaintext seed stays on the boot partition until it is deleted by hand", s.bootSeedPath, err)
+		return
+	}
+	dir, err := os.Open(filepath.Dir(s.bootSeedPath))
+	if err != nil {
+		log.Errorf("removed %s but could not open its directory to sync: %v", s.bootSeedPath, err)
+		return
+	}
+	if err = dir.Sync(); err != nil {
+		log.Errorf("removed %s but the sync failed: %v", s.bootSeedPath, err)
+	}
+	_ = dir.Close()
+	log.Infof("first-boot seed %s consumed and removed", s.bootSeedPath)
 }
 
 // writeFile0600 creates the file with 0600 from the start and fixes the mode of
