@@ -1,3 +1,10 @@
+## 2.6.35 (2026-10-26)
+
+### Changes
+
+* Build fix for 2.6.34 (red on forge, nothing shipped): every source compiled and `libkvm.so` linked, but the `kvm_vision_test` link failed on `__atomic_exchange_1` (libkvm) and `__atomic_compare_exchange_1` (libsys): `-latomic` had only ever been on the link line through the OpenCV libraries. The `kvm` component now requires `atomic` itself.
+* Not run on hardware
+
 ## 2.6.34 (2026-10-26)
 
 ### Changes
