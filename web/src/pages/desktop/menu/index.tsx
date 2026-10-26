@@ -91,7 +91,7 @@ export const Menu = () => {
         <div className="sticky top-[10px] flex w-full justify-center">
           <div
             className={clsx(
-              'relative h-[36px] max-w-full items-center overflow-x-auto rounded bg-neutral-800/80 pl-1 pr-2 transition-all duration-300 sm:overflow-visible [&>*]:shrink-0 [&::-webkit-scrollbar]:hidden',
+              'relative h-[36px] max-w-full items-center overflow-x-auto rounded bg-neutral-800/80 pl-1 [.light_&]:bg-neutral-800 [.light_&]:shadow-md [.light_&]:ring-1 [.light_&]:ring-neutral-600 pr-2 transition-all duration-300 sm:overflow-visible [&>*]:shrink-0 [&::-webkit-scrollbar]:hidden',
               isMenuExpanded ? 'flex' : 'hidden',
               isMenuHidden ? '-translate-y-[110%] opacity-80' : 'translate-y-0 opacity-100'
             )}

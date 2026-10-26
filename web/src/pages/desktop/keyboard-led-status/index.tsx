@@ -27,7 +27,7 @@ function LockIndicator({ labelKey, active, known }: LockIndicatorProps) {
       mouseEnterDelay={0.6}
     >
       <div
-        className="flex h-[11px] items-center gap-1 px-1 font-sans text-[10px] font-medium leading-[11px] text-neutral-400"
+        className="flex h-[11px] items-center gap-1 px-1 font-sans text-[10px] font-medium leading-[11px] text-neutral-400 [.light_&]:text-neutral-200"
         aria-label={indicatorLabel}
         role="img"
       >
@@ -56,7 +56,7 @@ export function KeyboardLedStatus() {
 
   return (
     <div
-      className="flex h-full w-[40px] flex-col items-start justify-center rounded bg-neutral-800/80"
+      className="flex h-full w-[40px] flex-col items-start justify-center rounded bg-neutral-800/80 [.light_&]:bg-neutral-800 [.light_&]:shadow-md [.light_&]:ring-1 [.light_&]:ring-neutral-600"
       aria-label="Keyboard lock status"
       role="group"
     >
