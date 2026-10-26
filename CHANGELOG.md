@@ -1,3 +1,10 @@
+## 2.6.33 (2026-10-26)
+
+### Changes
+
+* Build fix for 2.6.32 (red on forge, nothing shipped): OpenCV writes `CMakeDownloadLog.txt` on every configure, so failing on its existence always tripped. Per `cmake/OpenCVDownload.cmake` (4.9.0) the check now prints the log and fails only on a network-download record (`#cmake_download` / `#try`). G-API and ADE stay off and the download cache must hold no non-empty file.
+* Not run on hardware
+
 ## 2.6.32 (2026-10-26)
 
 ### Changes

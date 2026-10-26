@@ -106,11 +106,21 @@ cmake -S "$OCV_SRC" -B "$OCV_BUILD" -G "Unix Makefiles" \
 ocv_dl_files="$(find "$OCV_DL" -type f -size +0 ! -name .gitignore)"
 [ -z "$ocv_dl_files" ] || die "OpenCV downloaded into $OCV_DL at configure time: $(echo $ocv_dl_files)"
 log "OpenCV download cache contents: $(find "$OCV_DL" -mindepth 1 | tr '\n' ' ')"
-[ ! -e "$OCV_BUILD/CMakeDownloadLog.txt" ] || die "OpenCV configure downloaded something (see $OCV_BUILD/CMakeDownloadLog.txt)"
+# cmake/OpenCVDownload.cmake (4.9.0) writes CMakeDownloadLog.txt on every configure: line 1 is
+# '#use_cache "<cache dir>"'; a real network fetch appends '#cmake_download "<file>" "<url>"'
+# (then '#try N'); a request served from the cache logs '#do_*' / '#copy' / '#unpack' instead.
+# Print the log, and fail only on the network-download record.
+OCV_DL_LOG="$OCV_BUILD/CMakeDownloadLog.txt"
+[ -f "$OCV_DL_LOG" ] || die "$OCV_DL_LOG is missing: cannot prove OpenCV did not download"
+log "OpenCV CMakeDownloadLog.txt:"
+sed 's/^/    /' "$OCV_DL_LOG"
+if grep -E '^#(cmake_download|try) ' "$OCV_DL_LOG"; then
+    die "OpenCV downloaded at configure time (records above)"
+fi
 if grep -E 'Downloading |downloading |ocv_download' "$OCV_CFG_LOG" | grep -v 'Using github.com to download 3rdparty'; then
     die "OpenCV configure output mentions a download (lines above)"
 fi
-log "OpenCV configure: no download (no file in the cache $OCV_DL, no CMakeDownloadLog.txt, no download line in the configure output)"
+log "OpenCV configure: no download (no file in the cache $OCV_DL, no #cmake_download record in CMakeDownloadLog.txt, no download line in the configure output)"
 log "building OpenCV core, imgproc, imgcodecs ($JOBS jobs)"
 cmake --build "$OCV_BUILD" --parallel "$JOBS" --target opencv_core opencv_imgproc opencv_imgcodecs
 
