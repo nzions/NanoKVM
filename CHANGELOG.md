@@ -1,3 +1,10 @@
+## 2.6.23 (2026-10-26)
+
+### Changes
+
+* Build fix for 2.6.22 (red on forge, nothing shipped): the generated `cvi_json-c/cvi_debug.h` (json-c's debug.h) shadowed the middleware's `cvi_debug.h` in `libcvi_bin`'s include path; the generated dirs now come after the middleware's (`-idirafter`).
+* Not run on hardware
+
 ## 2.6.22 (2026-10-26)
 
 ### Changes

@@ -124,7 +124,7 @@ V1INC="$V1_UAPI_A|$V1_UAPI_B"
 # of the driver they ioctl; everything else is the v2 set (tools/abicheck).
 mk 3rdparty/inih "$LIBDIR/3rd/libini.so" "$V2INC" ""
 mk modules/sys "$LIBDIR/libsys.so" "$V2INC" ""
-mk modules/bin "$LIBDIR/libcvi_bin.so" "$V2INC" "-I$OUT/cvi/include/cvi_json-c -I$OUT/cvi/include/cvi_miniz"
+mk modules/bin "$LIBDIR/libcvi_bin.so" "$V2INC" "-idirafter $OUT/cvi/include/cvi_json-c -idirafter $OUT/cvi/include/cvi_miniz"
 mk modules/vpu "$LIBDIR/libvpu.so" "$V2INC" ""
 mk modules/venc "$LIBDIR/libvenc.so" "$V1INC" "-D__CV181X__"
 mk modules/vdec "$LIBDIR/libvdec.so" "$V1INC" "-D__CV181X__"
