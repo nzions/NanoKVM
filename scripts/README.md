@@ -246,7 +246,7 @@ tree against the release.
 
 ```bash
 scripts/sd-image.sh [--stock-sha256 <hex>] [--sha256 <hex>] \
-    <20260610_NanoKVM_Rev1_4_3.img> <nanokvm_2.5.13.tar.gz> <out.img>
+    <20260610_NanoKVM_Rev1_4_3.img> <nanokvm_2.5.14.tar.gz> <out.img>
 ```
 
 - Both inputs are verified by sha256 (stock: the 1.4.3 image is the default;
@@ -264,13 +264,15 @@ scripts/sd-image.sh [--stock-sha256 <hex>] [--sha256 <hex>] \
   `server.yaml` do not exist in the image. On first boot the server seeds the
   `admin` owner with a random password, shows it on the OLED, stores it in
   `/etc/kvm/initial.pass` (0600), sets it as the root password too, and the
-  owner must change it at first login. An operator can instead drop a seed of at
-  least 12 characters in `initial.pass` on the FAT boot partition (`/boot`, label
-  `boot`, writable from a Mac; see FLASHING.md): the server uses it, sets it as
-  root's too, and removes the file once consumed. The image's `/boot` is the
+  owner must change it at first login. An operator can instead drop a seed (any
+  non-empty password, at most 72 bytes) in `initial.pass` on the FAT boot
+  partition (`/boot`, label `boot`, writable from a Mac; see FLASHING.md): the
+  server uses it, sets it as root's too, and removes the file once consumed. An
+  optional `root.pass` there sets root's password separately (root then no
+  longer shares the admin seed) and is removed once applied. The image's `/boot` is the
   stock one, untouched. `/etc/kvm/ssh_stop` stays as the stock
   image ships it (sshd off until enabled in the UI).
 - The result cannot be boot-tested under QEMU: the stock kernel and xthead
   loaders need the SG2002's C906 vector unit and cvi video hardware.
 - Flash the (xz-decompressed) image to the card, for example
-  `dd if=nanokvm-cube-2.5.13-sd.img of=/dev/rdiskN bs=4m` on macOS.
+  `dd if=nanokvm-cube-2.5.14-sd.img of=/dev/rdiskN bs=4m` on macOS.

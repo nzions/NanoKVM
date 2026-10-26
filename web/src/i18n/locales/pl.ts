@@ -15,7 +15,6 @@ const pl = {
       placeholderPassword2: 'wprowadź hasło ponownie',
       noEmptyUsername: 'nazwa użykownika nie może być pusta',
       noEmptyPassword: 'hasło nie może być puste',
-      passwordLength: 'Hasło musi mieć od 8 do 72 znaków',
       noAccount:
         'Nie udało się uzyskać informacji o użytkowniku, odśwież stronę lub zresetuj hasło',
       invalidUser: 'Błędne hasło lub nazwa użykownika',

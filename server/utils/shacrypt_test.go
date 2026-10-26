@@ -137,7 +137,7 @@ func TestSetRootPasswordNoRootLine(t *testing.T) {
 }
 
 func TestSetRootPasswordInvalid(t *testing.T) {
-	for _, pw := range []string{"", "a:b", "a\nb", "a\rb"} {
+	for _, pw := range []string{"", "a:b", "a\nb", "a\rb", "a\x00b"} {
 		if err := SetRootPassword(pw); err == nil {
 			t.Errorf("SetRootPassword(%q) did not fail", pw)
 		}

@@ -15,7 +15,6 @@ const zh = {
       placeholderPassword2: '请再次输入密码',
       noEmptyUsername: '用户名不能为空',
       noEmptyPassword: '密码不能为空',
-      passwordLength: '密码长度必须为 8 到 72 个字符',
       noAccount: '获取用户信息失败，请刷新重试或重置密码',
       invalidUser: '用户名或密码错误',
       locked: '登录太频繁，请稍后再试',

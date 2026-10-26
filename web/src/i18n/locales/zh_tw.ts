@@ -15,7 +15,6 @@ const zh_tw = {
       placeholderPassword2: '請再次輸入密碼',
       noEmptyUsername: '使用者名稱不能為空',
       noEmptyPassword: '密碼不能為空',
-      passwordLength: '密碼長度必須為 8 到 72 個字元',
       noAccount: '找不到使用者，請重新整理網頁或重設密碼',
       invalidUser: '使用者名稱或密碼錯誤',
       locked: '登入次數過多，請稍後重試',

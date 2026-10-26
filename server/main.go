@@ -45,7 +45,7 @@ func initialize() {
 		}
 		if seeded != "" {
 			// one password for the OLED: the web owner and root share it
-			if err := utils.SetRootPassword(seeded); err != nil {
+			if err := authn.DefaultStore.ApplyRootPassword(seeded, utils.SetRootPassword); err != nil {
 				log.Printf("ERROR: failed to set the root password to the seeded one: %v", err)
 			} else if err := utils.ClearRootPassFile(); err != nil {
 				log.Printf("ERROR: failed to remove %s: %v", utils.RootPassFile, err)

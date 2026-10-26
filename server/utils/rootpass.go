@@ -28,7 +28,7 @@ var ShadowFile = "/etc/shadow"
 // reaches argv. Only root's hash and last-change day change; every other line
 // is kept byte for byte, and a missing root line is an error (never appended).
 func SetRootPassword(password string) error {
-	if password == "" || strings.ContainsAny(password, "\r\n:") {
+	if password == "" || strings.ContainsAny(password, "\r\n:\x00") {
 		return fmt.Errorf("refusing to set an invalid root password")
 	}
 

@@ -15,7 +15,6 @@ const de = {
       placeholderPassword2: 'Bitte Passwort erneut eingeben',
       noEmptyUsername: 'Benutzername benötigt',
       noEmptyPassword: 'Passwort benötigt',
-      passwordLength: 'Das Passwort muss zwischen 8 und 72 Zeichen lang sein',
       noAccount:
         'Abfragen der Benutzerdaten fehlgeschlagen, bitte die Seite neu laden oder Passwort zurücksetzen',
       invalidUser: 'Falscher Benutzername oder falsches Passwort',

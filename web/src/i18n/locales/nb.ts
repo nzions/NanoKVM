@@ -15,7 +15,6 @@ const nb = {
       placeholderPassword2: 'Oppgi passord igjen',
       noEmptyUsername: 'Brukernavn påkrevd',
       noEmptyPassword: 'Passord påkrevd',
-      passwordLength: 'Passordet må være mellom 8 og 72 tegn',
       noAccount:
         'Kunne ikke hente brukerinformasjon. Vennligst last inn siden på nytt eller gjenopprett passord',
       invalidUser: 'Ugyldig brukernavn eller passord',

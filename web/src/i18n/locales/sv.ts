@@ -15,7 +15,6 @@ const sv = {
       placeholderPassword2: 'Vänligen ange lösenordet igen',
       noEmptyUsername: 'Användarnamn krävs',
       noEmptyPassword: 'Lösenord krävs',
-      passwordLength: 'Lösenordet måste vara mellan 8 och 72 tecken',
       noAccount: 'Kunde inte hämta användarinformation, uppdatera sidan eller återställ lösenordet',
       invalidUser: 'Ogiltigt användarnamn eller lösenord',
       locked: 'För många inloggningar, försök igen senare',

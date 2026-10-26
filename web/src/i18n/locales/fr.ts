@@ -15,7 +15,6 @@ const fr = {
       placeholderPassword2: 'Veuillez entrer votre mot de passe à nouveau',
       noEmptyUsername: "Le nom d'utilisateur ne peut pas être vide",
       noEmptyPassword: 'Le mot de passe ne peut pas être vide',
-      passwordLength: 'Le mot de passe doit comporter entre 8 et 72 caractères',
       noAccount:
         "Impossible de récupérer les informations de l'utilisateur, veuillez rafraîchir la page ou réinitialiser le mot de passe",
       invalidUser: "Nom d'utilisateur ou mot de passe invalide",

@@ -15,7 +15,6 @@ const da = {
       placeholderPassword2: 'indtast adgangskode igen',
       noEmptyUsername: 'brugernavn kan ikke være tom',
       noEmptyPassword: 'adgangskode kan ikke være tom',
-      passwordLength: 'Adgangskoden skal være mellem 8 og 72 tegn',
       noAccount:
         'Kunne ikke hente brugeroplysninger. Prøv at opdater siden eller nulstil adgangskoden',
       invalidUser: 'ugyldigt brugernavn eller adgangskode',

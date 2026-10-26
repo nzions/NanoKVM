@@ -15,7 +15,6 @@ const cs = {
       placeholderPassword2: 'Zadejte prosím heslo znovu',
       noEmptyUsername: 'Uživatelské jméno nesmí být prázdné',
       noEmptyPassword: 'Heslo nesmí být prázdné',
-      passwordLength: 'Heslo musí mít 8 až 72 znaků',
       noAccount:
         'Nepodařilo se získat informace o uživateli, prosím obnovte stránku nebo resetujte heslo',
       invalidUser: 'Neplatné uživatelské jméno nebo heslo',

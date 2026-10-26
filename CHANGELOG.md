@@ -1,3 +1,13 @@
+## 2.5.14 (2026-10-26)
+
+### Features
+
+* First boot: an optional `/boot/root.pass` on the FAT boot partition sets root's password (read like `/boot/initial.pass`: one trailing newline trimmed, non-empty, never logged). If present when the owner is first created, root gets it instead of the admin seed, and the file is removed from `/boot` (and synced) once applied; if it cannot be removed the device logs a SECURITY line. If the shadow file cannot hold it (it contains `:`, a newline or NUL), it is left in place and root gets the admin seed. Absent, root shares the admin seed as before
+
+### Changes
+
+* No password policy: the 8-character minimum and the 12-character boot-seed minimum are gone, in the web UI as well as the server (owner and user create, change, reset, the boot seed and the root password). Any non-empty password is accepted. The two safety bounds stay: an empty password is refused, and one over bcrypt's 72 bytes is refused rather than silently truncated. The forced password change at first login is unchanged
+
 ## 2.5.13 (2026-10-26)
 
 ### Features

@@ -15,7 +15,6 @@ const ja = {
       placeholderPassword2: 'パスワードをもう一度入力してください',
       noEmptyUsername: 'ユーザー名は空にできません',
       noEmptyPassword: 'パスワードは空にできません',
-      passwordLength: 'パスワードは8〜72文字で入力してください',
       noAccount:
         'ユーザー情報の取得に失敗しました。ページを更新してもう一度お試しいただくか、パスワードをリセットしてください。',
       invalidUser: 'ユーザー名またはパスワードが正しくありません',

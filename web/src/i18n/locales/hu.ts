@@ -15,7 +15,6 @@ const hu = {
       placeholderPassword2: 'Adja meg újra a jelszót',
       noEmptyUsername: 'A felhasználónév nem lehet üres',
       noEmptyPassword: 'A jelszó nem lehet üres',
-      passwordLength: 'A jelszónak 8 és 72 karakter közötti hosszúságúnak kell lennie',
       noAccount:
         'Nem sikerült megszerezni a felhasználói információkat, frissítse az oldalt vagy állítsa vissza a jelszót',
       invalidUser: 'Érvénytelen felhasználónév vagy jelszó',

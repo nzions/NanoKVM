@@ -15,7 +15,6 @@ const tr = {
       placeholderPassword2: 'Şifrenizi tekrar deneyiniz',
       noEmptyUsername: 'Kullanıcı adı gereklidir',
       noEmptyPassword: 'Şifre gereklidir',
-      passwordLength: 'Parola 8 ile 72 karakter arasında olmalıdır',
       noAccount:
         'Kullanıcı verileri alınırken hata yaşandı, lütfen sayfayı yenileyiniz ya da şifrenizi sıfırlayınız',
       invalidUser: 'Yanlış kullanıcı adı ya da şifre',

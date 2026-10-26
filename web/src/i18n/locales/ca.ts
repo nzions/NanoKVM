@@ -15,7 +15,6 @@ const ca = {
       placeholderPassword2: 'Torna a introduir la contrasenya',
       noEmptyUsername: "Cal introduir el nom d'usuari",
       noEmptyPassword: 'Cal introduir la contrasenya',
-      passwordLength: 'La contrasenya ha de tenir entre 8 i 72 caràcters',
       noAccount:
         "No s'ha pogut obtenir la informació de l'usuari, actualitza la pàgina web o restableix la contrasenya",
       invalidUser: "Nom d'usuari o contrasenya invàlids",

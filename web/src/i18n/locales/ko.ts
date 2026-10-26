@@ -15,7 +15,6 @@ const ko = {
       placeholderPassword2: '비밀번호를 다시 입력하세요.',
       noEmptyUsername: '사용자 이름은 비어있을 수 없습니다.',
       noEmptyPassword: '비밀번호는 비어있을 수 없습니다.',
-      passwordLength: '비밀번호는 8자 이상 72자 이하여야 합니다',
       noAccount:
         '사용자 정보를 불러오는 데 실패했습니다. 페이지를 새로고침하거나 비밀번호를 초기화하세요.',
       invalidUser: '사용자 이름이나 비밀번호가 틀렸습니다.',

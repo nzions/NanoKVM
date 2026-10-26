@@ -15,7 +15,6 @@ const id = {
       placeholderPassword2: 'Silahkan masukkan password again',
       noEmptyUsername: 'nama user tidak boleh kosong',
       noEmptyPassword: 'sandi  tidak boleh kosong',
-      passwordLength: 'Kata sandi harus terdiri dari 8 hingga 72 karakter',
       noAccount:
         'Gagal mendapatkan informasi user, silahkan segarkan halaman atau atur ulang sandi',
       invalidUser: 'invalid username or password',

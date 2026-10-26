@@ -15,7 +15,6 @@ const es = {
       placeholderPassword2: 'Introduce tu contraseña de nuevo',
       noEmptyUsername: 'El nombre de usuario no puede estar vacío',
       noEmptyPassword: 'La contraseña no puede estar vacía',
-      passwordLength: 'La contraseña debe tener entre 8 y 72 caracteres',
       noAccount:
         'No se ha encontrado la cuenta. Por favor, recarga la página o recupera tu contraseña.',
       invalidUser: 'Nombre de usuario o contraseña incorrectos',

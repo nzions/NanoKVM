@@ -85,7 +85,7 @@ export const Password = () => {
             name="password"
             rules={[
               { required: true, message: t('auth.noEmptyPassword') },
-              { min: 8, max: 72, message: t('auth.passwordLength') }
+              { max: 72, message: t('auth.passwordTooLong') }
             ]}
           >
             <Input
@@ -100,7 +100,7 @@ export const Password = () => {
             name="password2"
             rules={[
               { required: true, message: t('auth.noEmptyPassword') },
-              { min: 8, max: 72, message: t('auth.passwordLength') }
+              { max: 72, message: t('auth.passwordTooLong') }
             ]}
           >
             <Input

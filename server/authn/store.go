@@ -24,11 +24,13 @@ const (
 	// kvm_system; it is removed once the owner changes the password.
 	SeedPasswordFile = "/etc/kvm/initial.pass"
 	// BootSeedFile is an optional operator-supplied first-boot seed on the FAT
-	// boot partition (writable from a Mac). If present when the owner is created
-	// and at least minBootSeedLength characters, it replaces the random seed and
-	// is removed once consumed.
-	BootSeedFile       = "/boot/initial.pass"
-	minBootSeedLength  = 12
+	// boot partition (writable from a Mac). If present and non-empty when the
+	// owner is created, it replaces the random seed and is removed once consumed.
+	BootSeedFile = "/boot/initial.pass"
+	// BootRootPassFile is an optional operator-supplied root password on the FAT
+	// boot partition, read like BootSeedFile. At first boot it replaces the admin
+	// seed as root's password and is removed once applied.
+	BootRootPassFile   = "/boot/root.pass"
 	currentFileVersion = 1
 	defaultUsername    = "admin"
 	// legacyDefaultPassword is the password older releases shipped with. It is
@@ -97,6 +99,8 @@ type Store struct {
 	// bootSeedPath is the operator-supplied first-boot seed on the FAT boot
 	// partition; it is consumed (removed) when it seeds a new owner.
 	bootSeedPath string
+	// bootRootPath is the operator-supplied root password on the boot partition.
+	bootRootPath string
 	// seeded is the password the last Init generated for a new owner account
 	seeded string
 	mutex  sync.RWMutex
@@ -110,6 +114,7 @@ func NewStore(path string) *Store {
 		path:         path,
 		seedPath:     filepath.Join(filepath.Dir(path), filepath.Base(SeedPasswordFile)),
 		bootSeedPath: BootSeedFile,
+		bootRootPath: BootRootPassFile,
 	}
 }
 
@@ -124,10 +129,15 @@ func ValidateUsername(username string) error {
 	return nil
 }
 
+// ValidatePassword has no policy: any non-empty password is accepted (an empty
+// one would mean no authentication). The only other bound is bcrypt's 72-byte
+// input limit, refused rather than silently truncated.
 func ValidatePassword(password string) error {
-	length := len([]byte(password))
-	if length < 8 || length > 72 {
-		return errors.New("password must be between 8 and 72 bytes")
+	if password == "" {
+		return errors.New("password must not be empty")
+	}
+	if len([]byte(password)) > 72 {
+		return errors.New("password must be at most 72 bytes")
 	}
 	return nil
 }
@@ -578,25 +588,35 @@ func (s *Store) bootSeed() (string, bool) {
 	if s.bootSeedPath == "" {
 		return "", false
 	}
-	data, err := os.ReadFile(s.bootSeedPath)
+	password, ok := readBootPassword(s.bootSeedPath, "first-boot seed")
+	if ok {
+		log.Infof("first-boot seed taken from %s", s.bootSeedPath)
+	}
+	return password, ok
+}
+
+// readBootPassword reads a one-line password file from the boot partition: one
+// trailing "\n" and then one "\r" are trimmed, and the rest must be a valid
+// password. False when the file is absent or unusable; the reason is logged,
+// never the value.
+func readBootPassword(path, what string) (string, bool) {
+	if path == "" {
+		return "", false
+	}
+	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return "", false
 	}
 	if err != nil {
-		log.Errorf("first-boot seed %s unreadable (%v): using a random seed", s.bootSeedPath, err)
+		log.Errorf("%s %s unreadable (%v): ignored", what, path, err)
 		return "", false
 	}
 	password := strings.TrimSuffix(string(data), "\n")
 	password = strings.TrimSuffix(password, "\r")
-	if len([]byte(password)) < minBootSeedLength {
-		log.Errorf("first-boot seed %s ignored: it must be at least %d characters; using a random seed", s.bootSeedPath, minBootSeedLength)
-		return "", false
-	}
 	if err = ValidatePassword(password); err != nil {
-		log.Errorf("first-boot seed %s ignored: %v; using a random seed", s.bootSeedPath, err)
+		log.Errorf("%s %s ignored: %v", what, path, err)
 		return "", false
 	}
-	log.Infof("first-boot seed taken from %s", s.bootSeedPath)
 	return password, true
 }
 
@@ -604,20 +624,43 @@ func (s *Store) bootSeed() (string, bool) {
 // The same value is already in the 0600 seed file, so a failure here is loud but
 // not fatal.
 func (s *Store) consumeBootSeed() {
-	if err := os.Remove(s.bootSeedPath); err != nil {
-		log.Errorf("SECURITY: could not remove the first-boot seed %s (%v): the plaintext seed stays on the boot partition until it is deleted by hand", s.bootSeedPath, err)
+	removeBootFile(s.bootSeedPath, "first-boot seed")
+}
+
+// removeBootFile removes a boot-partition password file and syncs its directory.
+func removeBootFile(path, what string) {
+	if err := os.Remove(path); err != nil {
+		log.Errorf("SECURITY: could not remove the %s %s (%v): the plaintext password stays on the boot partition until it is deleted by hand", what, path, err)
 		return
 	}
-	dir, err := os.Open(filepath.Dir(s.bootSeedPath))
+	dir, err := os.Open(filepath.Dir(path))
 	if err != nil {
-		log.Errorf("removed %s but could not open its directory to sync: %v", s.bootSeedPath, err)
+		log.Errorf("removed %s but could not open its directory to sync: %v", path, err)
 		return
 	}
 	if err = dir.Sync(); err != nil {
-		log.Errorf("removed %s but the sync failed: %v", s.bootSeedPath, err)
+		log.Errorf("removed %s but the sync failed: %v", path, err)
 	}
 	_ = dir.Close()
-	log.Infof("first-boot seed %s consumed and removed", s.bootSeedPath)
+	log.Infof("%s %s consumed and removed", what, path)
+}
+
+// ApplyRootPassword sets root's password at first boot through set. seeded is
+// the owner seed Init returned; it is root's password unless the boot partition
+// carries a root.pass, which then wins. root.pass is removed only after set
+// accepted it; if set refuses it (a character the shadow file cannot hold), the
+// failure is logged, root gets the owner seed instead and the file is left.
+func (s *Store) ApplyRootPassword(seeded string, set func(string) error) error {
+	if rootPass, ok := readBootPassword(s.bootRootPath, "first-boot root password"); ok {
+		err := set(rootPass)
+		if err == nil {
+			log.Infof("root password set from %s", s.bootRootPath)
+			removeBootFile(s.bootRootPath, "first-boot root password")
+			return nil
+		}
+		log.Errorf("root password from %s could not be applied (%v): root gets the owner seed", s.bootRootPath, err)
+	}
+	return set(seeded)
 }
 
 // writeFile0600 creates the file with 0600 from the start and fixes the mode of

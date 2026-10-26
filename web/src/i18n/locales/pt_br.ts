@@ -15,7 +15,6 @@ const pt_br = {
       placeholderPassword2: 'Por favor, digite a senha novamente',
       noEmptyUsername: 'Nome de usuário é obrigatório',
       noEmptyPassword: 'Senha é obrigatória',
-      passwordLength: 'A senha deve ter entre 8 e 72 caracteres',
       noAccount:
         'Falha ao obter informações do usuário, por favor atualize a página ou redefina a senha',
       invalidUser: 'Nome de usuário ou senha inválidos',

@@ -365,17 +365,116 @@ func TestBootSeedWithoutNewlineAndCRLF(t *testing.T) {
 	}
 }
 
-func TestShortBootSeedIsIgnored(t *testing.T) {
-	store := bootSeededStore(t, "elevenchars\n")
+func TestShortBootSeedIsAccepted(t *testing.T) {
+	store := bootSeededStore(t, "a\n")
 	seeded, err := store.Init()
-	if err != nil {
-		t.Fatal(err)
+	if err != nil || seeded != "a" {
+		t.Fatalf("a one-character boot seed must be used: seeded %q err=%v", seeded, err)
 	}
-	if seeded == "" || seeded == "elevenchars" || len(seeded) != seedPasswordLength {
-		t.Fatalf("short boot seed must fall back to a random seed, got %q", seeded)
+	if _, err = os.Stat(store.bootSeedPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("boot seed must be removed once consumed: %v", err)
 	}
-	if _, err = os.Stat(store.bootSeedPath); err != nil {
-		t.Fatalf("an ignored boot seed is left in place: %v", err)
+}
+
+func TestEmptyOrOversizeBootSeedIsIgnored(t *testing.T) {
+	for name, content := range map[string]string{"empty": "", "newline": "\n", "crlf": "\r\n", "over72": strings.Repeat("x", 73) + "\n"} {
+		store := bootSeededStore(t, content)
+		seeded, err := store.Init()
+		if err != nil || len(seeded) != seedPasswordLength {
+			t.Fatalf("%s: must fall back to a random seed, got %q err=%v", name, seeded, err)
+		}
+		if _, err = os.Stat(store.bootSeedPath); err != nil {
+			t.Fatalf("%s: an ignored boot seed is left in place: %v", name, err)
+		}
+	}
+}
+
+func TestValidatePasswordHasOnlySafetyBounds(t *testing.T) {
+	for _, ok := range []string{"a", "1234", strings.Repeat("x", 72)} {
+		if err := ValidatePassword(ok); err != nil {
+			t.Errorf("ValidatePassword(%d bytes) = %v, want nil", len(ok), err)
+		}
+	}
+	for _, bad := range []string{"", strings.Repeat("x", 73)} {
+		if err := ValidatePassword(bad); err == nil {
+			t.Errorf("ValidatePassword(%d bytes) accepted", len(bad))
+		}
+	}
+	store := NewStore(filepath.Join(t.TempDir(), "pwd"))
+	if err := store.Create("short", "a", RoleUser); err != nil {
+		t.Fatalf("Create with a one-character password: %v", err)
+	}
+	if err := store.Create("empty", "", RoleUser); err == nil {
+		t.Fatal("Create with an empty password must fail")
+	}
+}
+
+// rootPassStore returns a store whose boot-partition root.pass holds content
+// (no file when content is nil).
+func rootPassStore(t *testing.T, content *string) *Store {
+	t.Helper()
+	dir := t.TempDir()
+	store := NewStore(filepath.Join(dir, "pwd"))
+	store.bootRootPath = filepath.Join(dir, "boot-root.pass")
+	if content != nil {
+		if err := os.WriteFile(store.bootRootPath, []byte(*content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return store
+}
+
+func TestRootPassOverridesOwnerSeedAndIsConsumed(t *testing.T) {
+	content := "r\r\n"
+	store := rootPassStore(t, &content)
+	var got []string
+	err := store.ApplyRootPassword("owner-seed", func(p string) error { got = append(got, p); return nil })
+	if err != nil || len(got) != 1 || got[0] != "r" {
+		t.Fatalf("root set to %q err=%v, want only root.pass", got, err)
+	}
+	if _, err = os.Stat(store.bootRootPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("root.pass must be removed once applied: %v", err)
+	}
+}
+
+func TestAbsentRootPassUsesOwnerSeed(t *testing.T) {
+	store := rootPassStore(t, nil)
+	var got []string
+	err := store.ApplyRootPassword("owner-seed", func(p string) error { got = append(got, p); return nil })
+	if err != nil || len(got) != 1 || got[0] != "owner-seed" {
+		t.Fatalf("root set to %q err=%v, want the owner seed", got, err)
+	}
+}
+
+func TestEmptyRootPassUsesOwnerSeedAndStays(t *testing.T) {
+	content := "\n"
+	store := rootPassStore(t, &content)
+	var got []string
+	err := store.ApplyRootPassword("owner-seed", func(p string) error { got = append(got, p); return nil })
+	if err != nil || len(got) != 1 || got[0] != "owner-seed" {
+		t.Fatalf("root set to %q err=%v, want the owner seed", got, err)
+	}
+	if _, err = os.Stat(store.bootRootPath); err != nil {
+		t.Fatalf("an ignored root.pass is left in place: %v", err)
+	}
+}
+
+func TestRefusedRootPassFallsBackToOwnerSeedAndStays(t *testing.T) {
+	content := "bad:pass\n"
+	store := rootPassStore(t, &content)
+	var got []string
+	err := store.ApplyRootPassword("owner-seed", func(p string) error {
+		got = append(got, p)
+		if p == "bad:pass" {
+			return errors.New("refused")
+		}
+		return nil
+	})
+	if err != nil || len(got) != 2 || got[1] != "owner-seed" {
+		t.Fatalf("set calls %q err=%v, want root.pass refused then the owner seed", got, err)
+	}
+	if _, err = os.Stat(store.bootRootPath); err != nil {
+		t.Fatalf("a refused root.pass is left in place: %v", err)
 	}
 }
 

@@ -208,7 +208,7 @@ export const Users = () => {
             label={t('auth.placeholderPassword')}
             rules={[
               { required: true, message: t('auth.noEmptyPassword') },
-              { min: 8, max: 72, message: t('auth.passwordLength') }
+              { max: 72, message: t('auth.passwordTooLong') }
             ]}
           >
             <Input.Password autoComplete="new-password" />
@@ -240,7 +240,7 @@ export const Users = () => {
             label={t('auth.placeholderPassword')}
             rules={[
               { required: true, message: t('auth.noEmptyPassword') },
-              { min: 8, max: 72, message: t('auth.passwordLength') }
+              { max: 72, message: t('auth.passwordTooLong') }
             ]}
           >
             <Input.Password autoComplete="new-password" />

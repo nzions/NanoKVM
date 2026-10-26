@@ -15,7 +15,6 @@ const vi = {
       placeholderPassword2: 'vui lòng nhập lại mật khẩu',
       noEmptyUsername: 'tên người dùng không được để trống',
       noEmptyPassword: 'mật khẩu không được để trống',
-      passwordLength: 'Mật khẩu phải dài từ 8 đến 72 ký tự',
       noAccount:
         'Không thể lấy thông tin người dùng, vui lòng làm mới trang web hoặc đặt lại mật khẩu',
       invalidUser: 'tên người dùng hoặc mật khẩu không hợp lệ',

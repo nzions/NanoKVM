@@ -15,7 +15,6 @@ const it = {
       placeholderPassword2: 'Inserisci nuovamente la password',
       noEmptyUsername: 'Il nome utente non può essere vuoto',
       noEmptyPassword: 'La password non può essere vuota',
-      passwordLength: 'La password deve contenere da 8 a 72 caratteri',
       noAccount:
         'Impossibile ottenere informazioni utente, aggiorna la pagina o reimposta la password',
       invalidUser: 'Nome utente o password non validi',

@@ -15,7 +15,6 @@ const nl = {
       placeholderPassword2: 'Voer wachtwoord nogmaals in',
       noEmptyUsername: 'Gebruikersnaam mag niet leeg zijn',
       noEmptyPassword: 'Wachtwoord mag niet leeg zijn',
-      passwordLength: 'Het wachtwoord moet tussen 8 en 72 tekens lang zijn',
       noAccount:
         'Ophalen van gebruikersinformatie mislukt, vernieuw de webpagina of reset het wachtwoord',
       invalidUser: 'Ongeldige gebruikersnaam of wachtwoord',

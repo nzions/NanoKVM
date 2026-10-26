@@ -15,7 +15,7 @@ const en = {
       placeholderPassword2: 'Please enter password again',
       noEmptyUsername: 'Username required',
       noEmptyPassword: 'Password required',
-      passwordLength: 'Password must be between 8 and 72 characters',
+      passwordTooLong: 'Password must be at most 72 characters',
       noAccount: 'Failed to get user information, please refresh web page or reset password',
       invalidUser: 'Invalid username or password',
       locked: 'Too many logins, please try again later',
