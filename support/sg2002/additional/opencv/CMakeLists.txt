@@ -22,9 +22,11 @@ if(NOT EXISTS "${nanokvm_opencv_inc}/opencv2/opencv.hpp")
     message(FATAL_ERROR "NANOKVM_OPENCV_DIR=${nanokvm_opencv_dir} has no include/opencv4/opencv2/opencv.hpp")
 endif()
 
-set(opencv_libs "${nanokvm_opencv_dir}/lib/libopencv_core.so.409"
-                "${nanokvm_opencv_dir}/lib/libopencv_imgproc.so.409"
-                "${nanokvm_opencv_dir}/lib/libopencv_imgcodecs.so.409")
+# MaixCDK links a library path as -L<dir> -l<name>: build-deps.sh's link/ dir holds the
+# unversioned names (symlinks to lib/*.so.409, whose SONAME ld records as NEEDED).
+set(opencv_libs "${nanokvm_opencv_dir}/link/libopencv_core.so"
+                "${nanokvm_opencv_dir}/link/libopencv_imgproc.so"
+                "${nanokvm_opencv_dir}/link/libopencv_imgcodecs.so")
 foreach(lib ${opencv_libs})
     if(NOT EXISTS "${lib}")
         message(FATAL_ERROR "NANOKVM_OPENCV_DIR lacks ${lib}")

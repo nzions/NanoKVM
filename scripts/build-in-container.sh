@@ -161,9 +161,9 @@ rules="$(find "$kvm_build" \( -name flags.make -o -name link.txt -o -name build.
 # shellcheck disable=SC2086
 rules_ours="$(grep -l -F -e "$ocv_dir/include/opencv4" $rules || true)"
 # shellcheck disable=SC2086
-rules_ours_lib="$(grep -l -F -e "$ocv_dir/lib/libopencv_core.so.409" $rules || true)"
+rules_ours_lib="$(grep -l -F -e "$ocv_dir/link" $rules || true)"
 [ -n "$rules_ours" ] || { echo "[ERROR] no compile rule includes $ocv_dir/include/opencv4" >&2; exit 1; }
-[ -n "$rules_ours_lib" ] || { echo "[ERROR] no link rule names $ocv_dir/lib/libopencv_core.so.409" >&2; exit 1; }
+[ -n "$rules_ours_lib" ] || { echo "[ERROR] no link rule names $ocv_dir/link (our OpenCV libraries)" >&2; exit 1; }
 # every OpenCV include dir in any rule, and every libopencv path in any link rule, must be ours
 # shellcheck disable=SC2086
 foreign="$(cat $rules | tr ' ' '\n' \
@@ -176,7 +176,7 @@ if [ -n "$foreign" ]; then
 fi
 echo "[INFO] OpenCV in the kvm_vision build tree ($(printf '%s\n' "$rules" | wc -l | tr -d ' ') rule files):"
 echo "  compile rules naming $ocv_dir/include/opencv4: $(printf '%s\n' "$rules_ours" | wc -l | tr -d ' ')"
-echo "  link rules naming $ocv_dir/lib/libopencv_core.so.409: $(printf '%s\n' "$rules_ours_lib" | wc -l | tr -d ' ')"
+echo "  link rules naming $ocv_dir/link: $(printf '%s\n' "$rules_ours_lib" | wc -l | tr -d ' ')"
 echo "  no reference to a MaixCDK prebuilt OpenCV"
 
 # 2. NEEDED and the cv:: symbols

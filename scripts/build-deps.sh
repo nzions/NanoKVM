@@ -104,6 +104,14 @@ for m in core imgproc imgcodecs; do
     soname_ok "$OUT/lib/libopencv_$m.so.409" "libopencv_$m.so.409"
 done
 
+# MaixCDK turns a library path into -L<dir> -l<name>, which needs the unversioned name:
+# <outdir>/link/libopencv_<m>.so -> ../lib/libopencv_<m>.so.409 (link time only; not shipped).
+rm -rf "$OUT/link"
+mkdir -p "$OUT/link"
+for m in core imgproc imgcodecs; do
+    ln -s "../lib/libopencv_$m.so.409" "$OUT/link/libopencv_$m.so"
+done
+
 # The public headers libkvm.so compiles against: what `cmake --install` puts in
 # include/opencv4 for the three built modules (each module's include/, the umbrella
 # opencv2/opencv.hpp, and the two generated headers cvconfig.h / opencv2/opencv_modules.hpp).

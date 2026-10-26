@@ -1,3 +1,10 @@
+## 2.6.28 (2026-10-26)
+
+### Changes
+
+* Build fix for 2.6.27 (red on forge, nothing shipped): MaixCDK links a library path as `-L<dir> -l<name>`, so `ld` looked for `libopencv_core.so` and found only `.so.409`. `build-deps.sh` now also writes `<outdir>/link/libopencv_{core,imgproc,imgcodecs}.so` symlinks to the `.so.409` files (link time only, not shipped; the SONAME `ld` records is still `.so.409`), the opencv component links those, and the build-tree check looks for `<outdir>/link`.
+* Not run on hardware
+
 ## 2.6.27 (2026-10-26)
 
 ### Changes
