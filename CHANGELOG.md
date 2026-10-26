@@ -1,3 +1,14 @@
+## 2.6.0 (2026-10-26)
+
+### Changes
+
+* libkvm: the HDMI state machine takes the LT6911 INT line as a GPIO character device v2 line-event fd (both edges) instead of a 100 ms timerfd draining Sipeed's `/proc/lt_int` counter, so it sleeps in `poll()` until the line moves. Same decision as before: variant 0 probes on a rising edge, 1 and 3 on a falling edge. The code is `include/internal/hdmi_int.h`, shared with the emulator harness `tools/hdmiint`
+* libkvm: the INT line is found by its device-tree line NAME, `hdmi-int` (a `gpio-line-names` entry on the board DT), or by an explicit `<gpiochip name> <offset>` in `/etc/kvm/hdmi_int_line`. No global GPIO number is hardcoded; vendor GPIO 353 is the RTC bank (base 352) offset 1 in the vendor numbering. Needs the Cube DT to name the line
+* libkvm: fail closed. If the line cannot be found or requested, the state machine logs the reason and `FATAL` to stderr and ends without probing the chip or reporting a cable; the state stays "not connected", never a guess
+* libkvm: removed `publish_vi_state` and its 10 s read of `/proc/cvitek/vi_dbg` (about a second blocking, absent on a 7.3 kernel). The shared VI state is no longer published; kvm_system falls back to its own direct read and reports the state unknown (-1) when that is absent too
+* scripts/forge-build.sh: builds tools/hdmiint (riscv64 musl, static) and publishes it as `emu/hdmiint` (emulator only)
+* Not hardware-tested: emulator (gpio-sim) only
+
 ## 2.5.20 (2026-10-26)
 
 ### Changes

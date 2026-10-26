@@ -183,6 +183,14 @@ log "building the emulator gpio edge proof (tools/gpioedge)"
     CGO_ENABLED=0 GOOS=linux GOARCH=riscv64 go build -trimpath -o "$EMU_GPIOEDGE" .
 )
 [ -s "$EMU_GPIOEDGE" ] || die "the gpioedge build produced no $EMU_GPIOEDGE"
+
+# hdmiint: libkvm's real INT-line code (include/internal/hdmi_int.h) in a tiny
+# harness, for the emulator's gpio-sim kernel. Static, guest only.
+EMU_HDMIINT="$WORK_NANOKVM/build/emu/hdmiint"
+log "building the emulator INT line harness (tools/hdmiint)"
+"$HOST_TOOLS_BIN/riscv64-unknown-linux-musl-gcc" -static -O2 -Wall -Wextra \
+    -o "$EMU_HDMIINT" "$WORK_NANOKVM/tools/hdmiint/hdmiint.c"
+[ -s "$EMU_HDMIINT" ] || die "the hdmiint build produced no $EMU_HDMIINT"
 [ -s "$WORK_NANOKVM/scripts/emu-image.sh" ] || die "scripts/emu-image.sh is missing from the tree"
 
 # --- publish to the artifacts share --------------------------------------------
@@ -209,6 +217,8 @@ else
     (cd "$STAGE/emu" && sha256sum NanoKVM-Server > NanoKVM-Server.sha256)
     install -m 0755 "$EMU_GPIOEDGE" "$STAGE/emu/gpioedge"
     (cd "$STAGE/emu" && sha256sum gpioedge > gpioedge.sha256)
+    install -m 0755 "$EMU_HDMIINT" "$STAGE/emu/hdmiint"
+    (cd "$STAGE/emu" && sha256sum hdmiint > hdmiint.sha256)
     install -m 0755 "$WORK_NANOKVM/scripts/emu-image.sh" "$STAGE/emu/emu-image.sh"
     mv "$STAGE" "$DEST"
     log "published $DEST"

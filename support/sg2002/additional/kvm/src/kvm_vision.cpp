@@ -10,15 +10,16 @@
  * // free 错内存时会炸的问题
  */
 #include "kvm_vision.h"
-#include "vi_state_shared.hpp"
 #include "internal/vi_state_writer.hpp"
+#include "internal/hdmi_int.h"
 
 #include <errno.h>
 #include <stdarg.h>
 #include <poll.h>
 #include <string.h>
 #include <sys/eventfd.h>
-#include <sys/timerfd.h>
+#include <fcntl.h>
+#include <stdio.h>
 #include <unistd.h>
 #include <sys/stat.h>
 
@@ -49,12 +50,10 @@
 
 #define vi_width_path           "/kvmapp/kvm/width"
 #define vi_height_path          "/kvmapp/kvm/height"
-#define hdmi_state_path         "/proc/lt_int"
 #define hdmi_signal_file_path   "/kvmapp/kvm/state"
 #define watchdog_mode_path      "/etc/kvm/watchdog"
 #define watchdog_temp_path      "/tmp/watchdog"
 #define watchdog_file           "/tmp/nanokvm_wd"
-#define vi_state_publish_interval_ms 10000U
 
 #define LT6911_ADDR 	0x2B
 #define LT6911_READ 	0xFF
@@ -114,7 +113,6 @@ kvmv_data_t kvmv_data_buffer[kvmv_data_buffer_size];
 uint8_t kvmv_data_buffer_index = 0;
 
 uint8_t debug_en = 0;
-uint32_t last_vi_state_refresh_ms = 0;
 uint8_t hdmi_capture_enabled = 0;
 uint8_t hdmi_signal_active = 0;
 
@@ -730,11 +728,10 @@ extern kvm_venc_t kvm_venc;
 //   RES_CHANGE --probe: no signal-----> NO_SIGNAL
 //
 // The thread blocks in poll(). Its wake-ups are: the wake eventfd (resync
-// request from kvmv_hdmi_control, or exit) and the LT6911 INT tick. The INT
-// line is surfaced by the kernel as the /proc/lt_int edge counter, which has
-// no poll() support we can rely on, so a 100 ms timerfd (a poll()able event
-// source, not a sleep) is what drains it; moving to a GPIO chardev edge fd is
-// a change of this one source.
+// request from kvmv_hdmi_control, or exit) and the LT6911 INT line, a GPIO
+// character device v2 line-event fd requested for both edges. If that line
+// cannot be opened the thread logs it and ends: nothing probes the chip and
+// the cable state is never set to connected.
 
 typedef enum {
     HDMI_NO_SIGNAL = 0,
@@ -749,8 +746,6 @@ typedef struct {
     uint16_t width;
     uint16_t height;
 } hdmi_probe_t;
-
-#define hdmi_int_tick_ms 100
 
 // Written only under vi_mutex by the state machine thread.
 static hdmi_state_t hdmi_state = HDMI_NO_SIGNAL;
@@ -852,58 +847,36 @@ static void hdmi_apply(const hdmi_probe_t &p)
     pthread_mutex_unlock(&vi_mutex);
 }
 
-// Drains the /proc/lt_int edge counters. Returns true when the variant's
-// edge (C: rising, UXC/D: falling) was seen.
-static bool lt_int_edge_seen(void)
-{
-    char buf[4] = {0};
-    FILE *fp = fopen(hdmi_state_path, "r+");
-    if(fp == NULL) return false;
-    size_t n = fread(buf, sizeof(char), 2, fp);
-    buf[n] = 0;
-    int counts = atoi(buf);
-    if(counts != 0) fputs("0", fp);
-    fclose(fp);
-    if(counts == 0) return false;
-    uint8_t rising_times = counts % 10;
-    uint8_t falling_times = counts / 10;
-    if(kvmv_cfg.hdmi_version == 0) return rising_times != 0;
-    if(kvmv_cfg.hdmi_version == 1 || kvmv_cfg.hdmi_version == 3) return falling_times != 0;
-    return false;
-}
-
-static void publish_vi_state(void)
-{
-    // The driver read blocks for about a second; mark the deadline before it.
-    last_vi_state_refresh_ms = vi_state_shared::monotonic_ms();
-    vi_state_shared::refresh();
-}
-
 void* hdmi_state_machine(void * arg)
 {
     kvmv_cfg.thread_is_running = 1;
     get_hdmi_version();
 
-    int tick_fd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC);
-    if(hdmi_wake_fd < 0 || tick_fd < 0){
-        debug("[hdmi]state machine event sources failed: %d\n", errno);
-        if(tick_fd >= 0) close(tick_fd);
+    if(hdmi_wake_fd < 0){
+        fprintf(stderr, "[hdmi]state machine: no wake eventfd: %d\n", errno);
         kvmv_cfg.thread_is_running = 0;
         return NULL;
     }
-    struct itimerspec its = {};
-    its.it_interval.tv_nsec = hdmi_int_tick_ms * 1000000L;
-    its.it_value.tv_nsec = hdmi_int_tick_ms * 1000000L;
-    timerfd_settime(tick_fd, 0, &its, NULL);
-
-    last_vi_state_refresh_ms = vi_state_shared::monotonic_ms() - vi_state_publish_interval_ms;
-    lt_int_edge_seen();             // drop edges from before we started
+    int int_fd = hdmi_int_open();
+    if(int_fd < 0){
+        fprintf(stderr, "[hdmi]FATAL: LT6911 INT line unavailable, HDMI state is UNKNOWN (not probing, not reporting connected)\n");
+        kvmv_cfg.thread_is_running = 0;
+        return NULL;
+    }
+    int fl = fcntl(int_fd, F_GETFL);
+    if(fl < 0 || fcntl(int_fd, F_SETFL, fl | O_NONBLOCK) < 0){
+        fprintf(stderr, "[hdmi]FATAL: INT line O_NONBLOCK failed: %d\n", errno);
+        close(int_fd);
+        kvmv_cfg.thread_is_running = 0;
+        return NULL;
+    }
+    hdmi_int_edge_seen(int_fd, kvmv_cfg.hdmi_version);     // drop edges from before we started
     hdmi_post_resync();             // initial read of the chip
 
     struct pollfd fds[2];
     fds[0].fd = hdmi_wake_fd;
     fds[0].events = POLLIN;
-    fds[1].fd = tick_fd;
+    fds[1].fd = int_fd;
     fds[1].events = POLLIN;
 
     while(__atomic_load_n(&kvmv_cfg.try_exit_thread, __ATOMIC_ACQUIRE) == 0)
@@ -924,10 +897,7 @@ void* hdmi_state_machine(void * arg)
         if(__atomic_load_n(&kvmv_cfg.try_exit_thread, __ATOMIC_ACQUIRE) != 0) break;
         if(__atomic_exchange_n(&hdmi_resync, 0, __ATOMIC_ACQ_REL) != 0) probe_now = true;
         if(fds[1].revents & POLLIN){
-            uint64_t expirations;
-            ssize_t r = read(tick_fd, &expirations, sizeof(expirations));
-            (void)r;
-            if(lt_int_edge_seen()) probe_now = true;
+            if(hdmi_int_edge_seen(int_fd, kvmv_cfg.hdmi_version)) probe_now = true;
         }
 
         if(probe_now){
@@ -945,14 +915,8 @@ void* hdmi_state_machine(void * arg)
                 if(!stopped) hdmi_apply(p);
             }
         }
-
-        if(fds[1].revents & POLLIN){
-            if(vi_state_shared::monotonic_ms() - last_vi_state_refresh_ms >= vi_state_publish_interval_ms){
-                publish_vi_state();
-            }
-        }
     }
-    close(tick_fd);
+    close(int_fd);
     kvmv_cfg.thread_is_running = 0;
     return NULL;
 }
