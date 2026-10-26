@@ -1,3 +1,14 @@
+## 2.5.18 (2026-10-26)
+
+### Changes
+
+* libkvm: HDMI detection is one state machine thread (NO_SIGNAL / LOCKING / STREAMING / RES_CHANGE) that blocks in `poll()` on a wake eventfd and a 100 ms INT-drain timerfd instead of a 10 ms loop doing about 200 filesystem operations per second. It alone tears down VENC, then VPSS and VI/CSI, and re-inits them, under `vi_mutex` (the lock a frame read holds), so a restart can no longer free the VI channel mid-read
+* libkvm: cable state has one source, the LT6911 read on an INT edge or a resync; the 10 s `/proc/cvitek/vi_dbg` read now only publishes the shared VI state and no longer decides the cable state
+* libkvm: removed the `/etc/kvm/hdmi_mode` file and modes 0/1/2, `vi_detect_state`, `auto_change_mode`, the trial-resolution loop and manual-resolution mode. A transient unknown resolution is no longer persisted to `/etc`; a resolution outside the VI limits is reported as -7 and a listed-unsupported one as -6
+* libkvm: `kvmv_hdmi_control(0)` waits for an LT6911 read in flight on a mutex instead of spinning on a flag with `sleep`; `kvmv_hdmi_control(1)` asks the state machine to re-read the chip
+* libkvm: `kvmv_deinit` stops and joins the state machine before destroying `vi_mutex`
+* Not hardware-tested: kvm1 was unreachable
+
 ## 2.5.17 (2026-10-26)
 
 ### Changes
