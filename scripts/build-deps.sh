@@ -102,8 +102,8 @@ cmake -S "$OCV_SRC" -B "$OCV_BUILD" -G "Unix Makefiles" \
     -DBUILD_EXAMPLES=OFF -DBUILD_DOCS=OFF -DBUILD_opencv_apps=OFF -DBUILD_opencv_python3=OFF \
     -DBUILD_JAVA=OFF -DOPENCV_GENERATE_PKGCONFIG=OFF \
     -DBUILD_opencv_gapi=OFF -DWITH_ADE=OFF -DOPENCV_DOWNLOAD_PATH="$OCV_DL" 2>&1 | tee "$OCV_CFG_LOG"
-# (OpenCV leaves an empty marker directory/file there itself: only a regular file with content is a download)
-ocv_dl_files="$(find "$OCV_DL" -type f -size +0)"
+# (OpenCV writes its own .gitignore into the cache directory; any other non-empty file is a download)
+ocv_dl_files="$(find "$OCV_DL" -type f -size +0 ! -name .gitignore)"
 [ -z "$ocv_dl_files" ] || die "OpenCV downloaded into $OCV_DL at configure time: $(echo $ocv_dl_files)"
 log "OpenCV download cache contents: $(find "$OCV_DL" -mindepth 1 | tr '\n' ' ')"
 [ ! -e "$OCV_BUILD/CMakeDownloadLog.txt" ] || die "OpenCV configure downloaded something (see $OCV_BUILD/CMakeDownloadLog.txt)"

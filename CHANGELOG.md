@@ -1,3 +1,10 @@
+## 2.6.32 (2026-10-26)
+
+### Changes
+
+* Build fix for 2.6.31 (red on forge, nothing shipped): the only entry in OpenCV's download cache directory after a download-free configure is the `.gitignore` OpenCV writes there itself; the check now ignores exactly that file.
+* Not run on hardware
+
 ## 2.6.31 (2026-10-26)
 
 ### Changes
