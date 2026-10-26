@@ -1,3 +1,12 @@
+## 2.6.2 (2026-10-26)
+
+### Changes
+
+* scripts/sd-image.sh: `--kernel-fit <Image> <dtb>` builds the first-boot image for OUR mainline kernel: the stock FSBL, OpenSBI and U-Boot (FIP.BIN) and the rest of the 16 MB FAT16 boot partition stay, and `BOOT.SD` (the FIT stock U-Boot loads to 0x81800000 and boots with `bootm ${uImage_addr}#config-sg2002_licheervnano_sd`) is replaced by a FIT that mkimage builds from the Image and DTB. The node names, `#address-cells = <2>`, the riscv/linux kernel image with a crc32 hash and the sha256-hashed flat_dt come from the stock FIT (read with dumpimage); there is no ramdisk, the DTB boots `root=/dev/mmcblk0p2` itself. The kernel is lzma-compressed (stock U-Boot 2021.10 does gz, bz2, lzma, lz4, zstd; `--fit-comp gzip` is the fallback) because the 38 MB Image does not fit the partition, and is loaded at `--fit-load` (default 0x83000000), above the place U-Boot reads the FIT to, so decompression cannot overwrite its own input or the DTB. The DTB gets `/memreserve/ 0x80000000 0x80000` (`--fw-reserve`): the stock bootargs hold OpenSBI back with `riscv.fwsz=0x80000`, which only the vendor kernel reads. After the edit the script reads BOOT.SD back from the FAT, compares it, extracts kernel and DTB from the FIT again and checks the kernel decompresses to the input Image, and compares FIP.BIN and the directory with the stock partition
+* scripts/sd-image.sh: `--no-stock-ko` replaces `S00kmod` (insmod of the stock `soph_*.ko`) by a no-op, in `/etc/init.d` and in the `/kvmapp/system/init.d` copy kvm_system refreshes it from, because the kernel carries its drivers; other init scripts that still insmod/rmmod are listed in the log
+* scripts/sd-image.sh: the partition table is read from the MBR with od (no sfdisk), and the input may be an image this script built before (`--stock-sha256` of that image): its FSBL, U-Boot and boot partition are the stock ones
+* Not boot-tested: the SG2002's real FSBL and the C906 do not run under QEMU. Structure only (FIT listing, FAT read-back, rootfs read-back)
+
 ## 2.6.1 (2026-10-26)
 
 ### Fixes

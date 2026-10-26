@@ -284,3 +284,33 @@ scripts/sd-image.sh [--stock-sha256 <hex>] [--sha256 <hex>] \
   loaders need the SG2002's C906 vector unit and cvi video hardware.
 - Flash the (xz-decompressed) image to the card, for example
   `dd if=nanokvm-cube-2.5.16-sd.img of=/dev/rdiskN bs=4m` on macOS.
+
+### sd-image.sh --kernel-fit: our own kernel on the Cube
+
+```bash
+scripts/sd-image.sh --kernel-fit <Image> <sg2002-nanokvm-cube.dtb> --no-stock-ko \
+    [--fit-load 0x83000000] [--fit-comp lzma|gzip] [--fw-reserve 0x80000] \
+    <stock-or-earlier-sd.img> <nanokvm_VERSION.tar.gz> <out.img>
+```
+
+Keeps the stock FSBL, OpenSBI and U-Boot (`FIP.BIN` on the FAT16 boot partition) and
+replaces only `BOOT.SD` with a FIT of OUR Image and DTB (fleet
+`containers/kernel-nanokvm-sg2002`, the `-full` build with the vendor drivers built in).
+Stock U-Boot's `sdboot` loads `BOOT.SD` to 0x81800000 and runs
+`bootm ${uImage_addr}#config-sg2002_licheervnano_sd`, so that configuration name is kept.
+Needs mkimage, dumpimage, dtc, mtools (mdir mcopy mdel) and xz besides the tools above. The
+forge build is fleet's native entry `nanokvm-cube-sd-image`.
+
+* The FIT has no ramdisk (our DTB's bootargs name `root=/dev/mmcblk0p2`; U-Boot's own bootargs
+  win anyway and carry the same root).
+* The Image is ~38 MB and the boot partition is 16 MB, so the kernel is lzma-compressed in the
+  FIT (gzip, 14 MB, is the fallback and also fits). The script refuses a FIT that does not fit.
+* `--fit-load` is above `0x81800000 + FIT size` on purpose: decompressing onto the stock
+  0x80200000 would overwrite the FIT (and the DTB, which bootm leaves in place) being read.
+* `--fw-reserve`: the stock bootargs carry `riscv.fwsz=0x80000`, the vendor kernel's way of
+  keeping off OpenSBI. The mainline DTB has no node for it, so it gets `/memreserve/ 0x80000000 0x80000`.
+* `--no-stock-ko`: `S00kmod` (insmod of `soph_*.ko`) becomes a no-op.
+* The stock boot partition is untouched except `BOOT.SD`; `uEnv.txt` on it (loaded by stock
+  U-Boot's `loadenvcmd`) can override `othbootargs`, for example `loglevel=7`, without a rebuild.
+* The result is checked structurally only (FIT listing, FAT read-back, kernel extracted from the
+  FIT and compared). It cannot be booted under QEMU.
