@@ -1,3 +1,9 @@
+// Package authn is the web login. There is exactly one account, root, and its
+// password is root's Linux password: the hash in /etc/shadow is the only copy,
+// checked by utils.VerifyRootPassword (crypt $6$, $5$ and $1$). The state file
+// next to the old account store holds only what the shadow file cannot: the
+// session generation (bumped to revoke every session) and whether the next
+// login must change the password.
 package authn
 
 import (
@@ -9,203 +15,171 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 
+	"NanoKVM-Server/utils"
+
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/crypto/bcrypt"
 )
 
 const (
+	// AccountFile is the session state file. Releases up to 2.5.15 kept the
+	// multi-user account store (bcrypt hashes) here; it is replaced by the
+	// state below the first time this release starts.
 	AccountFile = "/etc/kvm/pwd"
-	// SeedPasswordFile holds the first-boot (or button-reset) password of the
-	// device owner. It is 0600 and shown on the device's own screen by
-	// kvm_system; it is removed once the owner changes the password.
+	// SeedPasswordFile holds the first-boot (or button-reset) password. It is
+	// 0600 and shown on the device's own screen by kvm_system; it is removed once
+	// the owner changes the password.
 	SeedPasswordFile = "/etc/kvm/initial.pass"
-	// BootSeedFile is an optional operator-supplied first-boot seed on the FAT
-	// boot partition (writable from a Mac). If present and non-empty when the
-	// owner is created, it replaces the random seed and is removed once consumed.
-	BootSeedFile = "/boot/initial.pass"
 	// BootRootPassFile is an optional operator-supplied root password on the FAT
-	// boot partition, read like BootSeedFile. At first boot it replaces the admin
-	// seed as root's password and is removed once applied.
-	BootRootPassFile   = "/boot/root.pass"
-	currentFileVersion = 1
-	defaultUsername    = "admin"
-	// legacyDefaultPassword is the password older releases shipped with. It is
-	// no longer used for seeding; an account still holding it must change it.
-	legacyDefaultPassword = "admin"
-	seedPasswordLength    = 12
+	// boot partition (writable from a Mac). At first boot it becomes root's
+	// password, is not marked for change, and is removed once applied.
+	BootRootPassFile = "/boot/root.pass"
+
+	// Username is the one account.
+	Username = "root"
+
+	stateVersion = 2
+	// MaxPasswordBytes bounds a password. crypt hashes the password thousands of
+	// times, so an unbounded one sent to the unauthenticated login route would be
+	// a CPU sink on this small SoC. (The bcrypt-era 72-byte limit is gone:
+	// SHA-crypt has no such limit, and the old passwords were all within it.)
+	MaxPasswordBytes   = 256
+	seedPasswordLength = 12
 	// seedPasswordAlphabet has no look-alike characters (0/O, 1/l/I).
 	seedPasswordAlphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 )
 
 type Role string
 
-const (
-	RoleAdmin Role = "admin"
-	RoleUser  Role = "user"
-)
+// RoleAdmin is the role of the one account; every protected route requires it.
+const RoleAdmin Role = "admin"
 
 var (
-	ErrUserNotFound     = errors.New("user not found")
-	ErrUserExists       = errors.New("username already exists")
-	ErrLastAdmin        = errors.New("at least one enabled admin is required")
-	ErrSelfModification = errors.New("administrators cannot disable or demote themselves")
-	ErrSelfDelete       = errors.New("administrators cannot delete themselves")
-	ErrSystemAccount    = errors.New("the device owner account must remain an enabled administrator")
-
-	usernamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,31}$`)
+	// ErrNotInitialized is returned by read-only calls when there is no usable
+	// state yet; only Init and Authenticate create or migrate it.
+	ErrNotInitialized = errors.New("account state not initialized")
+	// ErrWrongUser is returned for any username other than root.
+	ErrWrongUser = errors.New("user not found")
 )
 
+// User is the root account as the web sees it.
 type User struct {
-	Username           string `json:"username"`
-	PasswordHash       string `json:"password"`
-	Role               Role   `json:"role"`
-	Enabled            bool   `json:"enabled"`
+	Username           string
+	Role               Role
+	TokenVersion       uint64
+	MustChangePassword bool
+}
+
+// state is the file at Store.path.
+type state struct {
+	Version            int    `json:"version"`
 	TokenVersion       uint64 `json:"tokenVersion"`
 	MustChangePassword bool   `json:"mustChangePassword,omitempty"`
-	SystemAccount      bool   `json:"systemAccount,omitempty"`
 }
 
-type UserInfo struct {
-	Username      string `json:"username"`
-	Role          Role   `json:"role"`
-	Enabled       bool   `json:"enabled"`
-	SystemAccount bool   `json:"systemAccount,omitempty"`
+// legacyFile reads the account store of releases up to 2.5.15 (version 1, a
+// users list) or the older single-account form. Only the owner's
+// must-change flag is carried over; no hash is, because root's shadow entry
+// already holds the password those releases kept in step.
+type legacyFile struct {
+	Version int          `json:"version"`
+	Users   []legacyUser `json:"users"`
 }
 
-type UserPatch struct {
-	Role    *Role
-	Enabled *bool
-}
-
-type database struct {
-	Version        int    `json:"version"`
-	Users          []User `json:"users"`
-	LegacyUsername string `json:"username,omitempty"`
-	LegacyPassword string `json:"password,omitempty"`
-}
-
-type legacyAccount struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+type legacyUser struct {
+	Username           string `json:"username"`
+	SystemAccount      bool   `json:"systemAccount"`
+	MustChangePassword bool   `json:"mustChangePassword"`
 }
 
 type Store struct {
 	path     string
 	seedPath string
-	// bootSeedPath is the operator-supplied first-boot seed on the FAT boot
-	// partition; it is consumed (removed) when it seeds a new owner.
-	bootSeedPath string
 	// bootRootPath is the operator-supplied root password on the boot partition.
 	bootRootPath string
-	// seeded is the password the last Init generated for a new owner account
-	seeded string
-	mutex  sync.RWMutex
+	mutex        sync.RWMutex
 }
 
 var DefaultStore = NewStore(AccountFile)
 
-// NewStore keeps the seed password file next to the account file.
+// NewStore keeps the seed password file next to the state file.
 func NewStore(path string) *Store {
 	return &Store{
 		path:         path,
 		seedPath:     filepath.Join(filepath.Dir(path), filepath.Base(SeedPasswordFile)),
-		bootSeedPath: BootSeedFile,
 		bootRootPath: BootRootPassFile,
 	}
 }
 
-func IsValidRole(role Role) bool {
-	return role == RoleAdmin || role == RoleUser
-}
-
-func ValidateUsername(username string) error {
-	if !usernamePattern.MatchString(username) {
-		return errors.New("username must be 1-32 characters and contain only letters, numbers, '.', '_' or '-'")
-	}
-	return nil
-}
-
 // ValidatePassword has no policy: any non-empty password is accepted (an empty
-// one would mean no authentication). The only other bound is bcrypt's 72-byte
-// input limit, refused rather than silently truncated.
+// one would mean no authentication). Bounds: MaxPasswordBytes, and none of
+// NUL, ':', CR, LF, which the shadow update refuses.
 func ValidatePassword(password string) error {
 	if password == "" {
 		return errors.New("password must not be empty")
 	}
-	if len([]byte(password)) > 72 {
-		return errors.New("password must be at most 72 bytes")
+	if len(password) > MaxPasswordBytes {
+		return fmt.Errorf("password must be at most %d bytes", MaxPasswordBytes)
+	}
+	if strings.ContainsAny(password, "\r\n:\x00") {
+		return errors.New("password must not contain a colon, a newline or a NUL")
 	}
 	return nil
 }
 
-// Init creates the account file (and the seed password file) when missing. It
-// returns the password it seeded the owner account with, or "" when the account
-// already existed, so the caller can set the same password on the system.
-func (s *Store) Init() (string, error) {
+// Init creates the state when missing: it migrates a 2.5.15-style account file
+// or seeds root from the boot partition or a generated password. It is also
+// run lazily by Authenticate, so deleting the state file (the button reset
+// does) re-seeds a running server.
+func (s *Store) Init() error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-
-	s.seeded = ""
 	_, err := s.loadLocked(true)
-	seeded := s.seeded
-	s.seeded = ""
-	return seeded, err
+	return err
 }
 
-func (s *Store) List() ([]UserInfo, error) {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	db, err := s.loadLocked(false)
-	if err != nil {
-		return nil, err
-	}
-
-	users := make([]UserInfo, 0, len(db.Users))
-	for _, user := range db.Users {
-		users = append(users, UserInfo{
-			Username:      user.Username,
-			Role:          user.Role,
-			Enabled:       user.Enabled,
-			SystemAccount: user.SystemAccount,
-		})
-	}
-	return users, nil
-}
-
+// Get returns the account. It never creates or migrates state.
 func (s *Store) Get(username string) (*User, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
+	return s.getLocked(username)
+}
 
-	db, err := s.loadLocked(false)
+func (s *Store) getLocked(username string) (*User, error) {
+	if username != Username {
+		return nil, ErrWrongUser
+	}
+	st, err := s.loadLocked(false)
 	if err != nil {
 		return nil, err
 	}
-	return findUser(db.Users, username)
+	return userOf(st), nil
 }
 
+// Authenticate checks the password against root's /etc/shadow hash. A wrong
+// user or password is (nil, false, nil); an error means the answer is unknown
+// (state unreadable, or root's hash is of a type that cannot be checked).
 func (s *Store) Authenticate(username, password string) (*User, bool, error) {
+	if username != Username || password == "" || len(password) > MaxPasswordBytes {
+		return nil, false, nil
+	}
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	db, err := s.loadLocked(true)
+	st, err := s.loadLocked(true)
 	if err != nil {
 		return nil, false, err
 	}
-	user, err := findUser(db.Users, username)
-	if err != nil || !user.Enabled {
+	ok, err := utils.VerifyRootPassword(password)
+	if err != nil {
+		return nil, false, err
+	}
+	if !ok {
 		return nil, false, nil
 	}
-
-	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) == nil {
-		return user, true, nil
-	}
-
-	return nil, false, nil
+	return userOf(st), true, nil
 }
 
 func (s *Store) ValidateToken(username string, tokenVersion uint64) (*User, error) {
@@ -213,270 +187,223 @@ func (s *Store) ValidateToken(username string, tokenVersion uint64) (*User, erro
 	if err != nil {
 		return nil, err
 	}
-	if !user.Enabled || user.TokenVersion != tokenVersion {
+	if user.TokenVersion != tokenVersion {
 		return nil, errors.New("session revoked")
 	}
 	return user, nil
 }
 
-func (s *Store) Create(username, password string, role Role) error {
-	if err := ValidateUsername(username); err != nil {
-		return err
-	}
-	if err := ValidatePassword(password); err != nil {
-		return err
-	}
-	if !IsValidRole(role) {
-		return errors.New("invalid role")
-	}
-
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return err
-	}
-	tokenVersion, err := newTokenVersion()
-	if err != nil {
-		return err
-	}
-
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	db, err := s.loadLocked(true)
-	if err != nil {
-		return err
-	}
-	if _, err = findUser(db.Users, username); err == nil {
-		return ErrUserExists
-	}
-	db.Users = append(db.Users, User{
-		Username:     username,
-		PasswordHash: string(hash),
-		Role:         role,
-		Enabled:      true,
-		TokenVersion: tokenVersion,
-	})
-	return s.saveLocked(db)
-}
-
-func (s *Store) Update(actor, username string, patch UserPatch) (*User, error) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	db, err := s.loadLocked(true)
-	if err != nil {
-		return nil, err
-	}
-	index := userIndex(db.Users, username)
-	if index < 0 {
-		return nil, ErrUserNotFound
-	}
-	user := db.Users[index]
-
-	if patch.Role != nil && !IsValidRole(*patch.Role) {
-		return nil, errors.New("invalid role")
-	}
-	if actor == username && user.Role == RoleAdmin &&
-		((patch.Role != nil && *patch.Role != RoleAdmin) || (patch.Enabled != nil && !*patch.Enabled)) {
-		return nil, ErrSelfModification
-	}
-	if user.SystemAccount &&
-		((patch.Role != nil && *patch.Role != RoleAdmin) || (patch.Enabled != nil && !*patch.Enabled)) {
-		return nil, ErrSystemAccount
-	}
-
-	changed := false
-	if patch.Role != nil && user.Role != *patch.Role {
-		user.Role = *patch.Role
-		changed = true
-	}
-	if patch.Enabled != nil && user.Enabled != *patch.Enabled {
-		user.Enabled = *patch.Enabled
-		changed = true
-	}
-	if !changed {
-		return &user, nil
-	}
-
-	db.Users[index] = user
-	if enabledAdminCount(db.Users) == 0 {
-		return nil, ErrLastAdmin
-	}
-	db.Users[index].TokenVersion++
-	if err = s.saveLocked(db); err != nil {
-		return nil, err
-	}
-	return cloneUser(&db.Users[index]), nil
-}
-
-func (s *Store) Delete(actor, username string) error {
-	if actor == username {
-		return ErrSelfDelete
-	}
-
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	db, err := s.loadLocked(true)
-	if err != nil {
-		return err
-	}
-	index := userIndex(db.Users, username)
-	if index < 0 {
-		return ErrUserNotFound
-	}
-	if db.Users[index].SystemAccount {
-		return ErrSystemAccount
-	}
-	users := append([]User(nil), db.Users[:index]...)
-	users = append(users, db.Users[index+1:]...)
-	if enabledAdminCount(users) == 0 {
-		return ErrLastAdmin
-	}
-	db.Users = users
-	return s.saveLocked(db)
-}
-
-func (s *Store) SetPassword(username, password string) (*User, error) {
-	return s.SetPasswordAndRun(username, password, nil)
-}
-
-// SetPasswordAndRun commits the web password before running the optional
-// system-side update. If that update fails, the account record is rolled back
-// while the store lock is still held.
-func (s *Store) SetPasswordAndRun(username, password string, afterCommit func() error) (*User, error) {
+// SetPassword makes password root's Linux password (and so the web one),
+// clears the must-change flag, revokes every session and drops the seed file.
+// The shadow file is written first: if that fails nothing changed.
+func (s *Store) SetPassword(password string) (*User, error) {
 	if err := ValidatePassword(password); err != nil {
 		return nil, err
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, err
-	}
-
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	db, err := s.loadLocked(true)
+
+	st, err := s.loadLocked(true)
 	if err != nil {
 		return nil, err
 	}
-	index := userIndex(db.Users, username)
-	if index < 0 {
-		return nil, ErrUserNotFound
-	}
-	previous := *db
-	previous.Users = append([]User(nil), db.Users...)
-	db.Users[index].PasswordHash = string(hash)
-	db.Users[index].MustChangePassword = false
-	db.Users[index].TokenVersion++
-	if err = s.saveLocked(db); err != nil {
+	if err = utils.SetRootPassword(password); err != nil {
 		return nil, err
 	}
-	if afterCommit != nil {
-		if err = afterCommit(); err != nil {
-			if rollbackErr := s.saveLocked(&previous); rollbackErr != nil {
-				return nil, fmt.Errorf("system password update failed: %v; account rollback failed: %w", err, rollbackErr)
-			}
-			return nil, err
-		}
+	st.MustChangePassword = false
+	st.TokenVersion++
+	if err = s.saveLocked(st); err != nil {
+		return nil, fmt.Errorf("root password changed but the session state could not be saved: %w", err)
 	}
-	if db.Users[index].SystemAccount {
-		// the owner chose a password: stop showing the seed one on the screen
-		_ = os.Remove(s.seedPath)
+	// the owner chose a password: neither the seed nor a generated root one is
+	// shown on the screen any more
+	if rmErr := os.Remove(s.seedPath); rmErr != nil && !errors.Is(rmErr, os.ErrNotExist) {
+		log.Errorf("failed to remove %s: %v", s.seedPath, rmErr)
 	}
-	return cloneUser(&db.Users[index]), nil
+	if rmErr := utils.ClearRootPassFile(); rmErr != nil {
+		log.Errorf("failed to remove %s: %v", utils.RootPassFile, rmErr)
+	}
+	return userOf(st), nil
 }
 
+// Revoke invalidates every session.
 func (s *Store) Revoke(username string) (*User, error) {
+	if username != Username {
+		return nil, ErrWrongUser
+	}
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	db, err := s.loadLocked(true)
+	st, err := s.loadLocked(true)
 	if err != nil {
 		return nil, err
 	}
-	index := userIndex(db.Users, username)
-	if index < 0 {
-		return nil, ErrUserNotFound
-	}
-	db.Users[index].TokenVersion++
-	if err = s.saveLocked(db); err != nil {
+	st.TokenVersion++
+	if err = s.saveLocked(st); err != nil {
 		return nil, err
 	}
-	return cloneUser(&db.Users[index]), nil
+	return userOf(st), nil
 }
 
-func (s *Store) loadLocked(migrate bool) (*database, error) {
+func userOf(st *state) *User {
+	return &User{
+		Username:           Username,
+		Role:               RoleAdmin,
+		TokenVersion:       st.TokenVersion,
+		MustChangePassword: st.MustChangePassword,
+	}
+}
+
+// loadLocked reads the state. When ensure is set a missing file is seeded and a
+// pre-2.5.16 account file is migrated; otherwise both are ErrNotInitialized.
+// A file of an unknown (newer) version or that does not parse is an error and
+// is never overwritten.
+func (s *Store) loadLocked(ensure bool) (*state, error) {
 	data, err := os.ReadFile(s.path)
 	if errors.Is(err, os.ErrNotExist) {
-		db, defaultErr := s.defaultDatabase(migrate)
-		if defaultErr != nil {
-			return nil, defaultErr
+		if !ensure {
+			return nil, ErrNotInitialized
 		}
-		if migrate {
-			if saveErr := s.saveLocked(db); saveErr != nil {
-				return nil, saveErr
-			}
-		}
-		return db, nil
+		return s.seedLocked()
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	var db database
-	if err = json.Unmarshal(data, &db); err == nil && db.Version != 0 {
-		if err = validateDatabase(&db); err != nil {
-			return nil, err
-		}
-		retired, retireErr := s.retireLegacyHashes(&db, migrate)
-		if retireErr != nil {
-			return nil, retireErr
-		}
-		if retired && migrate {
-			if err = s.saveLocked(&db); err != nil {
-				return nil, err
-			}
-		}
-		return &db, nil
-	}
-
-	var legacy legacyAccount
-	if err = json.Unmarshal(data, &legacy); err != nil || legacy.Username == "" || legacy.Password == "" {
+	var head legacyFile
+	if err = json.Unmarshal(data, &head); err != nil {
 		return nil, errors.New("invalid account file")
 	}
-	if err = ValidateUsername(legacy.Username); err != nil {
-		return nil, fmt.Errorf("invalid legacy username: %w", err)
+	if head.Version > stateVersion {
+		return nil, fmt.Errorf("unsupported account file version: %d", head.Version)
 	}
+	if head.Version == stateVersion {
+		var st state
+		if err = json.Unmarshal(data, &st); err != nil {
+			return nil, errors.New("invalid account file")
+		}
+		if st.TokenVersion == 0 {
+			if st.TokenVersion, err = newTokenVersion(); err != nil {
+				return nil, err
+			}
+			if ensure {
+				if err = s.saveLocked(&st); err != nil {
+					return nil, err
+				}
+			}
+		}
+		return &st, nil
+	}
+	if !ensure {
+		return nil, ErrNotInitialized
+	}
+	return s.migrateLocked(data)
+}
+
+// migrateLocked replaces a pre-2.5.16 account file (the multi-user store, or
+// the older single account) with the state. Root's shadow entry is not touched:
+// since 2.5.14 the owner's web password was copied into it on every change, so
+// it is the password the owner knows. It refuses, leaving the old file in
+// place, unless that entry's hash is one the web can verify, so an upgraded
+// device cannot end up with a login nothing can pass.
+func (s *Store) migrateLocked(data []byte) (*state, error) {
+	if err := utils.CheckRootHashVerifiable(); err != nil {
+		log.Errorf("account migration refused, %s kept as it is: root's password in /etc/shadow cannot be verified by the web login (%v); reset the password on the device screen", s.path, err)
+		return nil, fmt.Errorf("account migration refused: %w", err)
+	}
+
+	var old legacyFile
+	if err := json.Unmarshal(data, &old); err != nil {
+		return nil, errors.New("invalid account file")
+	}
+	mustChange := false
+	for _, user := range old.Users {
+		if user.SystemAccount || user.Username == "admin" {
+			mustChange = user.MustChangePassword
+			break
+		}
+	}
+
 	tokenVersion, err := newTokenVersion()
 	if err != nil {
 		return nil, err
 	}
-	db = database{
-		Version: currentFileVersion,
-		Users: []User{{
-			Username:           legacy.Username,
-			PasswordHash:       legacy.Password,
-			Role:               RoleAdmin,
-			Enabled:            true,
-			TokenVersion:       tokenVersion,
-			MustChangePassword: passwordMatches(legacy.Password, legacyDefaultPassword),
-			SystemAccount:      true,
-		}},
-	}
-	if _, err = s.retireLegacyHashes(&db, migrate); err != nil {
+	st := &state{Version: stateVersion, TokenVersion: tokenVersion, MustChangePassword: mustChange}
+	if err = s.saveLocked(st); err != nil {
 		return nil, err
 	}
-	if migrate {
-		if err = s.saveLocked(&db); err != nil {
-			return nil, err
-		}
-	}
-	return &db, nil
+	log.Infof("account store migrated: web login is now root with root's /etc/shadow password (must change: %v); other accounts dropped", mustChange)
+	return st, nil
 }
 
-func (s *Store) saveLocked(db *database) error {
-	if err := validateDatabase(db); err != nil {
-		return err
+// seedLocked gives root its first password and creates the state. The boot
+// partition's root.pass wins and is consumed once applied; it is a chosen
+// password, so no change is forced. Otherwise root gets the seed from the seed
+// file, or a generated one written there for the device screen, and the first
+// login must change it. A root.pass that the shadow update refuses is logged
+// and left, and the seed is used.
+func (s *Store) seedLocked() (*state, error) {
+	password, mustChange, fromBoot := "", true, false
+	if boot, ok := readBootPassword(s.bootRootPath, "first-boot root password"); ok {
+		if err := utils.SetRootPassword(boot); err == nil {
+			password, mustChange, fromBoot = boot, false, true
+		} else {
+			log.Errorf("root password from %s could not be applied (%v): using the generated seed", s.bootRootPath, err)
+		}
 	}
-	syncLegacyAccount(db)
-	data, err := json.MarshalIndent(db, "", "  ")
+	if !fromBoot {
+		var err error
+		if password, err = s.seedPassword(); err != nil {
+			return nil, err
+		}
+		if err = utils.SetRootPassword(password); err != nil {
+			return nil, fmt.Errorf("set root to the seed password: %w", err)
+		}
+	}
+
+	tokenVersion, err := newTokenVersion()
+	if err != nil {
+		return nil, err
+	}
+	st := &state{Version: stateVersion, TokenVersion: tokenVersion, MustChangePassword: mustChange}
+	if err = s.saveLocked(st); err != nil {
+		return nil, err
+	}
+	if fromBoot {
+		log.Infof("root password set from %s", s.bootRootPath)
+		removeBootFile(s.bootRootPath, "first-boot root password")
+		// a seed left from an earlier reset is not root's password
+		if rmErr := os.Remove(s.seedPath); rmErr != nil && !errors.Is(rmErr, os.ErrNotExist) {
+			log.Errorf("failed to remove %s: %v", s.seedPath, rmErr)
+		}
+	}
+	// root now has the seed or the chosen password: a rotated one is obsolete
+	if err = utils.ClearRootPassFile(); err != nil {
+		log.Errorf("failed to remove %s: %v", utils.RootPassFile, err)
+	}
+	return st, nil
+}
+
+// seedPassword is the password already in the seed file (written by the button
+// reset or an interrupted first boot) or a fresh random one, written 0600 so
+// the device screen can show it.
+func (s *Store) seedPassword() (string, error) {
+	if data, err := os.ReadFile(s.seedPath); err == nil {
+		if password := strings.TrimSpace(string(data)); ValidatePassword(password) == nil {
+			return password, nil
+		}
+	}
+	password, err := randomPassword(seedPasswordLength)
+	if err != nil {
+		return "", err
+	}
+	if err = writeFile0600(s.seedPath, []byte(password+"\n")); err != nil {
+		return "", err
+	}
+	return password, nil
+}
+
+func (s *Store) saveLocked(st *state) error {
+	data, err := json.MarshalIndent(st, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -518,83 +445,6 @@ func (s *Store) saveLocked(db *database) error {
 	return dir.Sync()
 }
 
-// defaultDatabase seeds the device owner. The password is the one already in
-// the seed file (written by the button reset) or a fresh random one; when
-// persist is set it is written 0600 so the device screen can show it.
-func (s *Store) defaultDatabase(persist bool) (*database, error) {
-	password, err := s.seedPassword(persist)
-	if err != nil {
-		return nil, err
-	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, err
-	}
-	tokenVersion, err := newTokenVersion()
-	if err != nil {
-		return nil, err
-	}
-	return &database{
-		Version: currentFileVersion,
-		Users: []User{{
-			Username:           defaultUsername,
-			PasswordHash:       string(hash),
-			Role:               RoleAdmin,
-			Enabled:            true,
-			TokenVersion:       tokenVersion,
-			MustChangePassword: true,
-			SystemAccount:      true,
-		}},
-	}, nil
-}
-
-func (s *Store) seedPassword(persist bool) (string, error) {
-	if data, err := os.ReadFile(s.seedPath); err == nil {
-		if password := strings.TrimSpace(string(data)); ValidatePassword(password) == nil {
-			if persist {
-				s.seeded = password
-			}
-			return password, nil
-		}
-	}
-	bootPassword, fromBoot := s.bootSeed()
-	if fromBoot && !persist {
-		return bootPassword, nil
-	}
-	password := bootPassword
-	if !fromBoot {
-		var err error
-		if password, err = randomPassword(seedPasswordLength); err != nil {
-			return "", err
-		}
-	}
-	if persist {
-		if err := writeFile0600(s.seedPath, []byte(password+"\n")); err != nil {
-			return "", err
-		}
-		s.seeded = password
-		if fromBoot {
-			s.consumeBootSeed()
-		}
-	}
-	return password, nil
-}
-
-// bootSeed reads the operator-supplied first-boot seed from the FAT boot
-// partition (BootSeedFile). It returns false when the file is absent or unusable;
-// an unusable one is logged by reason only, never by value, and the caller falls
-// back to a random seed.
-func (s *Store) bootSeed() (string, bool) {
-	if s.bootSeedPath == "" {
-		return "", false
-	}
-	password, ok := readBootPassword(s.bootSeedPath, "first-boot seed")
-	if ok {
-		log.Infof("first-boot seed taken from %s", s.bootSeedPath)
-	}
-	return password, ok
-}
-
 // readBootPassword reads a one-line password file from the boot partition: one
 // trailing "\n" and then one "\r" are trimmed, and the rest must be a valid
 // password. False when the file is absent or unusable; the reason is logged,
@@ -620,13 +470,6 @@ func readBootPassword(path, what string) (string, bool) {
 	return password, true
 }
 
-// consumeBootSeed removes the boot-partition seed file and flushes the removal.
-// The same value is already in the 0600 seed file, so a failure here is loud but
-// not fatal.
-func (s *Store) consumeBootSeed() {
-	removeBootFile(s.bootSeedPath, "first-boot seed")
-}
-
 // removeBootFile removes a boot-partition password file and syncs its directory.
 func removeBootFile(path, what string) {
 	if err := os.Remove(path); err != nil {
@@ -643,24 +486,6 @@ func removeBootFile(path, what string) {
 	}
 	_ = dir.Close()
 	log.Infof("%s %s consumed and removed", what, path)
-}
-
-// ApplyRootPassword sets root's password at first boot through set. seeded is
-// the owner seed Init returned; it is root's password unless the boot partition
-// carries a root.pass, which then wins. root.pass is removed only after set
-// accepted it; if set refuses it (a character the shadow file cannot hold), the
-// failure is logged, root gets the owner seed instead and the file is left.
-func (s *Store) ApplyRootPassword(seeded string, set func(string) error) error {
-	if rootPass, ok := readBootPassword(s.bootRootPath, "first-boot root password"); ok {
-		err := set(rootPass)
-		if err == nil {
-			log.Infof("root password set from %s", s.bootRootPath)
-			removeBootFile(s.bootRootPath, "first-boot root password")
-			return nil
-		}
-		log.Errorf("root password from %s could not be applied (%v): root gets the owner seed", s.bootRootPath, err)
-	}
-	return set(seeded)
 }
 
 // writeFile0600 creates the file with 0600 from the start and fixes the mode of
@@ -698,153 +523,5 @@ func newTokenVersion() (uint64, error) {
 		if version != 0 && version != ^uint64(0) {
 			return version, nil
 		}
-	}
-}
-
-func validateDatabase(db *database) error {
-	if db.Version != currentFileVersion {
-		return fmt.Errorf("unsupported account file version: %d", db.Version)
-	}
-	if len(db.Users) == 0 {
-		return errors.New("account file contains no users")
-	}
-	seen := make(map[string]struct{}, len(db.Users))
-	systemAccounts := 0
-	for index := range db.Users {
-		user := &db.Users[index]
-		if err := ValidateUsername(user.Username); err != nil {
-			return err
-		}
-		if user.PasswordHash == "" || !IsValidRole(user.Role) {
-			return errors.New("account file contains an invalid user")
-		}
-		if _, exists := seen[user.Username]; exists {
-			return errors.New("account file contains duplicate usernames")
-		}
-		seen[user.Username] = struct{}{}
-		if user.TokenVersion == 0 {
-			user.TokenVersion = 1
-		}
-		if user.SystemAccount {
-			systemAccounts++
-			if user.Role != RoleAdmin || !user.Enabled || systemAccounts > 1 {
-				return ErrSystemAccount
-			}
-		}
-	}
-	if enabledAdminCount(db.Users) == 0 {
-		return ErrLastAdmin
-	}
-	return nil
-}
-
-func findUser(users []User, username string) (*User, error) {
-	index := userIndex(users, username)
-	if index < 0 {
-		return nil, ErrUserNotFound
-	}
-	return cloneUser(&users[index]), nil
-}
-
-func userIndex(users []User, username string) int {
-	for index := range users {
-		if users[index].Username == username {
-			return index
-		}
-	}
-	return -1
-}
-
-func enabledAdminCount(users []User) int {
-	count := 0
-	for _, user := range users {
-		if user.Role == RoleAdmin && user.Enabled {
-			count++
-		}
-	}
-	return count
-}
-
-func cloneUser(user *User) *User {
-	if user == nil {
-		return nil
-	}
-	copy := *user
-	return &copy
-}
-
-func passwordMatches(hash, password string) bool {
-	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
-}
-
-// isBcryptHash reports whether the stored value is a well-formed bcrypt hash.
-func isBcryptHash(hash string) bool {
-	_, err := bcrypt.Cost([]byte(hash))
-	return err == nil
-}
-
-// retireLegacyHashes replaces every stored password that is not a bcrypt hash.
-// Older releases kept a reversibly AES-encrypted password under a key that is
-// public in the source, so such a value is as good as plaintext and is no
-// longer accepted. The device owner gets the seed password (the one the device
-// screen shows); every other account gets a random password nobody knows and an
-// admin must reset it. Both must change it at the next login and every session
-// is revoked. It reports whether anything changed; the caller saves it.
-func (s *Store) retireLegacyHashes(db *database, persist bool) (bool, error) {
-	changed := false
-	for index := range db.Users {
-		user := &db.Users[index]
-		if isBcryptHash(user.PasswordHash) {
-			continue
-		}
-
-		var password string
-		var err error
-		if user.SystemAccount {
-			password, err = s.seedPassword(persist)
-		} else {
-			password, err = randomPassword(seedPasswordLength)
-		}
-		if err != nil {
-			return false, err
-		}
-		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-		if err != nil {
-			return false, err
-		}
-		tokenVersion, err := newTokenVersion()
-		if err != nil {
-			return false, err
-		}
-		user.PasswordHash = string(hash)
-		user.MustChangePassword = true
-		user.TokenVersion = tokenVersion
-		changed = true
-		log.Warnf("account %q held a legacy reversible password: replaced, it must be reset", user.Username)
-	}
-	return changed, nil
-}
-
-// Keep a legacy top-level account mirror so downgrading to a single-user
-// server still authenticates the original device owner instead of failing
-// open or forcing an immediate physical reset.
-func syncLegacyAccount(db *database) {
-	db.LegacyUsername = ""
-	db.LegacyPassword = ""
-	var fallback *User
-	for _, user := range db.Users {
-		if user.SystemAccount {
-			db.LegacyUsername = user.Username
-			db.LegacyPassword = user.PasswordHash
-			return
-		}
-		if fallback == nil && user.Role == RoleAdmin && user.Enabled {
-			copy := user
-			fallback = &copy
-		}
-	}
-	if fallback != nil {
-		db.LegacyUsername = fallback.Username
-		db.LegacyPassword = fallback.PasswordHash
 	}
 }

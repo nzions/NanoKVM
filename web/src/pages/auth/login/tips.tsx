@@ -1,8 +1,6 @@
 import { useState } from 'react';
-import { Button, Card, Modal, Typography } from 'antd';
+import { Button, Card, Modal } from 'antd';
 import { useTranslation } from 'react-i18next';
-
-const { Text } = Typography;
 
 export const Tips = () => {
   const { t } = useTranslation();
@@ -44,16 +42,6 @@ export const Tips = () => {
               </a>
             </div>
 
-            <ul className="list-outside list-disc">
-              <li>
-                {t('auth.tips.reset3')}
-                <Text code={true}>admin/admin</Text>
-              </li>
-              <li>
-                {t('auth.tips.reset4')}
-                <Text code={true}>root/root</Text>
-              </li>
-            </ul>
           </div>
         </Card>
 

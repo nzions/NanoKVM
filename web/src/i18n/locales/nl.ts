@@ -9,11 +9,9 @@ const nl = {
     },
     auth: {
       login: 'Inloggen',
-      placeholderUsername: 'Voer gebruikersnaam in',
       placeholderPassword: 'Voer wachtwoord in',
       placeholderCurrentPassword: 'Huidig wachtwoord',
       placeholderPassword2: 'Voer wachtwoord nogmaals in',
-      noEmptyUsername: 'Gebruikersnaam mag niet leeg zijn',
       noEmptyPassword: 'Wachtwoord mag niet leeg zijn',
       noAccount:
         'Ophalen van gebruikersinformatie mislukt, vernieuw de webpagina of reset het wachtwoord',
@@ -26,8 +24,6 @@ const nl = {
       changePasswordDesc:
         'Voor de veiligheid van uw apparaat, wijzig alstublieft het webaanmeldingswachtwoord.',
       differentPassword: 'Wachtwoorden komen niet overeen',
-      illegalUsername: 'Gebruikersnaam bevat ongeldige tekens',
-      illegalPassword: 'Wachtwoord bevat ongeldige tekens',
       forgetPassword: 'Wachtwoord vergeten',
       ok: 'Ok',
       cancel: 'Annuleren',
@@ -36,8 +32,6 @@ const nl = {
         reset1:
           'Om de wachtwoorden opnieuw in te stellen, houdt u de BOOT-knop op de NanoKVM 10 seconden lang ingedrukt.',
         reset2: 'Voor gedetailleerde stappen kunt u dit document raadplegen:',
-        reset3: 'Standaard webaccount:',
-        reset4: 'Standaard SSH-account:',
         change1: 'Houd er rekening mee dat deze actie de volgende wachtwoorden zal wijzigen:',
         change2: 'Web login wachtwoord',
         change3: 'Systeem root-wachtwoord (SSH-inlogwachtwoord)',
@@ -664,33 +658,12 @@ const nl = {
       account: {
         title: 'Account',
         webAccount: 'Web Account Naam',
-        roles: {
-          admin: 'Beheerder',
-          user: 'Gebruiker'
-        },
-        role: 'Rol',
         password: 'Wachtwoord',
         updateBtn: 'Update',
         logoutBtn: 'Afmelden',
         logoutDesc: 'Weet u zeker dat u wilt uitloggen?',
         okBtn: 'Ja',
-        cancelBtn: 'Nee',
-        users: {
-          title: 'Gebruikers',
-          create: 'Gebruiker aanmaken',
-          enabled: 'Ingeschakeld',
-          disabled: 'Uitgeschakeld',
-          deviceOwner: 'Apparaateigenaar',
-          resetPassword: 'Wachtwoord opnieuw instellen',
-          delete: 'Verwijderen',
-          deleteConfirm: 'Deze gebruiker verwijderen en al zijn sessies intrekken?',
-          created: 'Gebruiker aangemaakt',
-          deleted: 'Gebruiker verwijderd',
-          passwordUpdated: 'Wachtwoord bijgewerkt',
-          loadFailed: 'Gebruikers laden mislukt',
-          saveFailed: 'Gebruiker opslaan mislukt',
-          deleteFailed: 'Gebruiker verwijderen mislukt'
-        }
+        cancelBtn: 'Nee'
       }
     },
     picoclaw: {

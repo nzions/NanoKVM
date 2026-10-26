@@ -9,11 +9,9 @@ const ca = {
     },
     auth: {
       login: 'Inici de sessió',
-      placeholderUsername: "Nom d'usuari",
       placeholderPassword: 'Contrasenya',
       placeholderCurrentPassword: 'Contrasenya actual',
       placeholderPassword2: 'Torna a introduir la contrasenya',
-      noEmptyUsername: "Cal introduir el nom d'usuari",
       noEmptyPassword: 'Cal introduir la contrasenya',
       noAccount:
         "No s'ha pogut obtenir la informació de l'usuari, actualitza la pàgina web o restableix la contrasenya",
@@ -25,8 +23,6 @@ const ca = {
       changePassword: 'Canviar la contrasenya',
       changePasswordDesc: 'Per a la seguretat del dispositiu, canvia la contrasenya!',
       differentPassword: 'Les contrasenyes no coincideixen',
-      illegalUsername: "El nom d'usuari conté caràcters no permesos",
-      illegalPassword: 'La contrasenya conté caràcters no permesos',
       forgetPassword: 'Has oblidat la contrasenya',
       ok: "D'acord",
       cancel: 'Cancel·la',
@@ -35,8 +31,6 @@ const ca = {
         reset1:
           'Per restablir les contrasenyes, mantingues premut el botó BOOT del NanoKVM durant 10 segons.',
         reset2: 'Per veure els passos detallats, consulta aquest document:',
-        reset3: 'Compte web per defecte:',
-        reset4: 'Compte SSH per defecte:',
         change1: 'Aquesta acció canviarà les següents contrasenyes:',
         change2: "Contrasenya d'inici de sessió web",
         change3: 'Contrasenya root del sistema (inici de sessió SSH)',
@@ -657,33 +651,12 @@ const ca = {
       account: {
         title: 'Compte',
         webAccount: 'Nom del compte web',
-        roles: {
-          admin: 'Administrador',
-          user: 'Usuari'
-        },
-        role: 'Rol',
         password: 'Contrasenya',
         updateBtn: 'Canvia',
         logoutBtn: 'Tanca sessió',
         logoutDesc: 'Segur que vols tancar sessió?',
         okBtn: 'Sí',
-        cancelBtn: 'No',
-        users: {
-          title: 'Usuaris',
-          create: 'Crea usuari',
-          enabled: 'Activat',
-          disabled: 'Desactivat',
-          deviceOwner: 'Propietari del dispositiu',
-          resetPassword: 'Restableix la contrasenya',
-          delete: 'Elimina',
-          deleteConfirm: 'Voleu eliminar aquest usuari i revocar totes les seves sessions?',
-          created: 'Usuari creat',
-          deleted: 'Usuari eliminat',
-          passwordUpdated: 'Contrasenya actualitzada',
-          loadFailed: 'No s\'han pogut carregar els usuaris',
-          saveFailed: 'No s\'ha pogut desar l\'usuari',
-          deleteFailed: 'No s\'ha pogut eliminar l\'usuari'
-        }
+        cancelBtn: 'No'
       }
     },
     picoclaw: {

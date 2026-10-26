@@ -9,11 +9,9 @@ const id = {
     },
     auth: {
       login: 'Masuk',
-      placeholderUsername: 'Silahkan masukkan username',
       placeholderPassword: 'Silahkan masukkan password',
       placeholderCurrentPassword: 'Kata sandi saat ini',
       placeholderPassword2: 'Silahkan masukkan password again',
-      noEmptyUsername: 'nama user tidak boleh kosong',
       noEmptyPassword: 'sandi  tidak boleh kosong',
       noAccount:
         'Gagal mendapatkan informasi user, silahkan segarkan halaman atau atur ulang sandi',
@@ -25,8 +23,6 @@ const id = {
       changePassword: 'Ganti Sandi',
       changePasswordDesc: 'Untuk keamanan perangkat Anda, silakan ubah kata sandi masuk web.',
       differentPassword: 'sandi tidak sesuai',
-      illegalUsername: 'ada karakter ilegal pada nama user',
-      illegalPassword: 'ada karakter ilegal pada sandi',
       forgetPassword: 'Lupa Sandi',
       ok: 'Ok',
       cancel: 'Batalkan',
@@ -35,8 +31,6 @@ const id = {
         reset1:
           'To reset the passwords, pressing and holding the BOOT button on the NanoKVM for 10 seconds.',
         reset2: 'Untuk langkah-langkah rinci, lihat dokumen ini:',
-        reset3: 'Akun web default:',
-        reset4: 'Akun SSH default:',
         change1: 'Perhatikan bahwa tindakan ini akan mengubah kata sandi berikut:',
         change2: 'Kata sandi login web',
         change3: 'Kata sandi root sistem (kata sandi login SSH)',
@@ -657,33 +651,12 @@ const id = {
       account: {
         title: 'Akun',
         webAccount: 'Nama akun web',
-        roles: {
-          admin: 'Administrator',
-          user: 'Pengguna'
-        },
-        role: 'Peran',
         password: 'Kata sandi',
         updateBtn: 'Update',
         logoutBtn: 'Keluar',
         logoutDesc: 'Apakah Anda yakin ingin logout?',
         okBtn: 'Ya',
-        cancelBtn: 'Tidak',
-        users: {
-          title: 'Pengguna',
-          create: 'Buat Pengguna',
-          enabled: 'Aktif',
-          disabled: 'Nonaktif',
-          deviceOwner: 'Pemilik perangkat',
-          resetPassword: 'Atur Ulang Kata Sandi',
-          delete: 'Hapus',
-          deleteConfirm: 'Hapus pengguna ini dan cabut semua sesinya?',
-          created: 'Pengguna dibuat',
-          deleted: 'Pengguna dihapus',
-          passwordUpdated: 'Kata sandi diperbarui',
-          loadFailed: 'Gagal memuat pengguna',
-          saveFailed: 'Gagal menyimpan pengguna',
-          deleteFailed: 'Gagal menghapus pengguna'
-        }
+        cancelBtn: 'Tidak'
       }
     },
     picoclaw: {

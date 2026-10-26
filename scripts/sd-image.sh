@@ -17,10 +17,11 @@
 # no loader swaps, no busybox init, no /etc/kvm/emulator marker.
 #
 # NO secret is written. /etc/kvm/pwd, initial.pass and root.pass are absent from
-# the image; on first boot the server seeds the owner account ("admin") with a
-# random password, shows it on the OLED, writes it to /etc/kvm/initial.pass
-# (0600) and makes it the root password too. The owner must change it at first
-# login. /etc/kvm/ssh_stop (stock: sshd off) is left as shipped.
+# the image; the one web account is root and its password is root's Linux
+# password. On first boot the server takes /boot/root.pass for it, else sets a
+# random password, shows it on the OLED and writes it to /etc/kvm/initial.pass
+# (0600); the owner must change that one at first login. /etc/kvm/ssh_stop
+# (stock: sshd off) is left as shipped.
 #
 # No root and no loop mount: the rootfs (partition 2) is cut out with dd, edited
 # with debugfs -w, checked with e2fsck and spliced back with dd conv=notrunc.
@@ -372,4 +373,4 @@ printf '%s  %s\n' "$sum" "$(basename "$OUT")" >"$OUT.sha256"
 info "wrote $OUT ($img_bytes bytes, release $VERSION)"
 info "sha256 $sum"
 info "flash it to the microSD card (e.g. dd if=$(basename "$OUT") of=/dev/rdiskN bs=4m on macOS, or balenaEtcher)."
-info "first boot: the owner password is shown on the OLED (also /etc/kvm/initial.pass); user admin; change it at first login."
+info "first boot: the root password is /boot/root.pass if present, else shown on the OLED (also /etc/kvm/initial.pass) and changed at first login; web user root."

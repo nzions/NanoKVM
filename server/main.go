@@ -37,19 +37,12 @@ func initialize() {
 
 	logger.Init()
 
-	// seed the device owner now so its first-boot password is on the device screen
+	// migrate the 2.5.15 account store, or seed root now so its first-boot
+	// password is on the device screen. The one account is root and its
+	// password is root's Linux password.
 	if config.GetInstance().Authentication != "disable" {
-		seeded, err := authn.DefaultStore.Init()
-		if err != nil {
-			log.Printf("failed to initialize accounts: %v", err)
-		}
-		if seeded != "" {
-			// one password for the OLED: the web owner and root share it
-			if err := authn.DefaultStore.ApplyRootPassword(seeded, utils.SetRootPassword); err != nil {
-				log.Printf("ERROR: failed to set the root password to the seeded one: %v", err)
-			} else if err := utils.ClearRootPassFile(); err != nil {
-				log.Printf("ERROR: failed to remove %s: %v", utils.RootPassFile, err)
-			}
+		if err := authn.DefaultStore.Init(); err != nil {
+			log.Printf("ERROR: failed to initialize the root login: %v", err)
 		}
 	}
 

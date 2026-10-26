@@ -9,11 +9,9 @@ const nb = {
     },
     auth: {
       login: 'Logg inn',
-      placeholderUsername: 'Brukernavn',
       placeholderPassword: 'Passord',
       placeholderCurrentPassword: 'Nåværende passord',
       placeholderPassword2: 'Oppgi passord igjen',
-      noEmptyUsername: 'Brukernavn påkrevd',
       noEmptyPassword: 'Passord påkrevd',
       noAccount:
         'Kunne ikke hente brukerinformasjon. Vennligst last inn siden på nytt eller gjenopprett passord',
@@ -26,8 +24,6 @@ const nb = {
       changePasswordDesc:
         'For sikkerheten til enheten, vennligst endre passordet ditt for web-innlogging.',
       differentPassword: 'Passordene er ikke like',
-      illegalUsername: 'Brukernavn inneholder tegn som ikke er tillat',
-      illegalPassword: 'Passord inneholder tegn som ikke er tillat',
       forgetPassword: 'Glemt passord',
       ok: 'Ok',
       cancel: 'Avbryt',
@@ -36,8 +32,6 @@ const nb = {
         reset1:
           'To reset the passwords, pressing and holding the BOOT button on the NanoKVM for 10 seconds.',
         reset2: 'Se dette dokumentet for detaljerte trinn:',
-        reset3: 'Standard webkonto:',
-        reset4: 'Standard SSH-konto:',
         change1: 'Merk at denne handlingen endrer følgende passord:',
         change2: 'Passord for webinnlogging',
         change3: 'Systemets root-passord (SSH-innloggingspassord)',
@@ -656,33 +650,12 @@ const nb = {
       account: {
         title: 'Konto',
         webAccount: 'Navn på webkonto',
-        roles: {
-          admin: 'Administrator',
-          user: 'Bruker'
-        },
-        role: 'Rolle',
         password: 'Passord',
         updateBtn: 'Update',
         logoutBtn: 'Logg ut',
         logoutDesc: 'Er du sikker på at du vil logge ut?',
         okBtn: 'Ja',
-        cancelBtn: 'Nei',
-        users: {
-          title: 'Brukere',
-          create: 'Opprett bruker',
-          enabled: 'Aktivert',
-          disabled: 'Deaktivert',
-          deviceOwner: 'Enhetens eier',
-          resetPassword: 'Tilbakestill passord',
-          delete: 'Slett',
-          deleteConfirm: 'Slette denne brukeren og tilbakekalle alle øktene deres?',
-          created: 'Bruker opprettet',
-          deleted: 'Bruker slettet',
-          passwordUpdated: 'Passord oppdatert',
-          loadFailed: 'Kunne ikke laste brukere',
-          saveFailed: 'Kunne ikke lagre bruker',
-          deleteFailed: 'Kunne ikke slette bruker'
-        }
+        cancelBtn: 'Nei'
       }
     },
     picoclaw: {

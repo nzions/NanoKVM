@@ -9,11 +9,9 @@ const pl = {
     },
     auth: {
       login: 'Logowanie',
-      placeholderUsername: 'Wprowadź nazwę użykownika',
       placeholderPassword: 'wprowadź hasło',
       placeholderCurrentPassword: 'Obecne hasło',
       placeholderPassword2: 'wprowadź hasło ponownie',
-      noEmptyUsername: 'nazwa użykownika nie może być pusta',
       noEmptyPassword: 'hasło nie może być puste',
       noAccount:
         'Nie udało się uzyskać informacji o użytkowniku, odśwież stronę lub zresetuj hasło',
@@ -26,8 +24,6 @@ const pl = {
       changePasswordDesc:
         'Dla bezpieczeństwa Twojego urządzenia, proszę zmień hasło do logowania w sieci.',
       differentPassword: 'hasła nie zgadzają się',
-      illegalUsername: 'nazwa użytkownika zawiera niedozwolone znaki',
-      illegalPassword: 'hasło zawiera niedozwolone znaki',
       forgetPassword: 'Zapomiałeś hasła?',
       ok: 'Ok',
       cancel: 'Anuluj',
@@ -36,8 +32,6 @@ const pl = {
         reset1:
           'To reset the passwords, pressing and holding the BOOT button on the NanoKVM for 10 seconds.',
         reset2: 'Szczegółowe kroki znajdziesz w tym dokumencie:',
-        reset3: 'Domyślne konto web:',
-        reset4: 'Domyślne konto SSH:',
         change1: 'Pamiętaj, że ta operacja zmieni następujące hasła:',
         change2: 'Hasło logowania web',
         change3: 'Hasło roota systemu (hasło logowania SSH)',
@@ -660,33 +654,12 @@ const pl = {
       account: {
         title: 'Konto',
         webAccount: 'Nazwa konta web',
-        roles: {
-          admin: 'Administrator',
-          user: 'Użytkownik'
-        },
-        role: 'Rola',
         password: 'Hasło',
         updateBtn: 'Update',
         logoutBtn: 'Wyloguj',
         logoutDesc: 'Czy na pewno chcesz się wylogować?',
         okBtn: 'Tak',
-        cancelBtn: 'Nie',
-        users: {
-          title: 'Użytkownicy',
-          create: 'Utwórz użytkownika',
-          enabled: 'Włączony',
-          disabled: 'Wyłączony',
-          deviceOwner: 'Właściciel urządzenia',
-          resetPassword: 'Zresetuj hasło',
-          delete: 'Usuń',
-          deleteConfirm: 'Usunąć tego użytkownika i unieważnić wszystkie jego sesje?',
-          created: 'Użytkownik utworzony',
-          deleted: 'Użytkownik usunięty',
-          passwordUpdated: 'Hasło zaktualizowane',
-          loadFailed: 'Nie udało się wczytać użytkowników',
-          saveFailed: 'Nie udało się zapisać użytkownika',
-          deleteFailed: 'Nie udało się usunąć użytkownika'
-        }
+        cancelBtn: 'Nie'
       }
     },
     picoclaw: {

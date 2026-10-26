@@ -3,7 +3,6 @@ package auth
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,29 +13,31 @@ import (
 	"NanoKVM-Server/config"
 	"NanoKVM-Server/middleware"
 	"NanoKVM-Server/proto"
+	"NanoKVM-Server/utils"
 
 	"github.com/gin-gonic/gin"
 )
 
 const testSeedPassword = "seed-password"
 
-// newTestStore returns a store whose owner password is testSeedPassword and
-// is already changed (MustChangePassword cleared).
+// newTestStore returns a store whose root password is testSeedPassword in a
+// temporary shadow file and is already changed (MustChangePassword cleared).
 func newTestStore(t *testing.T) *authn.Store {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "pwd")
-	seedPath := filepath.Join(filepath.Dir(path), "initial.pass")
-	if err := os.WriteFile(seedPath, []byte(testSeedPassword+"\n"), 0o600); err != nil {
+	original, originalRoot := utils.ShadowFile, utils.RootPassFile
+	utils.ShadowFile, utils.RootPassFile = filepath.Join(t.TempDir(), "shadow"), filepath.Join(t.TempDir(), "root.pass")
+	t.Cleanup(func() { utils.ShadowFile, utils.RootPassFile = original, originalRoot })
+	if err := os.WriteFile(utils.ShadowFile, []byte("daemon:*:19000:0:99999:7:::\nroot:*:19000:0:99999:7:::\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	store := authn.NewStore(path)
-	if _, err := store.SetPassword("admin", testSeedPassword); err != nil {
+	store := authn.NewStore(filepath.Join(t.TempDir(), "pwd"))
+	if _, err := store.SetPassword(testSeedPassword); err != nil {
 		t.Fatal(err)
 	}
 	return store
 }
 
-func TestLoginCookieAndUserAuthorizationLifecycle(t *testing.T) {
+func TestLoginCookieLifecycle(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	store := newTestStore(t)
 	restore := useTestStore(store)
@@ -48,100 +49,56 @@ func TestLoginCookieAndUserAuthorizationLifecycle(t *testing.T) {
 	authenticated := router.Group("/").Use(middleware.CheckToken())
 	authenticated.GET("/account", service.GetAccount)
 	authenticated.POST("/logout", service.Logout)
-	admin := router.Group("/").Use(middleware.CheckToken(), middleware.RequireRole(authn.RoleAdmin))
-	admin.GET("/users", service.ListUsers)
-	admin.POST("/users", service.CreateUser)
-	admin.PUT("/users/:username", service.UpdateUser)
 
-	adminCookie := loginCookie(t, router, "admin", testSeedPassword)
-	if !adminCookie.HttpOnly || adminCookie.SameSite != http.SameSiteStrictMode || adminCookie.Path != "/" {
-		t.Fatalf("unsafe session cookie: %+v", adminCookie)
+	cookie := loginCookie(t, router, "root", testSeedPassword)
+	if !cookie.HttpOnly || cookie.SameSite != http.SameSiteStrictMode || cookie.Path != "/" {
+		t.Fatalf("unsafe session cookie: %+v", cookie)
 	}
-
-	createBody := map[string]any{
-		"username": "alice",
-		"password": "valid-password",
-		"role":     "user",
+	recorder := requestJSONRecorder(router, http.MethodGet, "/account", nil, cookie)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("account status = %d", recorder.Code)
 	}
-	if code := requestJSON(router, http.MethodPost, "/users", createBody, adminCookie); code != http.StatusOK {
-		t.Fatalf("create status = %d", code)
+	var rsp struct {
+		Data proto.GetAccountRsp `json:"data"`
 	}
-	userCookie := loginCookie(t, router, "alice", "valid-password")
-	if code := requestJSON(router, http.MethodGet, "/users", nil, userCookie); code != http.StatusForbidden {
-		t.Fatalf("user management status = %d, want 403", code)
-	}
-
-	disabled := false
-	if code := requestJSON(router, http.MethodPut, "/users/alice", map[string]any{"enabled": disabled}, adminCookie); code != http.StatusOK {
-		t.Fatalf("disable status = %d", code)
-	}
-	if code := requestJSON(router, http.MethodGet, "/account", nil, userCookie); code != http.StatusUnauthorized {
-		t.Fatalf("disabled session status = %d, want 401", code)
-	}
-}
-
-func TestLogoutDoesNotInvalidateAnotherUser(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	store := newTestStore(t)
-	restore := useTestStore(store)
-	defer restore()
-	if _, ok, err := store.Authenticate("admin", testSeedPassword); err != nil || !ok {
-		t.Fatalf("default login: ok=%v err=%v", ok, err)
-	}
-	if err := store.Create("alice", "alice-password", authn.RoleUser); err != nil {
+	if err := json.Unmarshal(recorder.Body.Bytes(), &rsp); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.Create("bob", "bob-password", authn.RoleUser); err != nil {
-		t.Fatal(err)
+	if rsp.Data.Username != "root" || rsp.Data.Role != "admin" {
+		t.Fatalf("account = %+v, want root/admin", rsp.Data)
 	}
 
-	service := NewService()
-	router := gin.New()
-	router.POST("/login", service.Login)
-	authenticated := router.Group("/").Use(middleware.CheckToken())
-	authenticated.GET("/account", service.GetAccount)
-	authenticated.POST("/logout", service.Logout)
-
-	aliceCookie := loginCookie(t, router, "alice", "alice-password")
-	bobCookie := loginCookie(t, router, "bob", "bob-password")
-	if code := requestJSON(router, http.MethodPost, "/logout", nil, aliceCookie); code != http.StatusOK {
+	if code := requestJSON(router, http.MethodPost, "/logout", nil, cookie); code != http.StatusOK {
 		t.Fatalf("logout status = %d", code)
 	}
-	if code := requestJSON(router, http.MethodGet, "/account", nil, aliceCookie); code != http.StatusUnauthorized {
-		t.Fatalf("logged out session status = %d", code)
-	}
-	if code := requestJSON(router, http.MethodGet, "/account", nil, bobCookie); code != http.StatusOK {
-		t.Fatalf("other user's session status = %d", code)
+	if code := requestJSON(router, http.MethodGet, "/account", nil, cookie); code != http.StatusUnauthorized {
+		t.Fatalf("logged out session status = %d, want 401", code)
 	}
 }
 
-func TestNormalUserPasswordNeverChangesSystemPassword(t *testing.T) {
+func TestOnlyRootCanLogIn(t *testing.T) {
+	gin.SetMode(gin.TestMode)
 	store := newTestStore(t)
 	restore := useTestStore(store)
 	defer restore()
-	if _, ok, err := store.Authenticate("admin", testSeedPassword); err != nil || !ok {
-		t.Fatalf("default login: ok=%v err=%v", ok, err)
-	}
-	if err := store.Create("alice", "alice-password", authn.RoleUser); err != nil {
-		t.Fatal(err)
-	}
 
-	originalUpdater := systemPasswordUpdater
-	updates := 0
-	systemPasswordUpdater = func(string) error {
-		updates++
-		return nil
-	}
-	defer func() { systemPasswordUpdater = originalUpdater }()
+	service := NewService()
+	router := gin.New()
+	router.POST("/login", service.Login)
 
-	if err := changeUserPassword("alice", "new-password"); err != nil {
-		t.Fatal(err)
-	}
-	if updates != 0 {
-		t.Fatalf("system password updated %d times for a normal user", updates)
-	}
-	if _, ok, err := store.Authenticate("alice", "new-password"); err != nil || !ok {
-		t.Fatalf("new web password login: ok=%v err=%v", ok, err)
+	for _, tc := range []struct{ user, password string }{
+		{"admin", testSeedPassword}, // the retired account, even with the right password
+		{"root", "wrong-password"},
+	} {
+		recorder := requestJSONRecorder(router, http.MethodPost, "/login",
+			map[string]any{"username": tc.user, "password": tc.password}, nil)
+		var rsp proto.Response
+		if err := json.Unmarshal(recorder.Body.Bytes(), &rsp); err != nil {
+			t.Fatal(err)
+		}
+		if rsp.Code == 0 {
+			t.Fatalf("login as %q with %q succeeded", tc.user, tc.password)
+		}
 	}
 }
 
@@ -150,19 +107,13 @@ func TestSelfPasswordChangeRequiresCurrentPassword(t *testing.T) {
 	store := newTestStore(t)
 	restore := useTestStore(store)
 	defer restore()
-	if _, ok, err := store.Authenticate("admin", testSeedPassword); err != nil || !ok {
-		t.Fatalf("default login: ok=%v err=%v", ok, err)
-	}
-	if err := store.Create("alice", "alice-password", authn.RoleUser); err != nil {
-		t.Fatal(err)
-	}
 
 	service := NewService()
 	router := gin.New()
 	router.POST("/login", service.Login)
 	authenticated := router.Group("/").Use(middleware.CheckToken())
 	authenticated.POST("/password", service.ChangePassword)
-	cookie := loginCookie(t, router, "alice", "alice-password")
+	cookie := loginCookie(t, router, "root", testSeedPassword)
 
 	recorder := requestJSONRecorder(router, http.MethodPost, "/password", map[string]any{
 		"currentPassword": "wrong-password",
@@ -175,80 +126,27 @@ func TestSelfPasswordChangeRequiresCurrentPassword(t *testing.T) {
 	if response.Code != -3 || response.Msg != "current password is incorrect" {
 		t.Fatalf("wrong-current-password response = %+v", response)
 	}
-	if _, ok, err := store.Authenticate("alice", "new-password"); err != nil || ok {
+	if ok, err := utils.VerifyRootPassword("new-password"); err != nil || ok {
 		t.Fatalf("password changed without current credential: ok=%v err=%v", ok, err)
 	}
 
 	requestJSON(router, http.MethodPost, "/password", map[string]any{
-		"currentPassword": "alice-password",
+		"currentPassword": testSeedPassword,
 		"password":        "new-password",
 	}, cookie)
-	if _, ok, err := store.Authenticate("alice", "new-password"); err != nil || !ok {
-		t.Fatalf("valid password change failed: ok=%v err=%v", ok, err)
+	// the web password IS root's shadow password: one store
+	if ok, err := utils.VerifyRootPassword("new-password"); err != nil || !ok {
+		t.Fatalf("valid password change did not reach /etc/shadow: ok=%v err=%v", ok, err)
 	}
-}
-
-func TestAdministratorCannotResetDeviceOwnerPassword(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	store := newTestStore(t)
-	restore := useTestStore(store)
-	defer restore()
-	if _, ok, err := store.Authenticate("admin", testSeedPassword); err != nil || !ok {
-		t.Fatalf("default login: ok=%v err=%v", ok, err)
+	if ok, err := utils.VerifyRootPassword(testSeedPassword); err != nil || ok {
+		t.Fatalf("old password still works: ok=%v err=%v", ok, err)
 	}
-	if err := store.Create("second-admin", "second-password", authn.RoleAdmin); err != nil {
-		t.Fatal(err)
+	if _, ok, err := store.Authenticate("root", "new-password"); err != nil || !ok {
+		t.Fatalf("login with the new password: ok=%v err=%v", ok, err)
 	}
-
-	originalUpdater := systemPasswordUpdater
-	updates := 0
-	systemPasswordUpdater = func(string) error {
-		updates++
-		return nil
-	}
-	defer func() { systemPasswordUpdater = originalUpdater }()
-
-	service := NewService()
-	router := gin.New()
-	router.POST("/login", service.Login)
-	admin := router.Group("/").Use(middleware.CheckToken(), middleware.RequireRole(authn.RoleAdmin))
-	admin.POST("/users/:username/password", service.ChangeUserPassword)
-	cookie := loginCookie(t, router, "second-admin", "second-password")
-	requestJSON(router, http.MethodPost, "/users/admin/password", map[string]any{
-		"password": "new-password",
-	}, cookie)
-
-	if updates != 0 {
-		t.Fatalf("administrator changed the device owner's system password %d times", updates)
-	}
-	if _, ok, err := store.Authenticate("admin", testSeedPassword); err != nil || !ok {
-		t.Fatalf("device owner password changed: ok=%v err=%v", ok, err)
-	}
-	if _, ok, err := store.Authenticate("admin", "new-password"); err != nil || ok {
-		t.Fatalf("unauthorized password became active: ok=%v err=%v", ok, err)
-	}
-}
-
-func TestSystemPasswordFailureRollsBackWebPassword(t *testing.T) {
-	store := newTestStore(t)
-	restore := useTestStore(store)
-	defer restore()
-	if _, ok, err := store.Authenticate("admin", testSeedPassword); err != nil || !ok {
-		t.Fatalf("default login: ok=%v err=%v", ok, err)
-	}
-
-	originalUpdater := systemPasswordUpdater
-	systemPasswordUpdater = func(string) error { return errors.New("passwd failed") }
-	defer func() { systemPasswordUpdater = originalUpdater }()
-
-	if err := changeUserPassword("admin", "new-password"); err == nil {
-		t.Fatal("system password failure was ignored")
-	}
-	if _, ok, err := store.Authenticate("admin", testSeedPassword); err != nil || !ok {
-		t.Fatalf("old web password was not restored: ok=%v err=%v", ok, err)
-	}
-	if _, ok, err := store.Authenticate("admin", "new-password"); err != nil || ok {
-		t.Fatalf("failed password stayed active: ok=%v err=%v", ok, err)
+	// the change revoked the session that made it
+	if code := requestJSON(router, http.MethodPost, "/password", map[string]any{}, cookie); code != http.StatusUnauthorized {
+		t.Fatalf("old session status = %d, want 401", code)
 	}
 }
 
@@ -329,13 +227,13 @@ func TestLoginTakesPlainPasswordOnly(t *testing.T) {
 	router.POST("/login", service.Login)
 
 	// the plain password logs in
-	loginCookie(t, router, "admin", testSeedPassword)
+	loginCookie(t, router, "root", testSeedPassword)
 
 	// an empty password and a password sent through the retired
 	// fixed-key encoding (not the stored one) are both refused
 	for _, password := range []string{"", "U2FsdGVkX1+not-the-password"} {
 		recorder := requestJSONRecorder(router, http.MethodPost, "/login",
-			map[string]any{"username": "admin", "password": password}, nil)
+			map[string]any{"username": "root", "password": password}, nil)
 		var rsp proto.Response
 		if err := json.Unmarshal(recorder.Body.Bytes(), &rsp); err != nil {
 			t.Fatal(err)
@@ -347,6 +245,44 @@ func TestLoginTakesPlainPasswordOnly(t *testing.T) {
 			if cookie.Name == middleware.CookieName {
 				t.Fatalf("login with password %q set a session cookie", password)
 			}
+		}
+	}
+}
+
+func TestLockoutBlocksEvenTheRightPassword(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	store := newTestStore(t)
+	restore := useTestStore(store)
+	defer restore()
+
+	conf := config.GetInstance()
+	originalMax, originalDuration := conf.Security.LoginMaxFailures, conf.Security.LoginLockoutDuration
+	conf.Security.LoginMaxFailures, conf.Security.LoginLockoutDuration = 2, 60
+	defer func() {
+		conf.Security.LoginMaxFailures, conf.Security.LoginLockoutDuration = originalMax, originalDuration
+		ClearLoginAttempt("192.0.2.1")
+	}()
+
+	// httptest requests come from 192.0.2.1
+	ClearLoginAttempt("192.0.2.1")
+	RecordLoginFailure("192.0.2.1")
+	RecordLoginFailure("192.0.2.1")
+
+	service := NewService()
+	router := gin.New()
+	router.POST("/login", service.Login)
+	recorder := requestJSONRecorder(router, http.MethodPost, "/login",
+		map[string]any{"username": "root", "password": testSeedPassword}, nil)
+	var rsp proto.Response
+	if err := json.Unmarshal(recorder.Body.Bytes(), &rsp); err != nil {
+		t.Fatal(err)
+	}
+	if rsp.Code != -5 {
+		t.Fatalf("locked login code = %d, want -5", rsp.Code)
+	}
+	for _, cookie := range recorder.Result().Cookies() {
+		if cookie.Name == middleware.CookieName {
+			t.Fatal("locked login set a session cookie")
 		}
 	}
 }

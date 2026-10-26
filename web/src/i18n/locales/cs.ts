@@ -9,11 +9,9 @@ const cs = {
     },
     auth: {
       login: 'Přihlášení',
-      placeholderUsername: 'Zadejte prosím uživatelské jméno',
       placeholderPassword: 'Zadejte prosím heslo',
       placeholderCurrentPassword: 'Současné heslo',
       placeholderPassword2: 'Zadejte prosím heslo znovu',
-      noEmptyUsername: 'Uživatelské jméno nesmí být prázdné',
       noEmptyPassword: 'Heslo nesmí být prázdné',
       noAccount:
         'Nepodařilo se získat informace o uživateli, prosím obnovte stránku nebo resetujte heslo',
@@ -26,8 +24,6 @@ const cs = {
       changePasswordDesc:
         'Pro bezpečnost vašeho zařízení prosím změňte heslo pro přihlášení na webu.',
       differentPassword: 'Hesla se neshodují',
-      illegalUsername: 'Uživatelské jméno obsahuje nepovolené znaky',
-      illegalPassword: 'Heslo obsahuje nepovolené znaky',
       forgetPassword: 'Zapomenuté heslo',
       ok: 'OK',
       cancel: 'Zrušit',
@@ -36,8 +32,6 @@ const cs = {
         reset1:
           'To reset the passwords, pressing and holding the BOOT button on the NanoKVM for 10 seconds.',
         reset2: 'Podrobné kroky najdete v tomto dokumentu:',
-        reset3: 'Výchozí webový účet:',
-        reset4: 'Výchozí účet SSH:',
         change1: 'Upozorňujeme, že tato akce změní následující hesla:',
         change2: 'Heslo pro webové přihlášení',
         change3: 'Heslo systémového uživatele root (heslo pro přihlášení SSH)',
@@ -657,33 +651,12 @@ const cs = {
       account: {
         title: 'Účet',
         webAccount: 'Název webového účtu',
-        roles: {
-          admin: 'Správce',
-          user: 'Uživatel'
-        },
-        role: 'Role',
         password: 'Heslo',
         updateBtn: 'Update',
         logoutBtn: 'Odhlásit',
         logoutDesc: 'Opravdu se chcete odhlásit?',
         okBtn: 'Ano',
-        cancelBtn: 'Ne',
-        users: {
-          title: 'Uživatelé',
-          create: 'Vytvořit uživatele',
-          enabled: 'Povoleno',
-          disabled: 'Zakázáno',
-          deviceOwner: 'Vlastník zařízení',
-          resetPassword: 'Obnovit heslo',
-          delete: 'Smazat',
-          deleteConfirm: 'Smazat tohoto uživatele a zrušit všechny jeho relace?',
-          created: 'Uživatel vytvořen',
-          deleted: 'Uživatel smazán',
-          passwordUpdated: 'Heslo aktualizováno',
-          loadFailed: 'Nepodařilo se načíst uživatele',
-          saveFailed: 'Nepodařilo se uložit uživatele',
-          deleteFailed: 'Nepodařilo se smazat uživatele'
-        }
+        cancelBtn: 'Ne'
       }
     },
     picoclaw: {

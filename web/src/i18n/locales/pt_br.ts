@@ -9,11 +9,9 @@ const pt_br = {
     },
     auth: {
       login: 'Login',
-      placeholderUsername: 'Nome de usuário',
       placeholderPassword: 'Senha',
       placeholderCurrentPassword: 'Senha atual',
       placeholderPassword2: 'Por favor, digite a senha novamente',
-      noEmptyUsername: 'Nome de usuário é obrigatório',
       noEmptyPassword: 'Senha é obrigatória',
       noAccount:
         'Falha ao obter informações do usuário, por favor atualize a página ou redefina a senha',
@@ -25,8 +23,6 @@ const pt_br = {
       changePassword: 'Mudar Senha',
       changePasswordDesc: 'Para a segurança do seu dispositivo, por favor, mude a senha!',
       differentPassword: 'Senhas não conferem',
-      illegalUsername: 'Nome de usuário contém caracteres inválidos',
-      illegalPassword: 'Senha contém caracteres inválidos',
       forgetPassword: 'Esqueci a senha',
       ok: 'Ok',
       cancel: 'Cancelar',
@@ -35,8 +31,6 @@ const pt_br = {
         reset1:
           'Para redefinir as senhas, pressione e segure o botão BOOT no NanoKVM por 10 segundos.',
         reset2: 'Para etapas detalhadas, por favor, consulte este documento:',
-        reset3: 'Conta padrão da Web:',
-        reset4: 'Conta padrão SSH:',
         change1: 'Por favor, note que esta ação irá alterar as seguintes senhas:',
         change2: 'Senha de login da Web',
         change3: 'Senha root do sistema (senha de login SSH)',
@@ -658,33 +652,12 @@ const pt_br = {
       account: {
         title: 'Conta',
         webAccount: 'Nome da Conta Web',
-        roles: {
-          admin: 'Administrador',
-          user: 'Usuário'
-        },
-        role: 'Função',
         password: 'Senha',
         updateBtn: 'Alterar',
         logoutBtn: 'Sair',
         logoutDesc: 'Tem certeza de que deseja sair?',
         okBtn: 'Sim',
-        cancelBtn: 'Não',
-        users: {
-          title: 'Usuários',
-          create: 'Criar usuário',
-          enabled: 'Ativado',
-          disabled: 'Desativado',
-          deviceOwner: 'Proprietário do dispositivo',
-          resetPassword: 'Redefinir senha',
-          delete: 'Excluir',
-          deleteConfirm: 'Excluir este usuário e revogar todas as suas sessões?',
-          created: 'Usuário criado',
-          deleted: 'Usuário excluído',
-          passwordUpdated: 'Senha atualizada',
-          loadFailed: 'Falha ao carregar os usuários',
-          saveFailed: 'Falha ao salvar o usuário',
-          deleteFailed: 'Falha ao excluir o usuário'
-        }
+        cancelBtn: 'Não'
       }
     },
     picoclaw: {

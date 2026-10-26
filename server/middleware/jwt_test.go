@@ -12,6 +12,7 @@ import (
 
 	"NanoKVM-Server/authn"
 	"NanoKVM-Server/config"
+	"NanoKVM-Server/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -20,7 +21,19 @@ import (
 
 const testSeedPassword = "seed-password"
 
-// newTestStore returns a store whose owner password is testSeedPassword and
+// useTestShadow points the shadow file at a temporary one holding a locked
+// root entry.
+func useTestShadow(t *testing.T) {
+	t.Helper()
+	original, originalRoot := utils.ShadowFile, utils.RootPassFile
+	utils.ShadowFile, utils.RootPassFile = filepath.Join(t.TempDir(), "shadow"), filepath.Join(t.TempDir(), "root.pass")
+	t.Cleanup(func() { utils.ShadowFile, utils.RootPassFile = original, originalRoot })
+	if err := os.WriteFile(utils.ShadowFile, []byte("daemon:*:19000:0:99999:7:::\nroot:*:19000:0:99999:7:::\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// newTestStore returns a store whose root password is testSeedPassword and
 // is already changed (MustChangePassword cleared).
 func newTestStore(t *testing.T) *authn.Store {
 	t.Helper()
@@ -29,12 +42,9 @@ func newTestStore(t *testing.T) *authn.Store {
 
 func newTestStoreAt(t *testing.T, path string) *authn.Store {
 	t.Helper()
-	seedPath := filepath.Join(filepath.Dir(path), "initial.pass")
-	if err := os.WriteFile(seedPath, []byte(testSeedPassword+"\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	useTestShadow(t)
 	store := authn.NewStore(path)
-	if _, err := store.SetPassword("admin", testSeedPassword); err != nil {
+	if _, err := store.SetPassword(testSeedPassword); err != nil {
 		t.Fatal(err)
 	}
 	return store
@@ -42,21 +52,22 @@ func newTestStoreAt(t *testing.T, path string) *authn.Store {
 
 func TestCheckTokenBlocksUntilPasswordChanged(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	useTestShadow(t)
 	path := filepath.Join(t.TempDir(), "pwd")
 	store := authn.NewStore(path)
 	seed, err := os.ReadFile(filepath.Join(filepath.Dir(path), "initial.pass"))
 	if err == nil {
 		t.Fatalf("seed file exists before first use: %q", seed)
 	}
-	// first use seeds the account and writes the seed password
-	if _, _, err = store.Authenticate("admin", ""); err != nil {
+	// first use seeds root and writes the seed password
+	if err = store.Init(); err != nil {
 		t.Fatal(err)
 	}
 	seed, err = os.ReadFile(filepath.Join(filepath.Dir(path), "initial.pass"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	owner, ok, err := store.Authenticate("admin", strings.TrimSpace(string(seed)))
+	owner, ok, err := store.Authenticate("root", strings.TrimSpace(string(seed)))
 	if err != nil || !ok {
 		t.Fatalf("seed login: ok=%v err=%v", ok, err)
 	}
@@ -79,7 +90,7 @@ func TestCheckTokenBlocksUntilPasswordChanged(t *testing.T) {
 		t.Fatalf("other route status = %d, want 403", status)
 	}
 
-	updated, err := store.SetPassword("admin", "a-new-password")
+	updated, err := store.SetPassword("a-new-password")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,16 +106,9 @@ func TestCheckTokenBlocksUntilPasswordChanged(t *testing.T) {
 func TestCheckTokenUsesLiveRoleAndVersion(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	store := newTestStore(t)
-	admin, ok, err := store.Authenticate("admin", testSeedPassword)
+	admin, ok, err := store.Authenticate("root", testSeedPassword)
 	if err != nil || !ok {
 		t.Fatalf("default login: ok=%v err=%v", ok, err)
-	}
-	if err = store.Create("alice", "valid-password", authn.RoleUser); err != nil {
-		t.Fatal(err)
-	}
-	alice, err := store.Get("alice")
-	if err != nil {
-		t.Fatal(err)
 	}
 
 	restore := useTestAuthStore(t, store)
@@ -113,7 +117,8 @@ func TestCheckTokenUsesLiveRoleAndVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	userToken, err := GenerateJWT(alice.Username, alice.TokenVersion)
+	// a token for the retired admin account names no user any more
+	userToken, err := GenerateJWT("admin", admin.TokenVersion)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,10 +133,10 @@ func TestCheckTokenUsesLiveRoleAndVersion(t *testing.T) {
 	if status := requestWithToken(router, "/admin", adminToken); status != http.StatusNoContent {
 		t.Fatalf("admin status = %d", status)
 	}
-	if status := requestWithToken(router, "/admin", userToken); status != http.StatusForbidden {
-		t.Fatalf("user status = %d", status)
+	if status := requestWithToken(router, "/admin", userToken); status != http.StatusUnauthorized {
+		t.Fatalf("retired admin token status = %d, want 401", status)
 	}
-	if _, err = store.Revoke("admin"); err != nil {
+	if _, err = store.Revoke("root"); err != nil {
 		t.Fatal(err)
 	}
 	if status := requestWithToken(router, "/admin", adminToken); status != http.StatusUnauthorized {
@@ -203,7 +208,7 @@ func TestRevokeUserSessionsCancelsActiveRequests(t *testing.T) {
 func TestAccountFileResetCancelsActiveSession(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "pwd")
 	store := newTestStoreAt(t, path)
-	user, ok, err := store.Authenticate("admin", testSeedPassword)
+	user, ok, err := store.Authenticate("root", testSeedPassword)
 	if err != nil || !ok {
 		t.Fatalf("default login: ok=%v err=%v", ok, err)
 	}

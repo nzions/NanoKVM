@@ -5,13 +5,10 @@ import (
 	"NanoKVM-Server/config"
 	"NanoKVM-Server/middleware"
 	"NanoKVM-Server/proto"
-	"NanoKVM-Server/utils"
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 )
-
-var systemPasswordUpdater = changeRootPassword
 
 func (s *Service) ChangePassword(c *gin.Context) {
 	var req proto.ChangePasswordReq
@@ -37,7 +34,9 @@ func (s *Service) ChangePassword(c *gin.Context) {
 		rsp.ErrRsp(c, -3, "current password is incorrect")
 		return
 	}
-	if err := changeUserPassword(principal.Username, req.Password); err != nil {
+	// the web password is root's Linux password: one store, one change
+	if _, err := authn.DefaultStore.SetPassword(req.Password); err != nil {
+		log.Errorf("failed to change the root password: %s", err)
 		rsp.ErrRsp(c, -5, err.Error())
 		return
 	}
@@ -65,41 +64,4 @@ func (s *Service) IsPasswordUpdated(c *gin.Context) {
 		return
 	}
 	rsp.OkRspWithData(c, &proto.IsPasswordUpdatedRsp{IsUpdated: !user.MustChangePassword})
-}
-
-func changeUserPassword(username, password string) error {
-	password, err := validatePassword(password)
-	if err != nil {
-		return err
-	}
-	user, err := authn.DefaultStore.Get(username)
-	if err != nil {
-		return err
-	}
-	if user.SystemAccount && user.Role == authn.RoleAdmin && user.Enabled {
-		_, err = authn.DefaultStore.SetPasswordAndRun(username, password, func() error {
-			return systemPasswordUpdater(password)
-		})
-		if err == nil {
-			// the owner chose a password: a generated root one is obsolete
-			if rmErr := utils.ClearRootPassFile(); rmErr != nil {
-				log.Errorf("failed to remove %s: %s", utils.RootPassFile, rmErr)
-			}
-		}
-		return err
-	}
-	_, err = authn.DefaultStore.SetPassword(username, password)
-	return err
-}
-
-// changeRootPassword keeps root's Linux password in step with the web one,
-// as the same SHA-512 crypt the first-boot seed uses (busybox passwd wrote
-// MD5-crypt).
-func changeRootPassword(password string) error {
-	if err := utils.SetRootPassword(password); err != nil {
-		log.Errorf("failed to change root password: %s", err)
-		return err
-	}
-	log.Debug("change root password successful")
-	return nil
 }

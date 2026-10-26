@@ -9,11 +9,9 @@ const th = {
     },
     auth: {
       login: 'เข้าสู่ระบบ',
-      placeholderUsername: 'ชื่อผู้ใช้งาน',
       placeholderPassword: 'รห้สผ่าน',
       placeholderCurrentPassword: 'รหัสผ่านปัจจุบัน',
       placeholderPassword2: 'ใส่รหัสผ่านอีกครั้ง',
-      noEmptyUsername: 'ต้องใส่ชื่อผู้ใช้งาน',
       noEmptyPassword: 'ต้องใส้รหัสผ่าน',
       noAccount: 'ไม่สามารถอ่านข้อมูลได้, โปรดรีเฟรชหน้าเว็บหรือรีเซ็ตรหัสผ่าน',
       invalidUser: 'ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง',
@@ -24,8 +22,6 @@ const th = {
       changePassword: 'เปลี่ยนรหัสผ่าน',
       changePasswordDesc: 'เพื่อความปลอดภัย, โปรดเปลี่ยนรหัสผ่าน!',
       differentPassword: 'รหัสผ่านไม่ตรงกัน',
-      illegalUsername: 'ชื่อผู้ใช้ไม่สามารถมีอักขระที่ไม่ถูกต้อง',
-      illegalPassword: 'รหัสผ่านไม่สามารถมีอักขระที่ไม่ถูกต้อง',
       forgetPassword: 'ลืมรหัสผ่าน',
       ok: 'โอเค',
       cancel: 'ยกเลิก',
@@ -33,8 +29,6 @@ const th = {
       tips: {
         reset1: 'หากต้องการรีเซ็ตรหัสผ่าน ให้กดปุ่ม BOOT บน NanoKVM ค้างไว้ 10 วินาที',
         reset2: 'สำหรับวิธีแบบลงลึก โปรดอ่าน::',
-        reset3: 'ค่าเริ่มต้นบัญชีเว็บ:',
-        reset4: 'ค่าเริ่มต้นบัญชี SSH:',
         change1: 'โปรดทราบ การกระทำนี้จะเปลี่ยนรหัสดีงกล่าว:',
         change2: 'รหัสผ่านเว็บไชต์',
         change3: 'รหัส Root ของระบบ (ใช้เข้า SSH)',
@@ -648,33 +642,12 @@ const th = {
       account: {
         title: 'บัญชี',
         webAccount: 'ชื่อผู้ใช้',
-        roles: {
-          admin: 'ผู้ดูแลระบบ',
-          user: 'ผู้ใช้'
-        },
-        role: 'บทบาท',
         password: 'รหัสผ่าน',
         updateBtn: 'ยืนยัน',
         logoutBtn: 'ออกจากระบบ',
         logoutDesc: 'คุณแน่ใจที่จะออกจากระบบหรือไม่?',
         okBtn: 'ใช่',
-        cancelBtn: 'ไม่ใช่',
-        users: {
-          title: 'ผู้ใช้',
-          create: 'สร้างผู้ใช้',
-          enabled: 'เปิดใช้งาน',
-          disabled: 'ปิดใช้งาน',
-          deviceOwner: 'เจ้าของอุปกรณ์',
-          resetPassword: 'รีเซ็ตรหัสผ่าน',
-          delete: 'ลบ',
-          deleteConfirm: 'ลบผู้ใช้นี้และเพิกถอนเซสชันทั้งหมดของผู้ใช้หรือไม่',
-          created: 'สร้างผู้ใช้แล้ว',
-          deleted: 'ลบผู้ใช้แล้ว',
-          passwordUpdated: 'อัปเดตรหัสผ่านแล้ว',
-          loadFailed: 'โหลดผู้ใช้ไม่สำเร็จ',
-          saveFailed: 'บันทึกผู้ใช้ไม่สำเร็จ',
-          deleteFailed: 'ลบผู้ใช้ไม่สำเร็จ'
-        }
+        cancelBtn: 'ไม่ใช่'
       }
     },
     picoclaw: {

@@ -9,11 +9,9 @@ const it = {
     },
     auth: {
       login: 'Accesso',
-      placeholderUsername: 'Inserisci il nome utente',
       placeholderPassword: 'Inserisci la password',
       placeholderCurrentPassword: 'Password attuale',
       placeholderPassword2: 'Inserisci nuovamente la password',
-      noEmptyUsername: 'Il nome utente non può essere vuoto',
       noEmptyPassword: 'La password non può essere vuota',
       noAccount:
         'Impossibile ottenere informazioni utente, aggiorna la pagina o reimposta la password',
@@ -26,8 +24,6 @@ const it = {
       changePasswordDesc:
         'Per la sicurezza del tuo dispositivo, modifica la password di accesso web.',
       differentPassword: 'Le password non corrispondono',
-      illegalUsername: 'Il nome utente contiene caratteri non validi',
-      illegalPassword: 'La password contiene caratteri non validi',
       forgetPassword: 'Hai dimenticato la password',
       ok: 'Ok',
       cancel: 'Annulla',
@@ -36,8 +32,6 @@ const it = {
         reset1:
           'To reset the passwords, pressing and holding the BOOT button on the NanoKVM for 10 seconds.',
         reset2: 'Per i passaggi dettagliati, consulta questo documento:',
-        reset3: 'Account web predefinito:',
-        reset4: 'Account SSH predefinito:',
         change1: 'Tieni presente che questa azione modificherà le seguenti password:',
         change2: 'Password di accesso web',
         change3: 'Password root di sistema (password di accesso SSH)',
@@ -663,33 +657,12 @@ const it = {
       account: {
         title: 'Account',
         webAccount: 'Nome account web',
-        roles: {
-          admin: 'Amministratore',
-          user: 'Utente'
-        },
-        role: 'Ruolo',
         password: 'Password',
         updateBtn: 'Update',
         logoutBtn: 'Esci',
         logoutDesc: 'Sei sicuro di voler uscire?',
         okBtn: 'Sì',
-        cancelBtn: 'No',
-        users: {
-          title: 'Utenti',
-          create: 'Crea utente',
-          enabled: 'Abilitato',
-          disabled: 'Disabilitato',
-          deviceOwner: 'Proprietario del dispositivo',
-          resetPassword: 'Reimposta password',
-          delete: 'Elimina',
-          deleteConfirm: 'Eliminare questo utente e revocare tutte le sue sessioni?',
-          created: 'Utente creato',
-          deleted: 'Utente eliminato',
-          passwordUpdated: 'Password aggiornata',
-          loadFailed: 'Impossibile caricare gli utenti',
-          saveFailed: 'Impossibile salvare l\'utente',
-          deleteFailed: 'Impossibile eliminare l\'utente'
-        }
+        cancelBtn: 'No'
       }
     },
     picoclaw: {

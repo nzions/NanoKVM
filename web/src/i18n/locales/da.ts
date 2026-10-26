@@ -9,11 +9,9 @@ const da = {
     },
     auth: {
       login: 'Log ind',
-      placeholderUsername: 'Indtast brugernavn',
       placeholderPassword: 'indtast adgangskode',
       placeholderCurrentPassword: 'Nuværende adgangskode',
       placeholderPassword2: 'indtast adgangskode igen',
-      noEmptyUsername: 'brugernavn kan ikke være tom',
       noEmptyPassword: 'adgangskode kan ikke være tom',
       noAccount:
         'Kunne ikke hente brugeroplysninger. Prøv at opdater siden eller nulstil adgangskoden',
@@ -25,8 +23,6 @@ const da = {
       changePassword: 'Skift adgangskode',
       changePasswordDesc: 'For sikkerheden af din enhed, bedes du ændre web-login adgangskoden.',
       differentPassword: 'Adgangskoder er ikke ens',
-      illegalUsername: 'brugernavn indeholder ugyldige tegn',
-      illegalPassword: 'adgangskode indeholder ugyldige tegn',
       forgetPassword: 'Glem adgangskode',
       ok: 'OK',
       cancel: 'Annuller',
@@ -35,8 +31,6 @@ const da = {
         reset1:
           'To reset the passwords, pressing and holding the BOOT button on the NanoKVM for 10 seconds.',
         reset2: 'Se detaljerede trin i dette dokument:',
-        reset3: 'Standard webkonto:',
-        reset4: 'Standard SSH-konto:',
         change1: 'Bemærk, at denne handling ændrer følgende adgangskoder:',
         change2: 'Adgangskode til weblogin',
         change3: 'Systemets root-adgangskode (SSH-loginadgangskode)',
@@ -656,33 +650,12 @@ const da = {
       account: {
         title: 'Konto',
         webAccount: 'Navn på webkonto',
-        roles: {
-          admin: 'Administrator',
-          user: 'Bruger'
-        },
-        role: 'Rolle',
         password: 'Adgangskode',
         updateBtn: 'Update',
         logoutBtn: 'Log ud',
         logoutDesc: 'Er du sikker på, at du vil logge ud?',
         okBtn: 'Ja',
-        cancelBtn: 'Annuller',
-        users: {
-          title: 'Brugere',
-          create: 'Opret bruger',
-          enabled: 'Aktiveret',
-          disabled: 'Deaktiveret',
-          deviceOwner: 'Enhedens ejer',
-          resetPassword: 'Nulstil adgangskode',
-          delete: 'Slet',
-          deleteConfirm: 'Slet denne bruger og tilbagekald alle vedkommendes sessioner?',
-          created: 'Bruger oprettet',
-          deleted: 'Bruger slettet',
-          passwordUpdated: 'Adgangskode opdateret',
-          loadFailed: 'Kunne ikke indlæse brugere',
-          saveFailed: 'Kunne ikke gemme bruger',
-          deleteFailed: 'Kunne ikke slette bruger'
-        }
+        cancelBtn: 'Annuller'
       }
     },
     picoclaw: {

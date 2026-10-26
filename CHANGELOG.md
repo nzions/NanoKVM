@@ -1,3 +1,14 @@
+## 2.5.16 (2026-10-26)
+
+### Changes
+
+* One account: `root`. The web login authenticates root against its `/etc/shadow` hash (SHA-512 `$6$`, SHA-256 `$5$` and MD5 `$1$` crypt, pure Go); the separate `admin` account, the multi-user account store, roles and Settings > Account > Users are gone, and so is `/boot/initial.pass`. Changing the password in the web UI sets root's shadow entry, the only password. `/etc/kvm/pwd` now holds only the session generation and the forced-change flag
+* Migration from 2.5.14/2.5.15: root's shadow entry is kept as it is (those releases copied the web password into it), the old account file is replaced and other accounts are dropped. If root's hash is not `$6$`/`$5$`/`$1$` the migration is refused and logged, the old file is left, and nothing is changed, so an upgraded device never loses a login it had
+* First boot: `/boot/root.pass` sets root's password and is consumed (no change forced). Without it a random password is set, shown on the OLED and kept in `/etc/kvm/initial.pass` (the OLED channel only), and the first web login must change it
+* Passwords are bounded at 256 bytes (was bcrypt's 72): crypt hashes thousands of rounds, so the length stays bounded on the unauthenticated login route
+* Web: the login form has no username field (the account is root); dead user-management strings removed from every language
+* Web: legible Light theme for the Tailscale icon, the Num/Caps pill and the toolbar (27502a7)
+
 ## 2.5.15 (2026-10-26)
 
 * bump-only release to exercise OTA on hardware

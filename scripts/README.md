@@ -246,7 +246,7 @@ tree against the release.
 
 ```bash
 scripts/sd-image.sh [--stock-sha256 <hex>] [--sha256 <hex>] \
-    <20260610_NanoKVM_Rev1_4_3.img> <nanokvm_2.5.14.tar.gz> <out.img>
+    <20260610_NanoKVM_Rev1_4_3.img> <nanokvm_2.5.16.tar.gz> <out.img>
 ```
 
 - Both inputs are verified by sha256 (stock: the 1.4.3 image is the default;
@@ -261,18 +261,17 @@ scripts/sd-image.sh [--stock-sha256 <hex>] [--sha256 <hex>] \
   copies `new_app_init` makes, so the first boot already runs our supervised
   `S95nanokvm`, firewall step and boot recovery.
 - No credential is written: `/etc/kvm/pwd`, `initial.pass`, `root.pass` and
-  `server.yaml` do not exist in the image. On first boot the server seeds the
-  `admin` owner with a random password, shows it on the OLED, stores it in
-  `/etc/kvm/initial.pass` (0600), sets it as the root password too, and the
-  owner must change it at first login. An operator can instead drop a seed (any
-  non-empty password, at most 72 bytes) in `initial.pass` on the FAT boot
+  `server.yaml` do not exist in the image. There is one account, `root`: the web
+  login and the Linux login share root's password. An operator drops it (any
+  non-empty password, at most 256 bytes) in `root.pass` on the FAT boot
   partition (`/boot`, label `boot`, writable from a Mac; see FLASHING.md): the
-  server uses it, sets it as root's too, and removes the file once consumed. An
-  optional `root.pass` there sets root's password separately (root then no
-  longer shares the admin seed) and is removed once applied. The image's `/boot` is the
+  server sets root's password from it and removes the file once applied. Without
+  it the server sets a random password, shows it on the OLED, stores it in
+  `/etc/kvm/initial.pass` (0600, only the OLED channel), and the first web login
+  must change it. The image's `/boot` is the
   stock one, untouched. `/etc/kvm/ssh_stop` stays as the stock
   image ships it (sshd off until enabled in the UI).
 - The result cannot be boot-tested under QEMU: the stock kernel and xthead
   loaders need the SG2002's C906 vector unit and cvi video hardware.
 - Flash the (xz-decompressed) image to the card, for example
-  `dd if=nanokvm-cube-2.5.14-sd.img of=/dev/rdiskN bs=4m` on macOS.
+  `dd if=nanokvm-cube-2.5.16-sd.img of=/dev/rdiskN bs=4m` on macOS.

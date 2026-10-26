@@ -9,11 +9,9 @@ const fr = {
     },
     auth: {
       login: 'Connexion',
-      placeholderUsername: "Veuillez entrer votre nom d'utilisateur",
       placeholderPassword: 'Veuillez entrer votre mot de passe',
       placeholderCurrentPassword: 'Mot de passe actuel',
       placeholderPassword2: 'Veuillez entrer votre mot de passe à nouveau',
-      noEmptyUsername: "Le nom d'utilisateur ne peut pas être vide",
       noEmptyPassword: 'Le mot de passe ne peut pas être vide',
       noAccount:
         "Impossible de récupérer les informations de l'utilisateur, veuillez rafraîchir la page ou réinitialiser le mot de passe",
@@ -26,8 +24,6 @@ const fr = {
       changePasswordDesc:
         'Pour la sécurité de votre appareil, veuillez modifier le mot de passe de connexion Web.',
       differentPassword: 'Les mots de passe ne correspondent pas',
-      illegalUsername: "Le nom d'utilisateur contient des caractères illégaux",
-      illegalPassword: 'Le mot de passe contient des caractères illégaux',
       forgetPassword: 'Mot de passe oublié',
       ok: 'Se connecter',
       cancel: 'Annuler',
@@ -36,8 +32,6 @@ const fr = {
         reset1:
           'Pour réinitialiser les mots de passe, appuyez et maintenez enfoncé le bouton BOOT sur le NanoKVM pendant 10 secondes.',
         reset2: 'Pour les étapes détaillées, veuillez consulter ce document :',
-        reset3: 'Compte Web par défaut :',
-        reset4: 'Compte SSH par défaut :',
         change1: 'Veuillez noter que cette action modifiera les mots de passe suivants :',
         change2: 'Mot de passe de connexion Web',
         change3: 'Mot de passe racine du système (mot de passe de connexion SSH)',
@@ -665,33 +659,12 @@ const fr = {
       account: {
         title: 'Compte',
         webAccount: 'Nom du compte Web',
-        roles: {
-          admin: 'Administrateur',
-          user: 'Utilisateur'
-        },
-        role: 'Rôle',
         password: 'Mot de passe',
         updateBtn: 'Mettre à jour',
         logoutBtn: 'Déconnexion',
         logoutDesc: 'Êtes-vous sûr de vouloir vous déconnecter?',
         okBtn: 'Oui',
-        cancelBtn: 'Non',
-        users: {
-          title: 'Utilisateurs',
-          create: 'Créer un utilisateur',
-          enabled: 'Activé',
-          disabled: 'Désactivé',
-          deviceOwner: 'Propriétaire de l\'appareil',
-          resetPassword: 'Réinitialiser le mot de passe',
-          delete: 'Supprimer',
-          deleteConfirm: 'Supprimer cet utilisateur et révoquer toutes ses sessions ?',
-          created: 'Utilisateur créé',
-          deleted: 'Utilisateur supprimé',
-          passwordUpdated: 'Mot de passe mis à jour',
-          loadFailed: 'Échec du chargement des utilisateurs',
-          saveFailed: 'Échec de l\'enregistrement de l\'utilisateur',
-          deleteFailed: 'Échec de la suppression de l\'utilisateur'
-        }
+        cancelBtn: 'Non'
       }
     },
     picoclaw: {

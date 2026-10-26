@@ -15,8 +15,8 @@ import (
 // RootPassFile holds a root password the device generated on its own (written
 // 0600 by the init scripts when the image's default root:root is found at boot).
 // kvm_system shows it on the OLED while it exists; it is removed once the
-// owner has chosen a password.
-const RootPassFile = "/etc/kvm/root.pass"
+// owner has chosen a password. A var so a test can redirect it.
+var RootPassFile = "/etc/kvm/root.pass"
 
 // ShadowFile is the shadow database SetRootPassword rewrites; a var so a test
 // can redirect it.

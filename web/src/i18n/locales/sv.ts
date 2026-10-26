@@ -9,11 +9,9 @@ const sv = {
     },
     auth: {
       login: 'Logga in',
-      placeholderUsername: 'Användarnamn',
       placeholderPassword: 'Lösenord',
       placeholderCurrentPassword: 'Nuvarande lösenord',
       placeholderPassword2: 'Vänligen ange lösenordet igen',
-      noEmptyUsername: 'Användarnamn krävs',
       noEmptyPassword: 'Lösenord krävs',
       noAccount: 'Kunde inte hämta användarinformation, uppdatera sidan eller återställ lösenordet',
       invalidUser: 'Ogiltigt användarnamn eller lösenord',
@@ -24,8 +22,6 @@ const sv = {
       changePassword: 'Byt lösenord',
       changePasswordDesc: 'För din enhets säkerhet, byt lösenord!',
       differentPassword: 'Lösenorden matchar inte',
-      illegalUsername: 'Användarnamnet innehåller ogiltiga tecken',
-      illegalPassword: 'Lösenordet innehåller ogiltiga tecken',
       forgetPassword: 'Glömt lösenord',
       ok: 'Ok',
       cancel: 'Avbryt',
@@ -33,8 +29,6 @@ const sv = {
       tips: {
         reset1: 'För att återställa lösenordet, håll in BOOT-knappen på NanoKVM i 10 sekunder.',
         reset2: 'För detaljerade steg, se detta dokument:',
-        reset3: 'Standardkonto för webben:',
-        reset4: 'Standardkonto för SSH:',
         change1: 'Observera att denna åtgärd ändrar följande lösenord:',
         change2: 'Webbinloggningslösenord',
         change3: 'Systemets root-lösenord (SSH-lösenord)',
@@ -654,33 +648,12 @@ const sv = {
       account: {
         title: 'Konto',
         webAccount: 'Webbkonto-namn',
-        roles: {
-          admin: 'Administratör',
-          user: 'Användare'
-        },
-        role: 'Roll',
         password: 'Lösenord',
         updateBtn: 'Byt',
         logoutBtn: 'Logga ut',
         logoutDesc: 'Är du säker på att du vill logga ut?',
         okBtn: 'Ja',
-        cancelBtn: 'Nej',
-        users: {
-          title: 'Användare',
-          create: 'Skapa användare',
-          enabled: 'Aktiverad',
-          disabled: 'Inaktiverad',
-          deviceOwner: 'Enhetens ägare',
-          resetPassword: 'Återställ lösenord',
-          delete: 'Ta bort',
-          deleteConfirm: 'Ta bort den här användaren och återkalla alla dess sessioner?',
-          created: 'Användare skapad',
-          deleted: 'Användare borttagen',
-          passwordUpdated: 'Lösenord uppdaterat',
-          loadFailed: 'Det gick inte att läsa in användare',
-          saveFailed: 'Det gick inte att spara användaren',
-          deleteFailed: 'Det gick inte att ta bort användaren'
-        }
+        cancelBtn: 'Nej'
       }
     },
     picoclaw: {

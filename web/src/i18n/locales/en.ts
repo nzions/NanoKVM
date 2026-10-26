@@ -9,13 +9,10 @@ const en = {
     },
     auth: {
       login: 'Login',
-      placeholderUsername: 'Username',
       placeholderPassword: 'Password',
       placeholderCurrentPassword: 'Current password',
       placeholderPassword2: 'Please enter password again',
-      noEmptyUsername: 'Username required',
       noEmptyPassword: 'Password required',
-      passwordTooLong: 'Password must be at most 72 characters',
       noAccount: 'Failed to get user information, please refresh web page or reset password',
       invalidUser: 'Invalid username or password',
       locked: 'Too many logins, please try again later',
@@ -25,8 +22,6 @@ const en = {
       changePassword: 'Change Password',
       changePasswordDesc: 'For the security of your device, please change the password!',
       differentPassword: 'Passwords do not match',
-      illegalUsername: 'Username contains illegal characters',
-      illegalPassword: 'Password contains illegal characters',
       forgetPassword: 'Forgot Password',
       ok: 'Ok',
       cancel: 'Cancel',
@@ -35,8 +30,6 @@ const en = {
         reset1:
           'To reset the passwords, press and hold the BOOT button on the NanoKVM for 10 seconds.',
         reset2: 'For detailed steps, please consult this document:',
-        reset3: 'Web default account:',
-        reset4: 'SSH default account:',
         change1: 'Please note that this action will change the following passwords:',
         change2: 'Web login password',
         change3: 'System root password (SSH login password)',
@@ -655,33 +648,12 @@ const en = {
       account: {
         title: 'Account',
         webAccount: 'Web Account Name',
-        role: 'Role',
-        roles: {
-          admin: 'Administrator',
-          user: 'User'
-        },
         password: 'Password',
         updateBtn: 'Change',
         logoutBtn: 'Logout',
         logoutDesc: 'Are you sure you want to logout?',
         okBtn: 'Yes',
-        cancelBtn: 'No',
-        users: {
-          title: 'Users',
-          create: 'Create User',
-          enabled: 'Enabled',
-          disabled: 'Disabled',
-          deviceOwner: 'Device owner',
-          resetPassword: 'Reset Password',
-          delete: 'Delete',
-          deleteConfirm: 'Delete this user and revoke all of their sessions?',
-          created: 'User created',
-          deleted: 'User deleted',
-          passwordUpdated: 'Password updated',
-          loadFailed: 'Failed to load users',
-          saveFailed: 'Failed to save user',
-          deleteFailed: 'Failed to delete user'
-        }
+        cancelBtn: 'No'
       }
     },
     picoclaw: {

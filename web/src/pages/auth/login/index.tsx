@@ -1,5 +1,5 @@
 import { ReactElement, useEffect, useState } from 'react';
-import { LockOutlined, UserOutlined } from '@ant-design/icons';
+import { LockOutlined } from '@ant-design/icons';
 import { Button, Form, Input } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -37,11 +37,9 @@ export const Login = (): ReactElement => {
     if (isLoading) return;
     setIsloading(true);
 
-    const username = values.username;
-    const password = values.password;
-
+    // the one account is root; its password is root's Linux password
     api
-      .login(username, password)
+      .login('root', values.password)
       .then((rsp: any) => {
         if (rsp.code !== 0) {
           let errorMsg = t('auth.error');
@@ -88,12 +86,7 @@ export const Login = (): ReactElement => {
               }}
             />
           </div>
-          <Form.Item
-            name="username"
-            rules={[{ required: true, message: t('auth.noEmptyUsername'), min: 1 }]}
-          >
-            <Input prefix={<UserOutlined />} placeholder={t('auth.placeholderUsername')} />
-          </Form.Item>
+          <div className="pb-4 text-center text-neutral-300">root</div>
 
           <Form.Item
             name="password"

@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { Logout } from './logout.tsx';
-import { Users } from './users.tsx';
 
 export const Account = () => {
   const { t } = useTranslation();
@@ -26,10 +25,6 @@ export const Account = () => {
           <span>{account.username}</span>
         </div>
 
-        <div className="flex items-center justify-between">
-          <span>{t('settings.account.role')}</span>
-          <span>{t(`settings.account.roles.${account.role}`)}</span>
-        </div>
 
         <div className="flex items-center justify-between">
           <span>{t('settings.account.password')}</span>
@@ -41,12 +36,6 @@ export const Account = () => {
 
       <Divider className="opacity-50" />
 
-      {account.role === 'admin' && (
-        <>
-          <Users />
-          <Divider className="opacity-50" />
-        </>
-      )}
 
       <Logout />
     </>

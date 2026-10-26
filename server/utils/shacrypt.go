@@ -1,7 +1,9 @@
 package utils
 
 import (
+	"crypto/sha256"
 	"crypto/sha512"
+	"hash"
 	"strconv"
 	"strings"
 )
@@ -14,15 +16,22 @@ const (
 	shaCryptAlphabet      = "./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 )
 
-// shaCryptOrder is the byte order of the SHA-512 crypt base64 output: each
+// shaCryptOrder512 is the byte order of the SHA-512 crypt base64 output: each
 // triple (a, b, c) is encoded as the 24-bit value a<<16 | b<<8 | c, low six
 // bits first. The final byte (63) is encoded on its own as two characters.
-var shaCryptOrder = [21][3]int{
+var shaCryptOrder512 = [][3]int{
 	{0, 21, 42}, {22, 43, 1}, {44, 2, 23}, {3, 24, 45}, {25, 46, 4},
 	{47, 5, 26}, {6, 27, 48}, {28, 49, 7}, {50, 8, 29}, {9, 30, 51},
 	{31, 52, 10}, {53, 11, 32}, {12, 33, 54}, {34, 55, 13}, {56, 14, 35},
 	{15, 36, 57}, {37, 58, 16}, {59, 17, 38}, {18, 39, 60}, {40, 61, 19},
 	{62, 20, 41},
+}
+
+// shaCryptOrder256 is the same for SHA-256 crypt: ten triples, then bytes 31
+// and 30 as the last three characters.
+var shaCryptOrder256 = [][3]int{
+	{0, 10, 20}, {21, 1, 11}, {12, 22, 2}, {3, 13, 23}, {24, 4, 14},
+	{15, 25, 5}, {6, 16, 26}, {27, 7, 17}, {18, 28, 8}, {9, 19, 29},
 }
 
 // SHA512Crypt returns the SHA-512 crypt ($6$) hash of password, following
@@ -31,6 +40,15 @@ var shaCryptOrder = [21][3]int{
 // 5000 and leaves the "rounds=" prefix out; any other value is clamped to
 // 1000..999999999 and written as "$6$rounds=N$...".
 func SHA512Crypt(password, salt string, rounds int) string {
+	return shaCrypt(sha512.New, "$6$", shaCryptOrder512, password, salt, rounds)
+}
+
+// SHA256Crypt is SHA512Crypt for the SHA-256 variant ($5$).
+func SHA256Crypt(password, salt string, rounds int) string {
+	return shaCrypt(sha256.New, "$5$", shaCryptOrder256, password, salt, rounds)
+}
+
+func shaCrypt(newHash func() hash.Hash, magic string, order [][3]int, password, salt string, rounds int) string {
 	explicit := rounds != 0
 	if rounds == 0 {
 		rounds = shaCryptDefaultRounds
@@ -50,20 +68,21 @@ func SHA512Crypt(password, salt string, rounds int) string {
 
 	pw := []byte(password)
 	sl := []byte(salt)
+	size := newHash().Size()
 
 	// Steps 4-8: digest B = H(password salt password).
-	b := sha512.New()
+	b := newHash()
 	b.Write(pw)
 	b.Write(sl)
 	b.Write(pw)
 	sumB := b.Sum(nil)
 
 	// Steps 1-3, 9-12: digest A.
-	a := sha512.New()
+	a := newHash()
 	a.Write(pw)
 	a.Write(sl)
 	n := len(pw)
-	for ; n > sha512.Size; n -= sha512.Size {
+	for ; n > size; n -= size {
 		a.Write(sumB)
 	}
 	a.Write(sumB[:n])
@@ -78,7 +97,7 @@ func SHA512Crypt(password, salt string, rounds int) string {
 
 	// Steps 13-15: DP = H(password repeated len(password) times); P is DP
 	// repeated or cut to len(password) bytes.
-	dp := sha512.New()
+	dp := newHash()
 	for i := 0; i < len(pw); i++ {
 		dp.Write(pw)
 	}
@@ -86,7 +105,7 @@ func SHA512Crypt(password, salt string, rounds int) string {
 
 	// Steps 16-18: DS = H(salt repeated 16 + A[0] times); S is DS cut to
 	// len(salt) bytes.
-	ds := sha512.New()
+	ds := newHash()
 	for i := 0; i < 16+int(sumA[0]); i++ {
 		ds.Write(sl)
 	}
@@ -95,7 +114,7 @@ func SHA512Crypt(password, salt string, rounds int) string {
 	// Step 21: the rounds.
 	sum := sumA
 	for i := 0; i < rounds; i++ {
-		c := sha512.New()
+		c := newHash()
 		if i&1 != 0 {
 			c.Write(p)
 		} else {
@@ -117,17 +136,21 @@ func SHA512Crypt(password, salt string, rounds int) string {
 
 	// Step 22: encode.
 	var out strings.Builder
-	out.WriteString("$6$")
+	out.WriteString(magic)
 	if explicit {
 		out.WriteString("rounds=" + strconv.Itoa(rounds) + "$")
 	}
 	out.WriteString(salt)
 	out.WriteByte('$')
-	for _, t := range shaCryptOrder {
+	for _, t := range order {
 		w := uint32(sum[t[0]])<<16 | uint32(sum[t[1]])<<8 | uint32(sum[t[2]])
 		writeB64(&out, w, 4)
 	}
-	writeB64(&out, uint32(sum[63]), 2)
+	if size == sha512.Size {
+		writeB64(&out, uint32(sum[63]), 2)
+	} else {
+		writeB64(&out, uint32(sum[31])<<8|uint32(sum[30]), 3)
+	}
 	return out.String()
 }
 

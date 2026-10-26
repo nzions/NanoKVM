@@ -9,11 +9,9 @@ const ja = {
     },
     auth: {
       login: 'ログイン',
-      placeholderUsername: 'ユーザー名を入力してください',
       placeholderPassword: 'パスワードを入力してください',
       placeholderCurrentPassword: '現在のパスワード',
       placeholderPassword2: 'パスワードをもう一度入力してください',
-      noEmptyUsername: 'ユーザー名は空にできません',
       noEmptyPassword: 'パスワードは空にできません',
       noAccount:
         'ユーザー情報の取得に失敗しました。ページを更新してもう一度お試しいただくか、パスワードをリセットしてください。',
@@ -25,8 +23,6 @@ const ja = {
       changePassword: 'パスワード変更',
       changePasswordDesc: 'デバイスのセキュリティのために、パスワードを変更してください！',
       differentPassword: 'パスワードが一致しません',
-      illegalUsername: 'ユーザー名に不正な文字が含まれています',
-      illegalPassword: 'パスワードに不正な文字が含まれています',
       forgetPassword: 'パスワードを忘れた',
       ok: 'OK',
       cancel: 'キャンセル',
@@ -34,8 +30,6 @@ const ja = {
       tips: {
         reset1: 'パスワードをリセットするには、NanoKVM の BOOT ボタンを 10 秒間押し続けます。',
         reset2: '詳細な手順については、次のドキュメントを参照してください：',
-        reset3: 'ウェブデフォルトアカウント：',
-        reset4: 'SSH デフォルトアカウント：',
         change1: 'この操作により、以下のパスワードも更新されることに注意してください：',
         change2: 'ウェブログインパスワード',
         change3: 'システム root パスワード（SSH ログインパスワード）',
@@ -663,33 +657,12 @@ const ja = {
       account: {
         title: 'アカウント',
         webAccount: 'ウェブアカウント名',
-        roles: {
-          admin: '管理者',
-          user: 'ユーザー'
-        },
-        role: 'ロール',
         password: 'パスワード',
         updateBtn: '変更',
         logoutBtn: 'ログアウト',
         logoutDesc: 'ログアウトしてもよろしいですか？',
         okBtn: 'はい',
-        cancelBtn: 'いいえ',
-        users: {
-          title: 'ユーザー',
-          create: 'ユーザーを作成',
-          enabled: '有効',
-          disabled: '無効',
-          deviceOwner: 'デバイス所有者',
-          resetPassword: 'パスワードをリセット',
-          delete: '削除',
-          deleteConfirm: 'このユーザーを削除し、すべてのセッションを取り消しますか？',
-          created: 'ユーザーを作成しました',
-          deleted: 'ユーザーを削除しました',
-          passwordUpdated: 'パスワードを更新しました',
-          loadFailed: 'ユーザーの読み込みに失敗しました',
-          saveFailed: 'ユーザーの保存に失敗しました',
-          deleteFailed: 'ユーザーの削除に失敗しました'
-        }
+        cancelBtn: 'いいえ'
       }
     },
     picoclaw: {

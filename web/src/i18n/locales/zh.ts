@@ -9,11 +9,9 @@ const zh = {
     },
     auth: {
       login: '登录',
-      placeholderUsername: '请输入用户名',
       placeholderPassword: '请输入密码',
       placeholderCurrentPassword: '请输入当前密码',
       placeholderPassword2: '请再次输入密码',
-      noEmptyUsername: '用户名不能为空',
       noEmptyPassword: '密码不能为空',
       noAccount: '获取用户信息失败，请刷新重试或重置密码',
       invalidUser: '用户名或密码错误',
@@ -24,8 +22,6 @@ const zh = {
       changePassword: '修改密码',
       changePasswordDesc: '为了您的设备安全，请修改密码!',
       differentPassword: '两次密码不一致',
-      illegalUsername: '用户名中包含非法字符',
-      illegalPassword: '密码中包含非法字符',
       forgetPassword: '忘记密码',
       ok: '确定',
       cancel: '取消',
@@ -33,8 +29,6 @@ const zh = {
       tips: {
         reset1: '长按 NanoKVM 上的 BOOT 按键 10 秒钟来重置帐号。',
         reset2: '详细操作步骤可参考此文档：',
-        reset3: '网页默认帐号：',
-        reset4: 'SSH 默认帐号：',
         change1: '请注意，此操作将同时更新以下密码：',
         change2: '网页的登录密码',
         change3: '系统 root 用户的密码（SSH 登录密码）',
@@ -638,33 +632,12 @@ const zh = {
       account: {
         title: '帐号',
         webAccount: '网页帐号',
-        role: '角色',
-        roles: {
-          admin: '管理员',
-          user: '普通用户'
-        },
         password: '密码',
         updateBtn: '修改',
         logoutBtn: '退出',
         logoutDesc: '确定要退出吗？',
         okBtn: '确定',
-        cancelBtn: '取消',
-        users: {
-          title: '用户管理',
-          create: '创建用户',
-          enabled: '已启用',
-          disabled: '已禁用',
-          deviceOwner: '设备所有者',
-          resetPassword: '重置密码',
-          delete: '删除',
-          deleteConfirm: '删除此用户并撤销其全部会话？',
-          created: '用户已创建',
-          deleted: '用户已删除',
-          passwordUpdated: '密码已更新',
-          loadFailed: '加载用户失败',
-          saveFailed: '保存用户失败',
-          deleteFailed: '删除用户失败'
-        }
+        cancelBtn: '取消'
       }
     },
     picoclaw: {

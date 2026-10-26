@@ -9,11 +9,9 @@ const ko = {
     },
     auth: {
       login: '로그인',
-      placeholderUsername: '사용자 이름을 입력하세요.',
       placeholderPassword: '비밀번호를 입력하세요.',
       placeholderCurrentPassword: '현재 비밀번호',
       placeholderPassword2: '비밀번호를 다시 입력하세요.',
-      noEmptyUsername: '사용자 이름은 비어있을 수 없습니다.',
       noEmptyPassword: '비밀번호는 비어있을 수 없습니다.',
       noAccount:
         '사용자 정보를 불러오는 데 실패했습니다. 페이지를 새로고침하거나 비밀번호를 초기화하세요.',
@@ -25,8 +23,6 @@ const ko = {
       changePassword: '비밀번호 변경',
       changePasswordDesc: '보안을 위해 웹 로그인 비밀번호를 변경하세요.',
       differentPassword: '비밀번호가 서로 일치하지 않습니다.',
-      illegalUsername: '사용자 이름에 사용할 수 없는 문자가 있습니다.',
-      illegalPassword: '비밀번호에 사용할 수 없는 문자가 있습니다.',
       forgetPassword: '비밀번호 분실',
       ok: '확인',
       cancel: '취소',
@@ -34,8 +30,6 @@ const ko = {
       tips: {
         reset1: '비밀번호를 재설정하려면 NanoKVM의 BOOT 버튼을 10초 동안 누르고 계세요.',
         reset2: '자세한 절차는 이 문서를 참조하세요:',
-        reset3: '웹 기본 계정:',
-        reset4: 'SSH 기본 계정:',
         change1: '이 작업을 수행하면 다음 비밀번호가 변경됩니다:',
         change2: '웹 로그인 비밀번호',
         change3: '시스템 루트 비밀번호 (SSH 로그인 비밀번호)',
@@ -650,33 +644,12 @@ const ko = {
       account: {
         title: '계정',
         webAccount: '웹 계정',
-        roles: {
-          admin: '관리자',
-          user: '사용자'
-        },
-        role: '역할',
         password: '비밀번호',
         updateBtn: '업데이트',
         logoutBtn: '로그아웃',
         logoutDesc: '정말로 로그아웃 하시겠습니까?',
         okBtn: '네',
-        cancelBtn: '아니오',
-        users: {
-          title: '사용자',
-          create: '사용자 만들기',
-          enabled: '사용',
-          disabled: '사용 안 함',
-          deviceOwner: '장치 소유자',
-          resetPassword: '비밀번호 재설정',
-          delete: '삭제',
-          deleteConfirm: '이 사용자를 삭제하고 모든 세션을 취소하시겠습니까?',
-          created: '사용자가 생성되었습니다',
-          deleted: '사용자가 삭제되었습니다',
-          passwordUpdated: '비밀번호가 업데이트되었습니다',
-          loadFailed: '사용자를 불러오지 못했습니다',
-          saveFailed: '사용자를 저장하지 못했습니다',
-          deleteFailed: '사용자를 삭제하지 못했습니다'
-        }
+        cancelBtn: '아니오'
       }
     },
     picoclaw: {

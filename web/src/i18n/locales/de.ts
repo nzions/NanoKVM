@@ -9,11 +9,9 @@ const de = {
     },
     auth: {
       login: 'Anmelden',
-      placeholderUsername: 'Benutzername',
       placeholderPassword: 'Passwort',
       placeholderCurrentPassword: 'Aktuelles Passwort',
       placeholderPassword2: 'Bitte Passwort erneut eingeben',
-      noEmptyUsername: 'Benutzername benötigt',
       noEmptyPassword: 'Passwort benötigt',
       noAccount:
         'Abfragen der Benutzerdaten fehlgeschlagen, bitte die Seite neu laden oder Passwort zurücksetzen',
@@ -25,8 +23,6 @@ const de = {
       changePassword: 'Passwort ändern',
       changePasswordDesc: 'Für die Sicherheit Ihres Geräts ändern Sie bitte das Passwort!',
       differentPassword: 'Passwörter stimmen nicht überein',
-      illegalUsername: 'Benutzername enthält ungültige Zeichen',
-      illegalPassword: 'Passwort enthält ungültige Zeichen',
       forgetPassword: 'Passwort vergessen',
       ok: 'Ok',
       cancel: 'Abbrechen',
@@ -35,8 +31,6 @@ const de = {
         reset1:
           'Um das Passwort zurückzusetzen, drücken und halten Sie den BOOT Knopf auf dem NanoKVM für 10 Sekunden.',
         reset2: 'Für detailliertere Anweisungen lesen Sie folgendes Dokument:',
-        reset3: 'Web Standard-Account:',
-        reset4: 'SSH Standard-Account:',
         change1: 'Bitte beachten Sie, dass diese Aktion folgende Passwörter ändert:',
         change2: 'Web Anmelde-Passwort',
         change3: 'System root Passwort (SSH Anmelde-Passwort)',
@@ -668,33 +662,12 @@ const de = {
       account: {
         title: 'Konto',
         webAccount: 'Web Konto Name',
-        roles: {
-          admin: 'Administrator',
-          user: 'Benutzer'
-        },
-        role: 'Rolle',
         password: 'Passwort',
         updateBtn: 'Ändern',
         logoutBtn: 'Abmelden',
         logoutDesc: 'Möchten Sie sich wirklich abmelden?',
         okBtn: 'Ja',
-        cancelBtn: 'Nein',
-        users: {
-          title: 'Benutzer',
-          create: 'Benutzer erstellen',
-          enabled: 'Aktiviert',
-          disabled: 'Deaktiviert',
-          deviceOwner: 'Gerätebesitzer',
-          resetPassword: 'Passwort zurücksetzen',
-          delete: 'Löschen',
-          deleteConfirm: 'Diesen Benutzer löschen und alle seine Sitzungen widerrufen?',
-          created: 'Benutzer erstellt',
-          deleted: 'Benutzer gelöscht',
-          passwordUpdated: 'Passwort aktualisiert',
-          loadFailed: 'Benutzer konnten nicht geladen werden',
-          saveFailed: 'Benutzer konnte nicht gespeichert werden',
-          deleteFailed: 'Benutzer konnte nicht gelöscht werden'
-        }
+        cancelBtn: 'Nein'
       }
     },
     picoclaw: {

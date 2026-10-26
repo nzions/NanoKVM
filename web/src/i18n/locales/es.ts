@@ -9,11 +9,9 @@ const es = {
     },
     auth: {
       login: 'Iniciar sesión',
-      placeholderUsername: 'Introduce tu nombre de usuario',
       placeholderPassword: 'Introduce tu contraseña',
       placeholderCurrentPassword: 'Contraseña actual',
       placeholderPassword2: 'Introduce tu contraseña de nuevo',
-      noEmptyUsername: 'El nombre de usuario no puede estar vacío',
       noEmptyPassword: 'La contraseña no puede estar vacía',
       noAccount:
         'No se ha encontrado la cuenta. Por favor, recarga la página o recupera tu contraseña.',
@@ -26,8 +24,6 @@ const es = {
       changePasswordDesc:
         'Para la seguridad de su dispositivo, por favor, modifique la contraseña de inicio de sesión en la web.',
       differentPassword: 'Las contraseñas no coinciden',
-      illegalUsername: 'El  nombre de usuario contiene caracteres no permitidos',
-      illegalPassword: 'La contraseña contiene caracteres no permitidos',
       forgetPassword: 'Contraseña olvidada',
       ok: 'Aceptar',
       cancel: 'Cancelar',
@@ -36,8 +32,6 @@ const es = {
         reset1:
           'Para restablecer las contraseñas, mantén pulsado el botón BOOT del NanoKVM durante 10 segundos.',
         reset2: 'Para ver los pasos detallados, consulta este documento:',
-        reset3: 'Cuenta predeterminada de la interfaz web:',
-        reset4: 'Cuenta predeterminada de SSH:',
         change1: 'Ten en cuenta que esta acción cambiará las siguientes contraseñas:',
         change2: 'Contraseña de acceso web',
         change3: 'Contraseña root del sistema (contraseña de acceso por SSH)',
@@ -665,33 +659,12 @@ const es = {
       account: {
         title: 'Cuenta',
         webAccount: 'Nombre de la cuenta web',
-        roles: {
-          admin: 'Administrador',
-          user: 'Usuario'
-        },
-        role: 'Rol',
         password: 'Contraseña',
         updateBtn: 'Actualizar',
         logoutBtn: 'Cerrar sesión',
         logoutDesc: '¿Estás seguro de que deseas cerrar sesión?',
         okBtn: 'Sí',
-        cancelBtn: 'No',
-        users: {
-          title: 'Usuarios',
-          create: 'Crear usuario',
-          enabled: 'Habilitado',
-          disabled: 'Deshabilitado',
-          deviceOwner: 'Propietario del dispositivo',
-          resetPassword: 'Restablecer contraseña',
-          delete: 'Eliminar',
-          deleteConfirm: '¿Eliminar este usuario y revocar todas sus sesiones?',
-          created: 'Usuario creado',
-          deleted: 'Usuario eliminado',
-          passwordUpdated: 'Contraseña actualizada',
-          loadFailed: 'Error al cargar los usuarios',
-          saveFailed: 'Error al guardar el usuario',
-          deleteFailed: 'Error al eliminar el usuario'
-        }
+        cancelBtn: 'No'
       }
     },
     picoclaw: {

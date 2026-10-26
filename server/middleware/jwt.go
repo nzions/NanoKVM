@@ -183,7 +183,7 @@ func CheckTokenOrLoopbackInternalToken() gin.HandlerFunc {
 func authenticate(c *gin.Context) (Principal, *Token, bool) {
 	conf := config.GetInstance()
 	if conf.Authentication == "disable" {
-		return Principal{Username: "admin", Role: authn.RoleAdmin}, nil, true
+		return Principal{Username: authn.Username, Role: authn.RoleAdmin}, nil, true
 	}
 
 	cookie, err := c.Cookie(CookieName)

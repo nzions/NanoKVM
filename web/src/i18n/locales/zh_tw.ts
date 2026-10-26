@@ -9,11 +9,9 @@ const zh_tw = {
     },
     auth: {
       login: '登入',
-      placeholderUsername: '使用者名稱',
       placeholderPassword: '密碼',
       placeholderCurrentPassword: '目前密碼',
       placeholderPassword2: '請再次輸入密碼',
-      noEmptyUsername: '使用者名稱不能為空',
       noEmptyPassword: '密碼不能為空',
       noAccount: '找不到使用者，請重新整理網頁或重設密碼',
       invalidUser: '使用者名稱或密碼錯誤',
@@ -24,8 +22,6 @@ const zh_tw = {
       changePassword: '更改密碼',
       changePasswordDesc: '為了您的裝置安全，請修改登入密碼。',
       differentPassword: '密碼不一致',
-      illegalUsername: '使用者名稱包含非法字元',
-      illegalPassword: '密碼包含非法字元',
       forgetPassword: '忘記密碼',
       ok: '確定',
       cancel: '取消',
@@ -33,8 +29,6 @@ const zh_tw = {
       tips: {
         reset1: '長按 NanoKVM 上的 BOOT 按鍵 10 秒鐘來重設帳號。',
         reset2: '詳細操作方法可參閱本文件：',
-        reset3: '網頁預設帳號：',
-        reset4: 'SSH 預設帳號：',
         change1: '請注意，此操作將同時更新下列密碼：',
         change2: '網頁登入密碼',
         change3: 'root user 密碼 (SSH登入密碼)',
@@ -638,33 +632,12 @@ const zh_tw = {
       account: {
         title: '帳號',
         webAccount: '網頁帳號',
-        roles: {
-          admin: '管理員',
-          user: '使用者'
-        },
-        role: '角色',
         password: '密碼',
         updateBtn: '修改',
         logoutBtn: '登出',
         logoutDesc: '您確定要登出嗎?',
         okBtn: '確定',
-        cancelBtn: '取消',
-        users: {
-          title: '使用者',
-          create: '建立使用者',
-          enabled: '已啟用',
-          disabled: '已停用',
-          deviceOwner: '裝置擁有者',
-          resetPassword: '重設密碼',
-          delete: '刪除',
-          deleteConfirm: '刪除此使用者並撤銷其所有工作階段？',
-          created: '使用者已建立',
-          deleted: '使用者已刪除',
-          passwordUpdated: '密碼已更新',
-          loadFailed: '載入使用者失敗',
-          saveFailed: '儲存使用者失敗',
-          deleteFailed: '刪除使用者失敗'
-        }
+        cancelBtn: '取消'
       }
     },
     picoclaw: {

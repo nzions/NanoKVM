@@ -64,27 +64,24 @@ turn:
     turnCred: example_cred    # The credential/password required for authorization to the TURN server
 ```
 
-## Web Users
+## Web Login
 
-NanoKVM uses two device-wide roles:
+There is one web account, `root`, and its password is root's Linux password: the hash in
+`/etc/shadow` is the only copy. The login verifies crypt `$6$` (SHA-512), `$5$` (SHA-256) and
+`$1$` (MD5) hashes; changing the password in **Settings > Account** (current password
+required) rewrites root's shadow entry with a `$6$` hash and revokes every session. A password
+is 1-256 bytes and contains no `:`, newline or NUL (crypt runs thousands of hashing rounds, so
+the length is bounded on the unauthenticated login route).
 
-- `admin`: KVM access plus user, system, network, update, storage, terminal, script, MCP, and PicoClaw administration.
-- `user`: KVM video, keyboard, mouse, paste, power/reset, and Wake-on-LAN access.
+`/etc/kvm/pwd` (mode `0600`) holds only the session generation and whether the next login must
+change the password. Releases up to 2.5.15 kept a multi-user account store there; the first
+start of a later release replaces it (root's shadow entry is kept as it is, other accounts are
+dropped) and refuses, leaving the old file, if root's hash is not one of the three types above.
+Deleting the file (the physical BOOT-button password reset does) re-seeds root.
 
-Administrators manage accounts from **Settings > Account**. Account data remains in
-`/etc/kvm/pwd`; the server migrates the legacy single-account JSON format in place and writes
-the multi-user format atomically with mode `0600`. Keeping the same path preserves the physical
-BOOT-button password reset behavior.
-Users must confirm their current password when changing it themselves; administrators can reset
-non-owner users from the account manager. Only the device owner can change the device owner's
-password, because that password is also synchronized to the Linux root account.
-
-All authenticated sessions are backed by the current account state. Disabling, deleting,
-changing the role or password of a user invalidates that user's HTTP and real-time connections
-without affecting other users. Multiple users may watch and control the KVM concurrently; input
-uses the existing cooperative HID coordinator, so simultaneous input can interleave.
-Video mode, quality, resolution, and MJPEG frame-detection controls remain shared KVM
-operations; when several users adjust them concurrently, the latest change applies device-wide.
+First boot: `/boot/root.pass` (one line, written from a Mac) becomes root's password and is
+consumed. Without it a random 12-character password is set, shown on the OLED (it is also
+`/etc/kvm/initial.pass`, `0600`), and the first login must change it.
 
 ## Compile & Deploy
 

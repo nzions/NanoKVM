@@ -83,10 +83,7 @@ export const Password = () => {
 
           <Form.Item
             name="password"
-            rules={[
-              { required: true, message: t('auth.noEmptyPassword') },
-              { max: 72, message: t('auth.passwordTooLong') }
-            ]}
+            rules={[{ required: true, message: t('auth.noEmptyPassword') }]}
           >
             <Input
               prefix={<LockOutlined />}
@@ -98,10 +95,7 @@ export const Password = () => {
 
           <Form.Item
             name="password2"
-            rules={[
-              { required: true, message: t('auth.noEmptyPassword') },
-              { max: 72, message: t('auth.passwordTooLong') }
-            ]}
+            rules={[{ required: true, message: t('auth.noEmptyPassword') }]}
           >
             <Input
               prefix={<LockOutlined />}

@@ -9,11 +9,9 @@ const hu = {
     },
     auth: {
       login: 'Bejelentkezés',
-      placeholderUsername: 'Adja meg a felhasználónevet',
       placeholderPassword: 'Adja meg a jelszót',
       placeholderCurrentPassword: 'Jelenlegi jelszó',
       placeholderPassword2: 'Adja meg újra a jelszót',
-      noEmptyUsername: 'A felhasználónév nem lehet üres',
       noEmptyPassword: 'A jelszó nem lehet üres',
       noAccount:
         'Nem sikerült megszerezni a felhasználói információkat, frissítse az oldalt vagy állítsa vissza a jelszót',
@@ -26,8 +24,6 @@ const hu = {
       changePasswordDesc:
         'Az eszköz biztonsága érdekében módosítsa a webes bejelentkezési jelszót.',
       differentPassword: 'A jelszavak nem egyeznek',
-      illegalUsername: 'A felhasználónév illegális karaktereket tartalmaz',
-      illegalPassword: 'A jelszó illegális karaktereket tartalmaz',
       forgetPassword: 'Jelszó-emlékeztető',
       ok: 'Ok',
       cancel: 'Mégse',
@@ -36,8 +32,6 @@ const hu = {
         reset1:
           'To reset the passwords, pressing and holding the BOOT button on the NanoKVM for 10 seconds.',
         reset2: 'A részletes lépésekért tekintse meg ezt a dokumentumot:',
-        reset3: 'Alapértelmezett webes fiók:',
-        reset4: 'Alapértelmezett SSH-fiók:',
         change1: 'Vegye figyelembe, hogy ez a művelet a következő jelszavakat módosítja:',
         change2: 'Webes bejelentkezési jelszó',
         change3: 'Rendszer root jelszava (SSH bejelentkezési jelszó)',
@@ -660,33 +654,12 @@ const hu = {
       account: {
         title: 'Fiók',
         webAccount: 'Webes fiók neve',
-        roles: {
-          admin: 'Rendszergazda',
-          user: 'Felhasználó'
-        },
-        role: 'Szerepkör',
         password: 'Jelszó',
         updateBtn: 'Update',
         logoutBtn: 'Kijelentkezés',
         logoutDesc: 'Biztos, hogy ki szeretne jelentkezni?',
         okBtn: 'Igen',
-        cancelBtn: 'Nem',
-        users: {
-          title: 'Felhasználók',
-          create: 'Felhasználó létrehozása',
-          enabled: 'Engedélyezve',
-          disabled: 'Letiltva',
-          deviceOwner: 'Eszköz tulajdonosa',
-          resetPassword: 'Jelszó visszaállítása',
-          delete: 'Törlés',
-          deleteConfirm: 'Törli ezt a felhasználót és visszavonja az összes munkamenetét?',
-          created: 'Felhasználó létrehozva',
-          deleted: 'Felhasználó törölve',
-          passwordUpdated: 'Jelszó frissítve',
-          loadFailed: 'Nem sikerült betölteni a felhasználókat',
-          saveFailed: 'Nem sikerült menteni a felhasználót',
-          deleteFailed: 'Nem sikerült törölni a felhasználót'
-        }
+        cancelBtn: 'Nem'
       }
     },
     picoclaw: {

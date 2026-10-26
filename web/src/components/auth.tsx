@@ -24,7 +24,7 @@ export const ProtectedRoute = ({ children }: { children: ReactNode }) => {
 
         setAccount({
           username: rsp.data.username,
-          role: rsp.data.role === 'admin' ? 'admin' : 'user'
+          role: 'admin'
         });
       })
       .catch(() => {

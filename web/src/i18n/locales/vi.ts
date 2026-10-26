@@ -9,11 +9,9 @@ const vi = {
     },
     auth: {
       login: 'Đăng nhập',
-      placeholderUsername: 'Vui lòng nhập tên người dùng',
       placeholderPassword: 'vui lòng nhập mật khẩu',
       placeholderCurrentPassword: 'Mật khẩu hiện tại',
       placeholderPassword2: 'vui lòng nhập lại mật khẩu',
-      noEmptyUsername: 'tên người dùng không được để trống',
       noEmptyPassword: 'mật khẩu không được để trống',
       noAccount:
         'Không thể lấy thông tin người dùng, vui lòng làm mới trang web hoặc đặt lại mật khẩu',
@@ -25,8 +23,6 @@ const vi = {
       changePassword: 'Đổi mật khẩu',
       changePasswordDesc: 'Để bảo mật thiết bị của bạn, vui lòng thay đổi mật khẩu đăng nhập web.',
       differentPassword: 'mật khẩu không khớp',
-      illegalUsername: 'tên người dùng chứa ký tự không hợp lệ',
-      illegalPassword: 'mật khẩu chứa ký tự không hợp lệ',
       forgetPassword: 'Quên mật khẩu',
       ok: 'OK',
       cancel: 'Hủy',
@@ -35,8 +31,6 @@ const vi = {
         reset1:
           'To reset the passwords, pressing and holding the BOOT button on the NanoKVM for 10 seconds.',
         reset2: 'Để biết các bước chi tiết, vui lòng xem tài liệu này:',
-        reset3: 'Tài khoản web mặc định:',
-        reset4: 'Tài khoản SSH mặc định:',
         change1: 'Lưu ý rằng thao tác này sẽ thay đổi các mật khẩu sau:',
         change2: 'Mật khẩu đăng nhập web',
         change3: 'Mật khẩu root hệ thống (mật khẩu đăng nhập SSH)',
@@ -656,33 +650,12 @@ const vi = {
       account: {
         title: 'Tài khoản',
         webAccount: 'Tên tài khoản web',
-        roles: {
-          admin: 'Quản trị viên',
-          user: 'Người dùng'
-        },
-        role: 'Vai trò',
         password: 'Mật khẩu',
         updateBtn: 'Update',
         logoutBtn: 'Đăng xuất',
         logoutDesc: 'Bạn có chắc chắn muốn đăng xuất không?',
         okBtn: 'Có',
-        cancelBtn: 'Không',
-        users: {
-          title: 'Người dùng',
-          create: 'Tạo người dùng',
-          enabled: 'Đã bật',
-          disabled: 'Đã tắt',
-          deviceOwner: 'Chủ sở hữu thiết bị',
-          resetPassword: 'Đặt lại mật khẩu',
-          delete: 'Xóa',
-          deleteConfirm: 'Xóa người dùng này và thu hồi tất cả phiên của họ?',
-          created: 'Đã tạo người dùng',
-          deleted: 'Đã xóa người dùng',
-          passwordUpdated: 'Đã cập nhật mật khẩu',
-          loadFailed: 'Không thể tải danh sách người dùng',
-          saveFailed: 'Không thể lưu người dùng',
-          deleteFailed: 'Không thể xóa người dùng'
-        }
+        cancelBtn: 'Không'
       }
     },
     picoclaw: {

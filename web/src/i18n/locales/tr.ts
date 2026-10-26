@@ -9,11 +9,9 @@ const tr = {
     },
     auth: {
       login: 'Giriş',
-      placeholderUsername: 'Kullanıcı Adı',
       placeholderPassword: 'Şifre',
       placeholderCurrentPassword: 'Mevcut parola',
       placeholderPassword2: 'Şifrenizi tekrar deneyiniz',
-      noEmptyUsername: 'Kullanıcı adı gereklidir',
       noEmptyPassword: 'Şifre gereklidir',
       noAccount:
         'Kullanıcı verileri alınırken hata yaşandı, lütfen sayfayı yenileyiniz ya da şifrenizi sıfırlayınız',
@@ -25,8 +23,6 @@ const tr = {
       changePassword: 'Şifrenizi değiştiriniz',
       changePasswordDesc: 'Güvenlik sebebiyle lütfen şifrenizi değiştiriniz!',
       differentPassword: 'Şifreler eşleşmemektedir',
-      illegalUsername: 'Kullanıcı adı istenmeyen karakterler içermektedir',
-      illegalPassword: 'Şifre istenmeyen karakterler içermektedir',
       forgetPassword: 'Şifremi unuttum',
       ok: 'Tamam',
       cancel: 'İptal',
@@ -35,8 +31,6 @@ const tr = {
         reset1:
           'Şifreleri sıfırlamak için NanoKVM üzerinde bulunan BOOT tuşuna 10 saniye boyunca basılı tutun.',
         reset2: 'Ayrıntılı adımlar için dökümana göz atın:',
-        reset3: 'Arayüz varsayılan hesap:',
-        reset4: 'Güvenli Kabuk Bağlantısı (SSH) varsayılan hesap:',
         change1: 'Bu işlem şu şifreleri değiştiricektir:',
         change2: 'Arayüz giriş şifresi',
         change3: 'Sistem yöneticisi şifresi (Güvenli Kabuk Bağlantısı (SSH) giriş şifresi)',
@@ -658,33 +652,12 @@ const tr = {
       account: {
         title: 'Hesap',
         webAccount: 'Web Hesap Adı',
-        roles: {
-          admin: 'Yönetici',
-          user: 'Kullanıcı'
-        },
-        role: 'Rol',
         password: 'Şifre',
         updateBtn: 'Değiştir',
         logoutBtn: 'Çıkış  yap',
         logoutDesc: 'Çıkış yapmak istediğinizden emin misiniz?',
         okBtn: 'Evet',
-        cancelBtn: 'Hayır',
-        users: {
-          title: 'Kullanıcılar',
-          create: 'Kullanıcı oluştur',
-          enabled: 'Etkin',
-          disabled: 'Devre dışı',
-          deviceOwner: 'Cihaz sahibi',
-          resetPassword: 'Parolayı sıfırla',
-          delete: 'Sil',
-          deleteConfirm: 'Bu kullanıcı silinsin ve tüm oturumları iptal edilsin mi?',
-          created: 'Kullanıcı oluşturuldu',
-          deleted: 'Kullanıcı silindi',
-          passwordUpdated: 'Parola güncellendi',
-          loadFailed: 'Kullanıcılar yüklenemedi',
-          saveFailed: 'Kullanıcı kaydedilemedi',
-          deleteFailed: 'Kullanıcı silinemedi'
-        }
+        cancelBtn: 'Hayır'
       }
     },
     picoclaw: {
