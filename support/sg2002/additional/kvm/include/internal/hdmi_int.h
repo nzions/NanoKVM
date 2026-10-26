@@ -1,18 +1,11 @@
 // LT6911 INT line as a GPIO character device v2 line-event fd. Header-only and
 // plain C so libkvm (kvm_vision.cpp) and the emulator harness
-// (tools/hdmiint) run the very same code.
+// (tools/hdmiint) run the very same code. The by-name line lookup itself is
+// kvm_gpio.h's (shared with every other GPIO user).
 #ifndef HDMI_INT_H
 #define HDMI_INT_H
 
-#include <dirent.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
-#include <sys/ioctl.h>
-#include <unistd.h>
+#include "kvm_gpio.h"
 
 // ---- LT6911 INT line: GPIO character device (v2 uABI) ----------------------
 //
@@ -23,91 +16,16 @@
 // its device-tree line NAME (hdmi_int_line_name, a gpio-line-names entry the
 // board DT must provide), or by an explicit "<gpiochip name> <offset>" pair in
 // hdmi_int_override_path. Neither found = no INT source = fail closed.
-//
-// Structs are declared here (layout of linux/gpio.h v2) so the build does not
-// depend on the toolchain's kernel headers being 5.10 or newer.
 
 #define hdmi_int_line_name      "hdmi-int"
 #define hdmi_int_override_path  "/etc/kvm/hdmi_int_line"
 
-#define GPIO_IOCTL_TYPE         0xB4
-#define GPIO_MAX_NAME           32
-
-struct nk_gpiochip_info {
-    char name[GPIO_MAX_NAME];
-    char label[GPIO_MAX_NAME];
-    uint32_t lines;
-};
-
-struct nk_gpio_v2_line_attribute {
-    uint32_t id;
-    uint32_t padding;
-    uint64_t value;
-};
-
-struct nk_gpio_v2_line_config_attribute {
-    struct nk_gpio_v2_line_attribute attr;
-    uint64_t mask;
-};
-
-struct nk_gpio_v2_line_config {
-    uint64_t flags;
-    uint32_t num_attrs;
-    uint32_t padding[5];
-    struct nk_gpio_v2_line_config_attribute attrs[10];
-};
-
-struct nk_gpio_v2_line_request {
-    uint32_t offsets[64];
-    char consumer[GPIO_MAX_NAME];
-    struct nk_gpio_v2_line_config config;
-    uint32_t num_lines;
-    uint32_t event_buffer_size;
-    uint32_t padding[5];
-    int32_t fd;
-};
-
-struct nk_gpio_v2_line_info {
-    char name[GPIO_MAX_NAME];
-    char consumer[GPIO_MAX_NAME];
-    uint32_t offset;
-    uint32_t num_attrs;
-    uint64_t flags;
-    struct nk_gpio_v2_line_attribute attrs[10];
-    uint32_t padding[4];
-};
-
-struct nk_gpio_v2_line_event {
-    uint64_t timestamp_ns;
-    uint32_t id;
-    uint32_t offset;
-    uint32_t seqno;
-    uint32_t line_seqno;
-    uint32_t padding[6];
-};
-
-#define NK_GPIO_GET_CHIPINFO_IOCTL     _IOR(GPIO_IOCTL_TYPE, 0x01, struct nk_gpiochip_info)
-#define NK_GPIO_V2_GET_LINEINFO_IOCTL  _IOWR(GPIO_IOCTL_TYPE, 0x05, struct nk_gpio_v2_line_info)
-#define NK_GPIO_V2_GET_LINE_IOCTL      _IOWR(GPIO_IOCTL_TYPE, 0x07, struct nk_gpio_v2_line_request)
-
-#define NK_GPIO_V2_LINE_FLAG_INPUT         (1ULL << 2)
-#define NK_GPIO_V2_LINE_FLAG_EDGE_RISING   (1ULL << 4)
-#define NK_GPIO_V2_LINE_FLAG_EDGE_FALLING  (1ULL << 5)
-#define NK_GPIO_V2_LINE_EVENT_RISING_EDGE  1U
-#define NK_GPIO_V2_LINE_EVENT_FALLING_EDGE 2U
-
 // Requests chip/offset for both edges. Returns the line event fd or -1.
 static inline int hdmi_int_request(int chip_fd, uint32_t offset)
 {
-    struct nk_gpio_v2_line_request req;
-    memset(&req, 0, sizeof(req));
-    req.offsets[0] = offset;
-    snprintf(req.consumer, sizeof(req.consumer), "kvm-hdmi-int");
-    req.num_lines = 1;
-    req.config.flags = NK_GPIO_V2_LINE_FLAG_INPUT | NK_GPIO_V2_LINE_FLAG_EDGE_RISING |
-                       NK_GPIO_V2_LINE_FLAG_EDGE_FALLING;
-    if(ioctl(chip_fd, NK_GPIO_V2_GET_LINE_IOCTL, &req) < 0) return -1;
-    return req.fd;
+    return nk_gpio_request(chip_fd, offset, "kvm-hdmi-int",
+                           NK_GPIO_V2_LINE_FLAG_INPUT | NK_GPIO_V2_LINE_FLAG_EDGE_RISING |
+                           NK_GPIO_V2_LINE_FLAG_EDGE_FALLING, 0);
 }
 
 // Opens the line event fd for the LT6911 INT pin. Every failure is logged to
@@ -141,49 +59,19 @@ static inline int hdmi_int_open(void)
     }
 
     // 2. the DT line name, searched over every gpiochip
-    DIR *dir = opendir("/dev");
-    if(dir == NULL){
-        fprintf(stderr, "[hdmi]opendir /dev failed: %d\n", errno);
+    uint32_t line = 0;
+    int cfd = nk_gpio_find(hdmi_int_line_name, &line);
+    if(cfd == NK_GPIO_NO_LINE){
+        fprintf(stderr, "[hdmi]no gpio line named \"%s\"\n", hdmi_int_line_name);
         return -1;
     }
-    int result = -1;
-    int scanned = 0;
-    struct dirent *de;
-    while((de = readdir(dir)) != NULL){
-        if(strncmp(de->d_name, "gpiochip", 8) != 0) continue;
-        char path[300];
-        snprintf(path, sizeof(path), "/dev/%s", de->d_name);
-        int cfd = open(path, O_RDONLY | O_CLOEXEC);
-        if(cfd < 0){
-            fprintf(stderr, "[hdmi]open %s failed: %d\n", path, errno);
-            continue;
-        }
-        struct nk_gpiochip_info ci;
-        memset(&ci, 0, sizeof(ci));
-        if(ioctl(cfd, NK_GPIO_GET_CHIPINFO_IOCTL, &ci) < 0){
-            fprintf(stderr, "[hdmi]chip info %s failed: %d\n", path, errno);
-            close(cfd);
-            continue;
-        }
-        scanned++;
-        for(uint32_t line = 0; line < ci.lines; line++){
-            struct nk_gpio_v2_line_info li;
-            memset(&li, 0, sizeof(li));
-            li.offset = line;
-            if(ioctl(cfd, NK_GPIO_V2_GET_LINEINFO_IOCTL, &li) < 0) break;
-            if(strncmp(li.name, hdmi_int_line_name, GPIO_MAX_NAME) != 0) continue;
-            result = hdmi_int_request(cfd, line);
-            if(result < 0) fprintf(stderr, "[hdmi]INT line \"%s\" (%s offset %u) request failed: %d\n",
-                                   hdmi_int_line_name, ci.name, line, errno);
-            else fprintf(stderr, "[hdmi]INT line \"%s\" = %s offset %u\n", hdmi_int_line_name, ci.name, line);
-            break;
-        }
-        close(cfd);
-        if(result >= 0) break;
-    }
-    closedir(dir);
-    if(result < 0 && scanned == 0)
-        fprintf(stderr, "[hdmi]no gpiochip readable under /dev\n");
+    if(cfd < 0) return -1;
+    int result = hdmi_int_request(cfd, line);
+    int err = errno;
+    close(cfd);
+    if(result < 0) fprintf(stderr, "[hdmi]INT line \"%s\" (offset %u) request failed: %d\n",
+                           hdmi_int_line_name, line, err);
+    else fprintf(stderr, "[hdmi]INT line \"%s\" = offset %u\n", hdmi_int_line_name, line);
     return result;
 }
 

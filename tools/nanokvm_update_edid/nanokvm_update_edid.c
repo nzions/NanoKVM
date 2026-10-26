@@ -16,6 +16,7 @@
 #include <time.h>
 
 #include "nanokvm_update_edid.h"
+#include "../../support/sg2002/additional/kvm/include/internal/kvm_gpio.h"
 
 
 int client;
@@ -84,12 +85,16 @@ int check_edid(uint8_t *edid_data, uint16_t edid_size)
 
 // =======================================================================================================
 
-void NanoKVM_PCIe_HDMI_Reset(void)
+// hdmi-rst is owned by the kvmgpio daemon (S15kvmhwd); the vendor kernel
+// (no line named hdmi-rst) falls back to sysfs gpio451. Fail closed: a reset
+// that did not happen must not be followed by an EDID write as if it had.
+int NanoKVM_PCIe_HDMI_Reset(void)
 {
-    system("echo 0 > /sys/class/gpio/gpio451/value");
+    if (nk_gpio_set_held("hdmi-rst", 451, 0) != 0) return -1;
     usleep(100000);
-    system("echo 1 > /sys/class/gpio/gpio451/value");
+    if (nk_gpio_set_held("hdmi-rst", 451, 1) != 0) return -1;
     usleep(100000);
+    return 0;
 }
 
 // =======================================================================================================
@@ -900,7 +905,10 @@ int main(int argc, char *argv[]) {
     }
     fprintf(stdout, "EDID data loaded successfully from %s\n", argv[1]);
 
-    if (product_version == PRODUCT_PCIE_A) NanoKVM_PCIe_HDMI_Reset();
+    if (product_version == PRODUCT_PCIE_A && NanoKVM_PCIe_HDMI_Reset() != 0) {
+        fprintf(stderr, "Failed to reset the LT6911 (hdmi-rst)\n");
+        return EXIT_FAILURE;
+    }
 
     // configure lt6911 edid
     if (lt6911_edid_config(chip_version, edid_data, edid_size) != 0) {
@@ -908,7 +916,10 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (product_version == PRODUCT_PCIE_A) NanoKVM_PCIe_HDMI_Reset();
+    if (product_version == PRODUCT_PCIE_A && NanoKVM_PCIe_HDMI_Reset() != 0) {
+        fprintf(stderr, "Failed to reset the LT6911 (hdmi-rst)\n");
+        return EXIT_FAILURE;
+    }
 
     print_success(product_version);
 

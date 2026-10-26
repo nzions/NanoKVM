@@ -1,3 +1,13 @@
+## 2.6.7 (2026-10-26)
+
+### Changes
+
+* Every userspace GPIO user finds its line by the device-tree line NAME over the GPIO chardev (v2 uABI), not by a vendor sysfs number: `hdmi-rst`, `oled-rst`, `wifi-en`, `pwr-key`, `rst-key`, `pwr-led` (Alpha `hdd-led`). The vendor sysfs numbers (451, 502, 503, ...) are used only when NO line carries the name (the vendor kernel); a line that exists but cannot be driven, a name carried twice or an unreadable chip is a loud error, never a guessed number
+* `kvm_gpio.h` (libkvm include/internal): the by-name lookup, line requests and get/set, shared by `hdmi_int.h` (now built on it), `kvm_vision.cpp`, `nanokvm_update_edid` and the new owner
+* `tools/kvmgpio`: static helper that OWNS the held outputs (a line request lives as long as its fd). `S15kvmhwd` starts `kvmgpio daemon` (idempotent, returns once it listens, hold nothing and exit 1 on a missing line), drives `oled-rst`, `wifi-en` and `hdmi-rst` through it, and skips the devmem pinmux of the GPIO pads on the chardev path (the mainline DT muxes them). libkvm's `hdmi-rst` assert/release and `nanokvm_update_edid`'s reset go through the owner's unix socket `/var/run/kvmgpio.sock`; the EDID tool no longer writes an EDID after a failed reset
+* Server: new `gpio` package (ioctls via golang.org/x/sys/unix, already vendored). The power and reset key presses and the power/HDD LED reads request the named line per operation and release it; the vendor sysfs file is the fallback only for `ErrNoLine`. An unparsable LED value is an error now (it was read as "off")
+* `nanokvm_update_edid` and `kvmgpio` are built by `scripts/build-in-container.sh` (the tracked prebuilt edid binary predated the change); `kvmgpio` ships under `system/tool/`
+
 ## 2.6.6 (2026-10-26)
 
 ### Fixes

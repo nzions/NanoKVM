@@ -8,6 +8,8 @@
 #   kvmapp/kvm_system/kvm_system    kvm_system daemon
 #   kvmapp/server/dl_lib/           video libraries, including a fresh libkvm.so
 #   server/NanoKVM-Server           Go server (BoringCrypto, RPATH $ORIGIN/dl_lib)
+#   tools/kvmgpio/kvmgpio           GPIO line owner (static)
+#   tools/nanokvm_update_edid/nanokvm_update_edid   EDID helper (static libc via musl)
 
 set -euo pipefail
 
@@ -71,6 +73,18 @@ echo "::endgroup::"
 echo "::group::support: build kvm_vision (libkvm.so)"
 ./build kvm_vision
 ./build kvm_vision add_to_kvmapp
+echo "::endgroup::"
+
+# GPIO helpers shipped under system/tool/. kvmgpio owns the held GPIO outputs by
+# DT line name (S15kvmhwd starts it). nanokvm_update_edid is rebuilt because its
+# hdmi-rst reset goes through kvm_gpio.h now; the tracked prebuilt predates it.
+# Static, the same musl cross compiler as everything else.
+echo "::group::tools: build kvmgpio and nanokvm_update_edid"
+riscv64-unknown-linux-musl-gcc -static -O2 -Wall -Wextra \
+    -o "$NANOKVM_PATH/tools/kvmgpio/kvmgpio" "$NANOKVM_PATH/tools/kvmgpio/kvmgpio.c"
+riscv64-unknown-linux-musl-gcc -march=rv64gc -O2 \
+    -o "$NANOKVM_PATH/tools/nanokvm_update_edid/nanokvm_update_edid" \
+    "$NANOKVM_PATH/tools/nanokvm_update_edid/nanokvm_update_edid.c"
 echo "::endgroup::"
 
 echo "::group::server: cross-compile NanoKVM-Server"

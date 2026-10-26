@@ -152,6 +152,7 @@ log "building the frontend"
     pnpm build
 )
 
+
 # --- package (what `make package` runs) ----------------------------------------
 log "packaging nanokvm_$VERSION"
 (
@@ -225,6 +226,8 @@ else
     (cd "$STAGE/emu" && sha256sum gpioedge > gpioedge.sha256)
     install -m 0755 "$EMU_HDMIINT" "$STAGE/emu/hdmiint"
     (cd "$STAGE/emu" && sha256sum hdmiint > hdmiint.sha256)
+    install -m 0755 "$WORK_NANOKVM/tools/kvmgpio/kvmgpio" "$STAGE/emu/kvmgpio"
+    (cd "$STAGE/emu" && sha256sum kvmgpio > kvmgpio.sha256)
     install -m 0755 "$WORK_NANOKVM/scripts/emu-image.sh" "$STAGE/emu/emu-image.sh"
     mv "$STAGE" "$DEST"
     log "published $DEST"

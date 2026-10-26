@@ -1,5 +1,16 @@
 #!/bin/sh
-# kvmhwd Rev2.5
+# kvmhwd Rev2.6
+#
+# GPIO lines are driven BY DEVICE-TREE LINE NAME through kvmgpio (the GPIO
+# chardev; the numbers below are the VENDOR kernel's global sysfs numbers and
+# are used only when the board DT names no line, i.e. on the vendor kernel).
+# GPIO_MODE: named = the DT names the lines; sysfs = vendor kernel, old path;
+# none = cannot tell, so no line is touched and the reason is logged.
+# Held outputs (oled-rst, wifi-en, hdmi-rst) live in the kvmgpio owner process
+# started here; the Go server presses the key lines and reads the LEDs itself.
+
+KVMGPIO=/kvmapp/system/tool/kvmgpio
+GPIO_MODE=none
 
 Alpha_OLED_RST_Pin=371
 Beta_OLED_RST_Pin=502
@@ -18,32 +29,25 @@ PCIe_HDMI_RST_Pin=451
 init_alpha_hw(){
   devmem 0x030010D0 32 0x2  # I2C1_SCL
   devmem 0x030010DC 32 0x2  # I2C1_SDA
-  devmem 0x030010D4 32 0x3  # OLED_RST
-  devmem 0x0300103C 32 0x3  # GPIOA15
-  devmem 0x03001050 32 0x3  # GPIOA22
-  devmem 0x0300105C 32 0x3  # GPIOA23
-  devmem 0x03001060 32 0x3  # GPIOA24
-  devmem 0x03001054 32 0x3  # GPIOA25
-  devmem 0x03001058 32 0x3  # GPIOA27
+  pad_gpio 0x030010D4  # OLED_RST
+  pad_gpio 0x0300103C  # GPIOA15
+  pad_gpio 0x03001050  # GPIOA22
+  pad_gpio 0x0300105C  # GPIOA23
+  pad_gpio 0x03001060  # GPIOA24
+  pad_gpio 0x03001054  # GPIOA25
+  pad_gpio 0x03001058  # GPIOA27
 
 	devmem 0x03001068 32 0x6  # GPIOA 18 UART1 RX
 	devmem 0x03001064 32 0x6  # GPIOA 19 UART1 TX
 	devmem 0x03001070 32 0x2  # GPIOA 28 UART2 TX
 	devmem 0x03001074 32 0x2  # GPIOA 29 UART2 RX
 
-  echo ${Alpha_OLED_RST_Pin} > /sys/class/gpio/export  # OLED_RST
-  echo out > /sys/class/gpio/gpio${Alpha_OLED_RST_Pin}/direction
-  echo 1 > /sys/class/gpio/gpio${Alpha_OLED_RST_Pin}/value
+  hw_out oled-rst ${Alpha_OLED_RST_Pin} 1  # OLED_RST
 
-  echo ${Alpha_PWR_LED_Pin} > /sys/class/gpio/export   # pwr led
-  echo ${Alpha_HDD_LED_Pin} > /sys/class/gpio/export   # hdd led
-  echo ${Alpha_PWR_KEY_Pin} > /sys/class/gpio/export   # pwr key
-  echo ${Alpha_RST_KEY_Pin} > /sys/class/gpio/export   # rst key
-
-  echo in > /sys/class/gpio/gpio${Alpha_PWR_LED_Pin}/direction     # pwr led
-  echo in > /sys/class/gpio/gpio${Alpha_HDD_LED_Pin}/direction     # hdd led
-  echo out > /sys/class/gpio/gpio${Alpha_PWR_KEY_Pin}/direction    # pwr key
-  echo out > /sys/class/gpio/gpio${Alpha_RST_KEY_Pin}/direction    # rst key
+  hw_in pwr-led ${Alpha_PWR_LED_Pin}   # pwr led
+  hw_in hdd-led ${Alpha_HDD_LED_Pin}   # hdd led
+  hw_key pwr-key ${Alpha_PWR_KEY_Pin}  # pwr key
+  hw_key rst-key ${Alpha_RST_KEY_Pin}  # rst key
 
   rmmod /mnt/system/ko/i2c-gpio.ko
   rmmod /mnt/system/ko/i2c-algo-bit.ko
@@ -53,12 +57,12 @@ init_alpha_hw(){
 }
 
 init_beta_pcie_hw(){
-  devmem 0x0300103C 32 0x3  # GPIOA15
-  devmem 0x03001050 32 0x3  # GPIOA22
-  devmem 0x0300105C 32 0x3  # GPIOA23
-  devmem 0x03001060 32 0x3  # GPIOA24
-  devmem 0x03001054 32 0x3  # GPIOA25
-  devmem 0x03001058 32 0x3  # GPIOA27
+  pad_gpio 0x0300103C  # GPIOA15
+  pad_gpio 0x03001050  # GPIOA22
+  pad_gpio 0x0300105C  # GPIOA23
+  pad_gpio 0x03001060  # GPIOA24
+  pad_gpio 0x03001054  # GPIOA25
+  pad_gpio 0x03001058  # GPIOA27
 
   devmem 0x030010E4 32 0x0  # SDIO CLK
   devmem 0x030010E0 32 0x0  # SDIO CMD
@@ -72,26 +76,81 @@ init_beta_pcie_hw(){
 	devmem 0x03001070 32 0x2  # GPIOA 28 UART2 TX
 	devmem 0x03001074 32 0x2  # GPIOA 29 UART2 RX
 
-  echo ${Beta_OLED_RST_Pin} > /sys/class/gpio/export  # Beta OLED_RST
-  echo out > /sys/class/gpio/gpio${Beta_OLED_RST_Pin}/direction
-  echo 1 > /sys/class/gpio/gpio${Beta_OLED_RST_Pin}/value
+  hw_out oled-rst ${Beta_OLED_RST_Pin} 1  # Beta OLED_RST
 
-  echo ${Beta_PWR_LED_Pin} > /sys/class/gpio/export   # pwr led
-  echo ${Beta_PWR_KEY_Pin} > /sys/class/gpio/export   # pwr key
-  echo ${Beta_RST_KEY_Pin} > /sys/class/gpio/export   # rst key
-  echo ${PCIe_HDMI_RST_Pin} > /sys/class/gpio/export   # hdmi rst key
-
-  echo in > /sys/class/gpio/gpio${Beta_PWR_LED_Pin}/direction     # pwr led
-  echo out > /sys/class/gpio/gpio${Beta_PWR_KEY_Pin}/direction    # pwr key
-  echo out > /sys/class/gpio/gpio${Beta_RST_KEY_Pin}/direction    # rst key
-  echo out > /sys/class/gpio/gpio${PCIe_HDMI_RST_Pin}/direction    # rst key
-
-  echo 1 > /sys/class/gpio/gpio${PCIe_HDMI_RST_Pin}/value    # rst key
+  hw_in pwr-led ${Beta_PWR_LED_Pin}   # pwr led
+  hw_key pwr-key ${Beta_PWR_KEY_Pin}  # pwr key
+  hw_key rst-key ${Beta_RST_KEY_Pin}  # rst key
+  hw_out hdmi-rst ${PCIe_HDMI_RST_Pin} 1  # LT6911 reset released
 
   rmmod /mnt/system/ko/i2c-gpio.ko
   rmmod /mnt/system/ko/i2c-algo-bit.ko
   insmod /mnt/system/ko/i2c-algo-bit.ko
   insmod /mnt/system/ko/i2c-gpio.ko
+}
+
+# gpio_mode_probe: decide the GPIO path from what the kernel shows. Every
+# supported board DT names "oled-rst". kvmgpio has: 0 named, 3 no such line
+# (vendor kernel), anything else (missing tool, ambiguous name, unreadable
+# chip) is an error and leaves GPIO_MODE=none: never a guessed number.
+gpio_mode_probe(){
+  GPIO_MODE=none
+  if [ ! -x "$KVMGPIO" ]
+  then
+    echo "kvmhwd: $KVMGPIO is missing: no gpio line will be touched" >&2
+    return
+  fi
+  "$KVMGPIO" has oled-rst
+  case $? in
+    0) GPIO_MODE=named ;;
+    3) GPIO_MODE=sysfs ;;
+    *) echo "kvmhwd: cannot tell whether the DT names the gpio lines: no gpio line will be touched" >&2 ;;
+  esac
+  echo "kvmhwd: gpio mode $GPIO_MODE"
+  if [ "$GPIO_MODE" = named ]
+  then
+    "$KVMGPIO" daemon || { echo "kvmhwd: kvmgpio owner failed to start: no gpio line will be held" >&2; GPIO_MODE=none; }
+  fi
+}
+
+# hw_out NAME SYSFS_PIN VALUE: drive a held output (the owner keeps it).
+hw_out(){
+  case $GPIO_MODE in
+    named)
+      "$KVMGPIO" set "$1" "$3" > /dev/null || echo "kvmhwd: gpio $1=$3 failed" >&2 ;;
+    sysfs)
+      gpio_export "$2"
+      echo out > /sys/class/gpio/gpio$2/direction
+      echo "$3" > /sys/class/gpio/gpio$2/value ;;
+    *)
+      echo "kvmhwd: gpio $1=$3 not driven (no gpio access)" >&2 ;;
+  esac
+}
+
+# hw_in NAME SYSFS_PIN: an input line needs nothing on the chardev path (readers
+# request it themselves); the vendor path exports it as an input.
+hw_in(){
+  if [ "$GPIO_MODE" = sysfs ]
+  then
+    gpio_export "$2"
+    echo in > /sys/class/gpio/gpio$2/direction
+  fi
+}
+
+# hw_key NAME SYSFS_PIN: a key line. Chardev: the Go server requests it per
+# press, so nothing here (the owner must not hold it). Vendor: export as out.
+hw_key(){
+  if [ "$GPIO_MODE" = sysfs ]
+  then
+    gpio_export "$2"
+    echo out > /sys/class/gpio/gpio$2/direction
+  fi
+}
+
+# pad_gpio ADDR: vendor kernel only. The mainline DT muxes these pads through
+# its pinctrl, so the devmem write is redundant there and is skipped.
+pad_gpio(){
+  [ "$GPIO_MODE" = sysfs ] && devmem "$1" 32 0x3
 }
 
 # write_state FILE VALUE: replace FILE with VALUE atomically. The file either
@@ -134,24 +193,20 @@ kvm_hw_detect(){
     else
       mkdir /etc/kvm/
     fi
-    devmem 0x0300104C 32 0x3  # GPIOA26 / WiFi_EN
-    gpio_export ${WiFi_EN_Pin}  # WiFi_EN
-    echo out > /sys/class/gpio/gpio${WiFi_EN_Pin}/direction
-    echo 0 > /sys/class/gpio/gpio${WiFi_EN_Pin}/value
+    pad_gpio 0x0300104C  # GPIOA26 / WiFi_EN
+    hw_out wifi-en ${WiFi_EN_Pin} 0  # WiFi_EN
 
-    devmem 0x0300103C 32 0x3  # GPIOA15
-    devmem 0x03001050 32 0x3  # GPIOA22
-    devmem 0x0300105C 32 0x3  # GPIOA23
-    devmem 0x03001060 32 0x3  # GPIOA24
-    devmem 0x03001054 32 0x3  # GPIOA25
-    devmem 0x03001058 32 0x3  # GPIOA27
+    pad_gpio 0x0300103C  # GPIOA15
+    pad_gpio 0x03001050  # GPIOA22
+    pad_gpio 0x0300105C  # GPIOA23
+    pad_gpio 0x03001060  # GPIOA24
+    pad_gpio 0x03001054  # GPIOA25
+    pad_gpio 0x03001058  # GPIOA27
 
     devmem 0x030010D0 32 0x2  # I2C1_SCL
     devmem 0x030010DC 32 0x2  # I2C1_SDA
-    devmem 0x030010D4 32 0x3  # OLED_RST
-    gpio_export ${Alpha_OLED_RST_Pin}  # OLED_RST
-    echo out > /sys/class/gpio/gpio${Alpha_OLED_RST_Pin}/direction
-    echo 1 > /sys/class/gpio/gpio${Alpha_OLED_RST_Pin}/value
+    pad_gpio 0x030010D4  # OLED_RST
+    hw_out oled-rst ${Alpha_OLED_RST_Pin} 1  # OLED_RST (the one DT line, named: the Alpha pin only on the vendor kernel)
 
     kvm_tmp=$(i2cdetect -ry 1 0x3d 0x3d | grep 3d)
     if [ -n "$kvm_tmp" ]
@@ -160,10 +215,8 @@ kvm_hw_detect(){
       write_state /etc/kvm/hw "alpha"
     else
       # beta/pcie hw
-      echo ${Alpha_OLED_RST_Pin} > /sys/class/gpio/unexport  # OLED_RST
-      gpio_export ${Beta_OLED_RST_Pin}  # Beta_OLED_RST_Pin
-      echo out > /sys/class/gpio/gpio${Beta_OLED_RST_Pin}/direction
-      echo 1 > /sys/class/gpio/gpio${Beta_OLED_RST_Pin}/value
+      [ "$GPIO_MODE" = sysfs ] && echo ${Alpha_OLED_RST_Pin} > /sys/class/gpio/unexport  # OLED_RST
+      hw_out oled-rst ${Beta_OLED_RST_Pin} 1  # Beta_OLED_RST_Pin
 
       rmmod /mnt/system/ko/i2c-gpio.ko
       rmmod /mnt/system/ko/i2c-algo-bit.ko
@@ -174,8 +227,10 @@ kvm_hw_detect(){
 
       kvm_tmp=$(i2cdetect -ry 5 0x3c 0x3c | grep 3c)
       # finish the shared work first, record the result last
-      echo 1 > /sys/class/gpio/gpio${WiFi_EN_Pin}/value
-      echo ${WiFi_EN_Pin} > /sys/class/gpio/unexport  # WiFi_EN
+      hw_out wifi-en ${WiFi_EN_Pin} 1
+      # vendor kernel: the exported pad keeps its level once unexported; on the
+      # chardev path the owner keeps wifi-en driven high for good.
+      [ "$GPIO_MODE" = sysfs ] && echo ${WiFi_EN_Pin} > /sys/class/gpio/unexport  # WiFi_EN
 
       if [ -n "$kvm_tmp" ]
       then
@@ -242,16 +297,19 @@ kvm_hdmi_version_detect()
 
 case "$1" in
   start)
+    gpio_mode_probe
     kvm_hw_detect
     kvm_hw_init
   ;;
   re-detect)
     # an explicit re-detect may reboot again, so clear the once-only marker too
     rm -f /etc/kvm/hw /etc/kvm/hw_rebooted
+    gpio_mode_probe
     kvm_hw_detect
     kvm_hw_init
   ;;
   re-init)
+    gpio_mode_probe
     kvm_hw_init
   ;;
   get_hdmi_version)

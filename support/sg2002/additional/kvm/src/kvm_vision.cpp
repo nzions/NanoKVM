@@ -1461,10 +1461,9 @@ uint8_t kvmv_hdmi_control(uint8_t _en)
         }
         return -1;
     }
-    if(access("/sys/class/gpio/gpio451/value", F_OK) != 0){
-        system("echo 451 > /sys/class/gpio/export");
-        system("echo out > /sys/class/gpio/gpio451/direction");
-    }
+    // The LT6911 reset line is "hdmi-rst" (DT line name), owned by the
+    // kvmgpio daemon S15kvmhwd started; vendor sysfs gpio451 only when no
+    // line carries the name. A failure leaves the state machine untouched.
     if(_en == 0){
         // lt_mutex is held by the state machine for the whole of an LT6911
         // read, so taking it here waits for a read in flight and keeps the
@@ -1472,10 +1471,16 @@ uint8_t kvmv_hdmi_control(uint8_t _en)
         pthread_mutex_lock(&lt_mutex);
         hdmi_stopped = 1;
         pthread_mutex_unlock(&lt_mutex);
-        system("echo 0 > /sys/class/gpio/gpio451/value");
+        if(nk_gpio_set_held("hdmi-rst", 451, 0) != 0){
+            fprintf(stderr, "[kvmv]hdmi-rst: cannot hold the LT6911 in reset\n");
+            return -1;
+        }
         return 0;
     } else {
-        system("echo 1 > /sys/class/gpio/gpio451/value");
+        if(nk_gpio_set_held("hdmi-rst", 451, 1) != 0){
+            fprintf(stderr, "[kvmv]hdmi-rst: cannot release the LT6911 reset\n");
+            return -1;
+        }
         pthread_mutex_lock(&lt_mutex);
         hdmi_stopped = 0;
         pthread_mutex_unlock(&lt_mutex);

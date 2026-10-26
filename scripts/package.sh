@@ -81,6 +81,8 @@ require_file "$ROOT/kvmapp/server/dl_lib/libkvm.so" "run: make vision"
 require_riscv64 "$ROOT/server/NanoKVM-Server"
 require_riscv64 "$ROOT/kvmapp/kvm_system/kvm_system"
 require_riscv64 "$ROOT/kvmapp/server/dl_lib/libkvm.so"
+require_file "$ROOT/tools/kvmgpio/kvmgpio" "build tools/kvmgpio (scripts/forge-build.sh does)"
+require_riscv64 "$ROOT/tools/kvmgpio/kvmgpio"
 
 echo "[INFO] staging nanokvm_$VERSION"
 # Clear the whole output directory: release.yml uploads build/release/nanokvm_*
@@ -149,6 +151,8 @@ cp -a "$ROOT/web/dist/." "$STAGE/server/web/"
 mkdir -p "$STAGE/system/tool"
 cp -a "$ROOT/tools/nanokvm_update_edid/nanokvm_update_edid" "$STAGE/system/tool/"
 cp -a "$ROOT/tools/nanokvm_update_edid/E21_NanoKVM.bin" "$STAGE/system/tool/"
+#    kvmgpio owns the held GPIO outputs by DT line name; S15kvmhwd runs it from here.
+cp -a "$ROOT/tools/kvmgpio/kvmgpio" "$STAGE/system/tool/"
 
 # 7. Default runtime state read by common.GetScreen() on first boot.
 mkdir -p "$STAGE/kvm"

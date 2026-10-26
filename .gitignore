@@ -36,3 +36,6 @@ kvmapp/kvm_system/kvm_system
 
 # Release packages assembled by scripts/package.sh
 /build/
+
+# built by scripts/build-in-container.sh, packaged under system/tool/
+/tools/kvmgpio/kvmgpio

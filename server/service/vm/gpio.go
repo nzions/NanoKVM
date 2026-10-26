@@ -1,15 +1,15 @@
 package vm
 
 import (
+	"errors"
 	"fmt"
-	"os"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 
 	"NanoKVM-Server/config"
+	"NanoKVM-Server/gpio"
 	"NanoKVM-Server/proto"
 )
 
@@ -22,14 +22,14 @@ func (s *Service) SetGpio(c *gin.Context) {
 		return
 	}
 
-	device := ""
+	line, device := "", ""
 	conf := config.GetInstance().Hardware
 
 	switch req.Type {
 	case "power":
-		device = conf.GPIOPower
+		line, device = conf.LinePower, conf.GPIOPower
 	case "reset":
-		device = conf.GPIOReset
+		line, device = conf.LineReset, conf.GPIOReset
 	default:
 		rsp.ErrRsp(c, -2, fmt.Sprintf("invalid power event: %s", req.Type))
 		return
@@ -42,12 +42,12 @@ func (s *Service) SetGpio(c *gin.Context) {
 		duration = 800 * time.Millisecond
 	}
 
-	if err := writeGpio(device, duration); err != nil {
+	if err := writeGpio(line, device, duration); err != nil {
 		rsp.ErrRsp(c, -3, fmt.Sprintf("operation failed: %s", err))
 		return
 	}
 
-	log.Debugf("gpio %s set successfully", device)
+	log.Debugf("gpio %s (%s) set successfully", line, device)
 	rsp.OkRsp(c)
 }
 
@@ -56,7 +56,7 @@ func (s *Service) GetGpio(c *gin.Context) {
 
 	conf := config.GetInstance().Hardware
 
-	pwr, err := readGpio(conf.GPIOPowerLED)
+	pwr, err := readGpio(conf.LinePowerLED, conf.GPIOPowerLED)
 	if err != nil {
 		rsp.ErrRsp(c, -2, fmt.Sprintf("failed to read power led: %s", err))
 		return
@@ -64,7 +64,7 @@ func (s *Service) GetGpio(c *gin.Context) {
 
 	hdd := false
 	if conf.Version == config.HWVersionAlpha {
-		hdd, err = readGpio(conf.GPIOHDDLed)
+		hdd, err = readGpio(conf.LineHDDLed, conf.GPIOHDDLed)
 		if err != nil {
 			rsp.ErrRsp(c, -2, fmt.Sprintf("failed to read hdd led: %s", err))
 			return
@@ -78,39 +78,38 @@ func (s *Service) GetGpio(c *gin.Context) {
 	rsp.OkRspWithData(c, data)
 }
 
-func writeGpio(device string, duration time.Duration) error {
-	if err := os.WriteFile(device, []byte("1"), 0o666); err != nil {
-		log.Errorf("write gpio %s failed: %s", device, err)
+// writeGpio presses a key line for duration. The line is found by its DT name
+// over the GPIO chardev; the vendor sysfs file is used only when no line
+// carries the name. A missing line is an error, never a guessed number.
+func writeGpio(line string, sysfs string, duration time.Duration) error {
+	err := gpio.Pulse(line, duration)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, gpio.ErrNoLine) || sysfs == "" {
+		log.Errorf("pulse gpio line %q failed: %s", line, err)
 		return err
 	}
-
-	time.Sleep(duration)
-
-	if err := os.WriteFile(device, []byte("0"), 0o666); err != nil {
-		log.Errorf("write gpio %s failed: %s", device, err)
+	if err := gpio.SysfsPulse(sysfs, duration); err != nil {
+		log.Errorf("write gpio %s failed: %s", sysfs, err)
 		return err
 	}
-
 	return nil
 }
 
-func readGpio(device string) (bool, error) {
-	content, err := os.ReadFile(device)
+// readGpio returns true when the (active-low) LED line is lit.
+func readGpio(line string, sysfs string) (bool, error) {
+	high, err := gpio.Read(line)
 	if err != nil {
-		log.Errorf("read gpio %s failed: %s", device, err)
-		return false, err
+		if !errors.Is(err, gpio.ErrNoLine) || sysfs == "" {
+			log.Errorf("read gpio line %q failed: %s", line, err)
+			return false, err
+		}
+		high, err = gpio.SysfsRead(sysfs)
+		if err != nil {
+			log.Errorf("read gpio %s failed: %s", sysfs, err)
+			return false, err
+		}
 	}
-
-	contentStr := string(content)
-	if len(contentStr) > 1 {
-		contentStr = contentStr[:len(contentStr)-1]
-	}
-
-	value, err := strconv.Atoi(contentStr)
-	if err != nil {
-		log.Errorf("invalid gpio content: %s", content)
-		return false, nil
-	}
-
-	return value == 0, nil
+	return !high, nil
 }

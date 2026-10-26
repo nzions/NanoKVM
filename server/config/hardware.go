@@ -21,6 +21,10 @@ func HWVersionFile() string {
 
 var HWAlpha = Hardware{
 	Version:      HWVersionAlpha,
+	LineReset:    "rst-key",
+	LinePower:    "pwr-key",
+	LinePowerLED: "pwr-led",
+	LineHDDLed:   "hdd-led",
 	GPIOReset:    "/sys/class/gpio/gpio507/value",
 	GPIOPower:    "/sys/class/gpio/gpio503/value",
 	GPIOPowerLED: "/sys/class/gpio/gpio504/value",
@@ -29,6 +33,9 @@ var HWAlpha = Hardware{
 
 var HWBeta = Hardware{
 	Version:      HWVersionBeta,
+	LineReset:    "rst-key",
+	LinePower:    "pwr-key",
+	LinePowerLED: "pwr-led",
 	GPIOReset:    "/sys/class/gpio/gpio505/value",
 	GPIOPower:    "/sys/class/gpio/gpio503/value",
 	GPIOPowerLED: "/sys/class/gpio/gpio504/value",
@@ -37,6 +44,9 @@ var HWBeta = Hardware{
 
 var HWPcie = Hardware{
 	Version:      HWVersionPcie,
+	LineReset:    "rst-key",
+	LinePower:    "pwr-key",
+	LinePowerLED: "pwr-led",
 	GPIOReset:    "/sys/class/gpio/gpio505/value",
 	GPIOPower:    "/sys/class/gpio/gpio503/value",
 	GPIOPowerLED: "/sys/class/gpio/gpio504/value",

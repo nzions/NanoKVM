@@ -56,8 +56,15 @@ type Security struct {
 	CORSOrigins []string `yaml:"corsOrigins"`
 }
 
+// Hardware names the board's GPIO lines twice: Line* are the device-tree line
+// names (the GPIO chardev, the only path on the mainline kernel), GPIO* the
+// vendor kernel's sysfs value files, used only when no line carries the name.
 type Hardware struct {
 	Version      HWVersion `yaml:"-"`
+	LineReset    string    `yaml:"-"`
+	LinePower    string    `yaml:"-"`
+	LinePowerLED string    `yaml:"-"`
+	LineHDDLed   string    `yaml:"-"`
 	GPIOReset    string    `yaml:"-"`
 	GPIOPower    string    `yaml:"-"`
 	GPIOPowerLED string    `yaml:"-"`
