@@ -1,3 +1,10 @@
+## 2.6.50 (2026-10-27)
+
+### Fixes
+
+* 2.6.48 lost DHCP on hardware (the link light was up, no lease was ever requested; 2.6.44 got one on the same board). The cause was not reproduced: busybox 1.36.1 lists `udhcpc -x`, so the prime suspect, the foreground `set_hostname` that 2.6.48 ran before `udhcpc`, is unproven. The 2.6.49 retry logic is dropped. The network path in `/etc/init.d/S30eth` (`start()`: `ip addr flush`, the `/boot/eth.nodhcp` branch and `udhcpc -i eth0 -t 10 -T 1 -A 5 -b -p /run/udhcpc.eth0.pid &`) is restored byte for byte to what 2.6.44 ran, so `udhcpc` no longer sends `-x hostname:`.
+* The hostname is set off the critical path: the functions moved to `/kvmapp/system/init.d/hostname.sh` (not an `S??` name, so rcS never runs it by itself), and the last thing `start()` does, after networking was launched, is run it in a background subshell under `timeout 15`; a failure or timeout only logs. It cannot block the boot or touch DHCP. avahi (S50) reads the kernel hostname when it starts, so the name being set before then is best-effort: mDNS may advertise the old name until avahi restarts. The name is no longer sent in the DHCP request.
+
 ## 2.6.49 (2026-10-27)
 
 ### Fixes
