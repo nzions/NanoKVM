@@ -134,6 +134,9 @@ mk modules/sys "$LIBDIR/libsys.so" "$V2INC" ""
 # libcvi_bin's table and libvpu's one CVI_ISP_GetVDTimeOut call. Copied into the (re-fetched,
 # git-less) pin tree; the modules' makefiles take every src/*.c.
 install -m 0644 "$SHIM/bin/isp_bin_stub.c" "$MW/v2/modules/bin/src/nanokvm_isp_bin_stub.c"
+# vo_json_struct.c / vpss_json_struct.c are json-only (the JSON_* helpers, param_point and
+# cvi_json_* all live in the closed blob) and nothing else in libcvi_bin calls into them.
+rm -f "$MW/v2/modules/bin/src/vo_json_struct.c" "$MW/v2/modules/bin/src/vpss_json_struct.c"
 install -m 0644 "$SHIM/vpu/isp_vd_stub.c" "$MW/v2/modules/vpu/src/nanokvm_isp_vd_stub.c"
 mk modules/bin "$LIBDIR/libcvi_bin.so" "$V2INC" "-idirafter $OUT/cvi/include/cvi_json-c -idirafter $OUT/cvi/include/cvi_miniz"
 mk modules/vpu "$LIBDIR/libvpu.so" "$V2INC" ""

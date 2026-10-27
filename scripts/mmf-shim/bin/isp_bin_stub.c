@@ -1,5 +1,6 @@
 /*
- * NanoKVM: isp_bin_{getBinSize,getBinParam,setBinParam,setBinParambuf}_p0..p3.
+ * NanoKVM: isp_bin_{getBinSize,getBinParam,setBinParam,setBinParambuf}_p0..p3 and the
+ * four header_bin_* handlers of the same table.
  *
  * libcvi_bin's table of per-block handlers (cvi_bin.c) names the ISP parameter block
  * handlers, which the pin only ships inside the closed libcvi_bin_isp.so. NanoKVM runs
@@ -11,31 +12,34 @@
 #include <stdio.h>
 #include <linux/cvi_type.h>
 
-#define ISP_BIN_STUB(p) \
-	CVI_S32 isp_bin_getBinSize_##p(CVI_U32 *binSize) \
+#define ISP_BIN_STUB(pfx, p) \
+	CVI_S32 pfx##_getBinSize##p(CVI_U32 *binSize) \
 	{ \
 		if (binSize) \
 			*binSize = 0; \
 		return CVI_FAILURE; \
 	} \
-	CVI_S32 isp_bin_getBinParam_##p(CVI_U8 *addr, CVI_U32 binSize) \
+	CVI_S32 pfx##_getBinParam##p(CVI_U8 *addr, CVI_U32 binSize) \
 	{ \
 		(void)addr; \
 		(void)binSize; \
 		return CVI_FAILURE; \
 	} \
-	CVI_S32 isp_bin_setBinParam_##p(FILE *fp) \
+	CVI_S32 pfx##_setBinParam##p(FILE *fp) \
 	{ \
 		(void)fp; \
 		return CVI_FAILURE; \
 	} \
-	CVI_S32 isp_bin_setBinParambuf_##p(CVI_U8 *buffer) \
+	CVI_S32 pfx##_setBinParambuf##p(CVI_U8 *buffer) \
 	{ \
 		(void)buffer; \
 		return CVI_FAILURE; \
 	}
 
-ISP_BIN_STUB(p0)
-ISP_BIN_STUB(p1)
-ISP_BIN_STUB(p2)
-ISP_BIN_STUB(p3)
+/* The header block handlers (isp_bin.h declares the first two; the other two have the
+ * same function-pointer types in cvi_bin.c's table). */
+ISP_BIN_STUB(header_bin, )
+ISP_BIN_STUB(isp_bin, _p0)
+ISP_BIN_STUB(isp_bin, _p1)
+ISP_BIN_STUB(isp_bin, _p2)
+ISP_BIN_STUB(isp_bin, _p3)
