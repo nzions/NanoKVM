@@ -33,8 +33,8 @@ SRC="$(cd "$(dirname "$0")/.." && pwd)"
 ARTIFACTS="${ARTIFACTS_DIR:-/artifacts}"
 
 # ------------------------------------------------------------------- the pins
-USERSPACE=2.6.44
-USERSPACE_SHA256=bec56565afa7c8aa7dbcec331c4f52c2fdc2478a82c00efe4369005d6b34a68f
+USERSPACE=2.6.47
+USERSPACE_SHA256=e9c0eeb788a9fb2a41aafa63453564b1fae46fd8fbde7eca353ab9349488962d
 
 KERNEL_TAG=k1.2
 INPUTS=https://hc.nikspace.net/nanokvm/sdimg/inputs
