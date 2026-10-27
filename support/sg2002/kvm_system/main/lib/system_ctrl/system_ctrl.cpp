@@ -55,7 +55,7 @@ static uint8_t write_secret_file(const char *path, const char *text)
 }
 
 // Show a legacy generated password on the OLED while its file exists (releases
-// before 2.6.46 wrote one; nothing writes it now).
+// before 2.6.47 wrote one; nothing writes it now).
 void kvm_show_seed_password(void)
 {
 	if(access(SEED_PASS_FILE, F_OK) != 0 && access(ROOT_PASS_FILE, F_OK) != 0){
