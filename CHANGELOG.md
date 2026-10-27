@@ -1,3 +1,13 @@
+## 2.6.48 (2026-10-27)
+
+### Changes
+
+* Automatic hostname (Nik's ruling: "auto set the hostname to nanokvm-<id> if the board has a serial use the last 4 otherwise use the mac"). `/etc/init.d/S30eth` (the one place; it runs before udhcpc and avahi) sets the hostname at every boot: a non-empty `/boot/hostname` wins unchanged; otherwise `nanokvm-<id>`, `<id>` = the last 4 characters (lowercase `[0-9a-z]`) of the SoC unique id `/sys/class/cvi-base/base_uid` (the id S03usbdev and `/device_key` already use), then the device-tree `serial-number`, then the `/proc/cpuinfo` Serial; failing those, the last 4 hex digits of eth0's MAC. An id that is empty, all zeros or all f is skipped. With neither it keeps the existing hostname and logs why.
+* It writes `/etc/hostname` and runs `hostname`, rewrites a `host-name=` pinned in `/etc/avahi/avahi-daemon.conf` if there is one (avahi otherwise advertises the kernel name, so mDNS shows `nanokvm-<id>.local`), and `udhcpc` now sends the name (`-x hostname:`).
+* A hostname set in the web UI is written to `/boot/hostname` by the server, so it persists and wins over the automatic one. The automatic name is never written to `/boot`, so it follows the board and a later `/boot/hostname` takes over. Hand edits of `/etc/hostname` alone are replaced at the next boot.
+* `scripts/FLASHING.md` and `scripts/sd-image.sh`: `/boot/hostname` is optional.
+* Not run on hardware
+
 ## 2.6.47 (2026-10-27)
 
 ### Changes

@@ -48,7 +48,13 @@ This uses the raw `.img`, because macOS ships no `xz`.
 
        diskutil unmountDisk /dev/diskN && sudo dd if=nanokvm-cube-2.5.16-sd.img of=/dev/rdiskN bs=4m status=progress && sync && diskutil eject /dev/diskN
 
-## After flashing: set the hostname and the root password
+## After flashing: the hostname and the root password
+
+The hostname is OPTIONAL: a non-empty `hostname` file on the `boot` partition wins. Without
+one the box names itself `nanokvm-<id>` (mDNS `nanokvm-<id>.local`, and the name DHCP
+sends), `<id>` being the last 4 characters of the board's serial number (the SoC unique id),
+or, if it has none, the last 4 hex digits of eth0's MAC. A name set later in the web UI
+is saved to that same `hostname` file, so it persists and wins.
 
 There is one account, `root`: the web login and the Linux login share its password. The
 card's small FAT partition (label `boot`) is readable and writable from the Mac. A
@@ -60,7 +66,7 @@ no `eth.nodhcp`.
 
 1. Re-insert the card (the flash ejected it). It mounts as `/Volumes/boot` (macOS adds a
    number, e.g. `boot 1`, if another volume is already named `boot`; use the name you see).
-2. (Optional: skip it for the no-password first boot, but still write `hostname`.) On m5sspro (where nik's sage key is), as one line: generate the password, store it in
+2. (Optional: skip it for the no-password first boot; write `hostname` only if you want a name of your own.) On m5sspro (where nik's sage key is), as one line: generate the password, store it in
    sage FIRST, share it with the rook, only then write it to the card, and eject. `--show`
    is needed or sage prints a redaction instead of the value:
 
