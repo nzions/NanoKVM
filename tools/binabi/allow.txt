@@ -5,3 +5,13 @@
 # (so whoever fixes a listed item must delete its entry). The sections field is exact:
 # to relax a size, list the build's "<section> <size>" line AND the golden's, with a reason.
 
+
+# 2.6.46: the BOOT-button reset locks root in /etc/shadow itself instead of generating a password (kvm_system lock_root_shadow)
+kvm_system imports fchown # 2.6.46 lock_root_shadow keeps the shadow file's owner
+kvm_system imports rename # 2.6.46 lock_root_shadow replaces /etc/shadow atomically
+kvm_system imports stat # 2.6.46 lock_root_shadow keeps the shadow file's mode
+kvm_system imports strchr # 2.6.46 lock_root_shadow finds the hash field of root's line
+kvm_system sections .text 166632 # 2.6.46 golden .text (reset code replaced)
+kvm_system sections .text 166838 # 2.6.46 build .text with lock_root_shadow
+kvm_system sections .rodata 55464 # 2.6.46 golden .rodata (reset code replaced)
+kvm_system sections .rodata 55384 # 2.6.46 build .rodata with lock_root_shadow
