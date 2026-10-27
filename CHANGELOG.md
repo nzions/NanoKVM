@@ -1,3 +1,9 @@
+## 2.6.49 (2026-10-27)
+
+### Fixes
+
+* Regression in 2.6.48: the SD image booted and the link light blinked but the board never sent a DHCP request (2.6.44 got a lease on the same board). The only networking change in 2.6.48 was in `/etc/init.d/S30eth`: `set_hostname` ran first in `start()` and both `udhcpc` calls gained `-x "hostname:$HN"`. The image's busybox (v1.36.1) does list `-x OPT:VAL` for udhcpc, so the option itself is not shown to be the cause; the root cause is not reproduced off-board. The script no longer lets the hostname work stand between the board and a lease: a failing `set_hostname` only logs, and if `udhcpc -x hostname:` exits non-zero (it did not start) it is run again without `-x`, in both the DHCP and the `/boot/eth.nodhcp` fallback branch. The DHCP branch runs in a background subshell so a slow lease never delays the boot. avahi still advertises the hostname over mDNS.
+
 ## 2.6.48 (2026-10-27)
 
 ### Changes

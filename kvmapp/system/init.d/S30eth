@@ -123,9 +123,24 @@ set_hostname() {
     fi
 }
 
+# run_udhcpc TRIES runs udhcpc with the hostname option. With -b and no &, it
+# returns once it has a lease or its retries ran out (then it keeps going in
+# the background), so a non-zero status means udhcpc did not start at all, e.g.
+# it rejected an option: run it again without -x so networking never depends on
+# the hostname option.
+run_udhcpc() {
+    _tries=$1
+    if [ -n "$HN" ]; then
+        udhcpc -i eth0 -x "hostname:$HN" -t "$_tries" -T 1 -A 5 -b -p /run/udhcpc.eth0.pid && return 0
+        echo "S30eth: udhcpc -x hostname failed ($?): retrying without it" >&2
+    fi
+    udhcpc -i eth0 -t "$_tries" -T 1 -A 5 -b -p /run/udhcpc.eth0.pid
+}
+
 start() {
-    set_hostname
-    HN=$(hostname)
+    # naming the box must never stop networking: a failure here only logs
+    set_hostname || echo "S30eth: set_hostname failed ($?): continuing" >&2
+    HN=$(hostname 2>/dev/null)
     ip addr flush dev eth0
     if [ -e /boot/eth.nodhcp ]; then
         while IFS= read -r line || [ -n "$line" ]; do
@@ -180,7 +195,7 @@ EOF
         done < /boot/eth.nodhcp
 
         ip a show dev eth0 | grep inet > /dev/null || {
-            udhcpc -i eth0 -x "hostname:$HN" -t 3 -T 1 -A 5 -b -p /run/udhcpc.eth0.pid &>/dev/null
+            run_udhcpc 3 >/dev/null 2>&1
             ip a show dev eth0 | grep inet > /dev/null
         } || {
             inet=$RESERVE_INET
@@ -188,7 +203,9 @@ EOF
             ip a add "$inet" brd + dev eth0
         } || exit 1
     else
-        udhcpc -i eth0 -x "hostname:$HN" -t 10 -T 1 -A 5 -b -p /run/udhcpc.eth0.pid &
+        # backgrounded so a slow lease never holds up the boot; the function
+        # still sees udhcpc's exit status for the fallback
+        run_udhcpc 10 &
     fi
 }
 
