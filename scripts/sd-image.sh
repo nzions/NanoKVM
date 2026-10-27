@@ -18,9 +18,9 @@
 #
 # NO secret is written. /etc/kvm/pwd, initial.pass and root.pass are absent from
 # the image; the one web account is root and its password is root's Linux
-# password. On first boot the server takes /boot/root.pass for it, else sets a
-# random password, shows it on the OLED and writes it to /etc/kvm/initial.pass
-# (0600); the owner must change that one at first login. /etc/kvm/ssh_stop
+# password. On first boot the server takes /boot/root.pass for it; with none, root is
+# locked in /etc/shadow (no password) and the first web connection sets the password
+# (POST /api/auth/setup, once). No seed is generated. /etc/kvm/ssh_stop
 # (stock: sshd off) is left as shipped.
 #
 # No root and no loop mount: the rootfs (partition 2) is cut out with dd, edited
@@ -701,4 +701,4 @@ printf '%s  %s\n' "$sum" "$(basename "$OUT")" >"$OUT.sha256"
 info "wrote $OUT ($img_bytes bytes, release $VERSION)"
 info "sha256 $sum"
 info "flash it to the microSD card (e.g. dd if=$(basename "$OUT") of=/dev/rdiskN bs=4m on macOS, or balenaEtcher)."
-info "first boot: the root password is /boot/root.pass if present, else shown on the OLED (also /etc/kvm/initial.pass) and changed at first login; web user root."
+info "first boot: the root password is /boot/root.pass if present (optional); with none the box boots with NO password and the first web connection sets it - anyone on the LAN can claim it first. Web user root."

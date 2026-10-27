@@ -46,8 +46,7 @@
 #define RM_Watchdog_times			60
 #define WIFI_AP_PASS_LEN			10
 #define WIFI_AP_TIMEOUT_MS			600000	// stop the config AP after 10 min without a result
-#define RESET_PASS_LEN				12
-#define SEED_PASS_FILE				"/etc/kvm/initial.pass"	// 0600; first-boot / reset password, shown on the OLED
+#define SEED_PASS_FILE				"/etc/kvm/initial.pass"	// legacy: a generated password of releases before 2.6.46, shown on the OLED while it exists
 #define ROOT_PASS_FILE				"/etc/kvm/root.pass"	// 0600; root password rotated away from root:root by S50sshd, shown on the OLED
 
 typedef struct {

@@ -1,3 +1,16 @@
+## 2.6.46 (2026-10-27)
+
+### Changes
+
+* First connection sets the password (Nik's ruling: "no password then.... 1st connection sets the password"). With no `/boot/root.pass` at first boot the server no longer generates a seed password (it was shown on the OLED and kept in `/etc/kvm/initial.pass`; a Cube has no OLED, so the box was unreachable). Root is locked in `/etc/shadow` (`!`, no ssh password login) and the account state `/etc/kvm/pwd` records `passwordUnset`. `/boot/root.pass` is unchanged: present, it wins, is consumed and forces no change.
+* `POST /api/auth/setup {"password": "..."}` (unauthenticated) sets the password: accepted only while it is unset, validated by `ValidatePassword`, written with `SetRootPassword`, bumps the token version and returns a logged-in session exactly like login (cookie `nano-kvm-token`). Under the store lock, so of concurrent setups exactly one wins. Once set it answers code `-7` ("password already set"), never a second setup. Anyone on the LAN who connects first claims an unset device.
+* `POST /api/auth/login` while unset answers code `-6` ("password not set: call POST /api/auth/setup") and does not count as a failed attempt. `GET /api/auth/state` (unauthenticated) answers `{"password_set": bool}`. All codes travel in the body of an HTTP 200, as everywhere in this API.
+* Web login page: when the password is unset it shows "Set root password" (password and confirm) and logs in on success.
+* The BOOT-button reset (`kvm_system`) no longer generates a password: it locks root in `/etc/shadow` and removes `/etc/kvm/pwd`, which returns the device to the same unset state. The OLED no longer shows a password (an old `/etc/kvm/initial.pass` still is, until removed).
+* A device whose password is already set is unaffected; a state with the old must-change-from-seed flag keeps working.
+* `scripts/FLASHING.md` and `scripts/sd-image.sh`: `root.pass` is optional.
+* Not run on hardware
+
 ## 2.6.45 (2026-10-26)
 
 ### Changes

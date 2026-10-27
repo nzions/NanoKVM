@@ -10,7 +10,9 @@ import (
 func authRouter(r *gin.Engine) {
 	service := auth.NewService()
 
-	r.POST("/api/auth/login", service.Login) // login
+	r.POST("/api/auth/login", service.Login)   // login
+	r.GET("/api/auth/state", service.GetState) // password set? (unauthenticated)
+	r.POST("/api/auth/setup", service.Setup)   // first-connection password setup (only while unset)
 
 	api := r.Group("/api").Use(middleware.CheckToken())
 

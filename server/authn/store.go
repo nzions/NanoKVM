@@ -2,8 +2,11 @@
 // password is root's Linux password: the hash in /etc/shadow is the only copy,
 // checked by utils.VerifyRootPassword (crypt $6$, $5$ and $1$). The state file
 // next to the old account store holds only what the shadow file cannot: the
-// session generation (bumped to revoke every session) and whether the next
-// login must change the password.
+// session generation (bumped to revoke every session), whether the next
+// login must change the password, and whether the password is UNSET: a device
+// with no /boot/root.pass at first boot (or after the button reset) has root
+// locked in /etc/shadow, accepts no login, and lets the first connection set
+// the password once through SetupPassword.
 package authn
 
 import (
@@ -12,7 +15,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/big"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,9 +30,9 @@ const (
 	// multi-user account store (bcrypt hashes) here; it is replaced by the
 	// state below the first time this release starts.
 	AccountFile = "/etc/kvm/pwd"
-	// SeedPasswordFile holds the first-boot (or button-reset) password. It is
-	// 0600 and shown on the device's own screen by kvm_system; it is removed once
-	// the owner changes the password.
+	// SeedPasswordFile was the generated first-boot (or button-reset) password
+	// shown on the OLED. Nothing writes it any more; one left by an older release
+	// is removed when the state is created and when a password is chosen.
 	SeedPasswordFile = "/etc/kvm/initial.pass"
 	// BootRootPassFile is an optional operator-supplied root password on the FAT
 	// boot partition (writable from a Mac). At first boot it becomes root's
@@ -45,10 +47,7 @@ const (
 	// times, so an unbounded one sent to the unauthenticated login route would be
 	// a CPU sink on this small SoC. (The bcrypt-era 72-byte limit is gone:
 	// SHA-crypt has no such limit, and the old passwords were all within it.)
-	MaxPasswordBytes   = 256
-	seedPasswordLength = 12
-	// seedPasswordAlphabet has no look-alike characters (0/O, 1/l/I).
-	seedPasswordAlphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+	MaxPasswordBytes = 256
 )
 
 type Role string
@@ -62,6 +61,11 @@ var (
 	ErrNotInitialized = errors.New("account state not initialized")
 	// ErrWrongUser is returned for any username other than root.
 	ErrWrongUser = errors.New("user not found")
+	// ErrPasswordUnset is returned by Authenticate while root has no password:
+	// the client must call SetupPassword.
+	ErrPasswordUnset = errors.New("password not set")
+	// ErrPasswordAlreadySet is returned by SetupPassword once a password exists.
+	ErrPasswordAlreadySet = errors.New("password already set")
 )
 
 // User is the root account as the web sees it.
@@ -70,13 +74,16 @@ type User struct {
 	Role               Role
 	TokenVersion       uint64
 	MustChangePassword bool
+	PasswordUnset      bool
 }
 
-// state is the file at Store.path.
+// state is the file at Store.path. PasswordUnset is absent (false) in every
+// state written by an earlier release, so such a device is unaffected.
 type state struct {
 	Version            int    `json:"version"`
 	TokenVersion       uint64 `json:"tokenVersion"`
 	MustChangePassword bool   `json:"mustChangePassword,omitempty"`
+	PasswordUnset      bool   `json:"passwordUnset,omitempty"`
 }
 
 // legacyFile reads the account store of releases up to 2.5.15 (version 1, a
@@ -130,7 +137,8 @@ func ValidatePassword(password string) error {
 }
 
 // Init creates the state when missing: it migrates a 2.5.15-style account file
-// or seeds root from the boot partition or a generated password. It is also
+// or seeds root from the boot partition, else locks root with the password
+// UNSET (the first connection sets it). It is also
 // run lazily by Authenticate, so deleting the state file (the button reset
 // does) re-seeds a running server.
 func (s *Store) Init() error {
@@ -161,6 +169,7 @@ func (s *Store) getLocked(username string) (*User, error) {
 // Authenticate checks the password against root's /etc/shadow hash. A wrong
 // user or password is (nil, false, nil); an error means the answer is unknown
 // (state unreadable, or root's hash is of a type that cannot be checked).
+// While the password is unset the error is ErrPasswordUnset.
 func (s *Store) Authenticate(username, password string) (*User, bool, error) {
 	if username != Username || password == "" || len(password) > MaxPasswordBytes {
 		return nil, false, nil
@@ -171,6 +180,9 @@ func (s *Store) Authenticate(username, password string) (*User, bool, error) {
 	st, err := s.loadLocked(true)
 	if err != nil {
 		return nil, false, err
+	}
+	if st.PasswordUnset {
+		return nil, false, ErrPasswordUnset
 	}
 	ok, err := utils.VerifyRootPassword(password)
 	if err != nil {
@@ -193,8 +205,68 @@ func (s *Store) ValidateToken(username string, tokenVersion uint64) (*User, erro
 	return user, nil
 }
 
+// PasswordSet reports whether root has a password. It creates the state when
+// missing (like Authenticate), so a first call after the button reset locks root
+// and answers false.
+func (s *Store) PasswordSet() (bool, error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	st, err := s.loadLocked(true)
+	if err != nil {
+		return false, err
+	}
+	return !st.PasswordUnset, nil
+}
+
+// SetupPassword is the one-time first-connection setup: while the password is
+// unset it makes password root's Linux password, clears the unset flag and
+// revokes every session. Under the store's lock, so of concurrent calls exactly
+// one succeeds; every later call is ErrPasswordAlreadySet.
+func (s *Store) SetupPassword(password string) (*User, error) {
+	if err := ValidatePassword(password); err != nil {
+		return nil, err
+	}
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	st, err := s.loadLocked(true)
+	if err != nil {
+		return nil, err
+	}
+	if !st.PasswordUnset {
+		return nil, ErrPasswordAlreadySet
+	}
+	if err = utils.SetRootPassword(password); err != nil {
+		return nil, err
+	}
+	st.PasswordUnset = false
+	st.MustChangePassword = false
+	st.TokenVersion++
+	if err = s.saveLocked(st); err != nil {
+		// the state still says unset: lock root again so nobody holds a password
+		// the state does not know about
+		if lockErr := utils.LockRootPassword(); lockErr != nil {
+			log.Errorf("SECURITY: setup could not be saved (%v) and root could not be locked again: %v", err, lockErr)
+		}
+		return nil, fmt.Errorf("session state could not be saved: %w", err)
+	}
+	s.removeSeedFiles()
+	return userOf(st), nil
+}
+
+// removeSeedFiles drops a seed password file and a rotated root password file
+// left by an earlier release.
+func (s *Store) removeSeedFiles() {
+	if rmErr := os.Remove(s.seedPath); rmErr != nil && !errors.Is(rmErr, os.ErrNotExist) {
+		log.Errorf("failed to remove %s: %v", s.seedPath, rmErr)
+	}
+	if rmErr := utils.ClearRootPassFile(); rmErr != nil {
+		log.Errorf("failed to remove %s: %v", utils.RootPassFile, rmErr)
+	}
+}
+
 // SetPassword makes password root's Linux password (and so the web one),
-// clears the must-change flag, revokes every session and drops the seed file.
+// clears the must-change and unset flags, revokes every session and drops the seed file.
 // The shadow file is written first: if that fails nothing changed.
 func (s *Store) SetPassword(password string) (*User, error) {
 	if err := ValidatePassword(password); err != nil {
@@ -211,18 +283,14 @@ func (s *Store) SetPassword(password string) (*User, error) {
 		return nil, err
 	}
 	st.MustChangePassword = false
+	st.PasswordUnset = false
 	st.TokenVersion++
 	if err = s.saveLocked(st); err != nil {
 		return nil, fmt.Errorf("root password changed but the session state could not be saved: %w", err)
 	}
 	// the owner chose a password: neither the seed nor a generated root one is
 	// shown on the screen any more
-	if rmErr := os.Remove(s.seedPath); rmErr != nil && !errors.Is(rmErr, os.ErrNotExist) {
-		log.Errorf("failed to remove %s: %v", s.seedPath, rmErr)
-	}
-	if rmErr := utils.ClearRootPassFile(); rmErr != nil {
-		log.Errorf("failed to remove %s: %v", utils.RootPassFile, rmErr)
-	}
+	s.removeSeedFiles()
 	return userOf(st), nil
 }
 
@@ -250,6 +318,7 @@ func userOf(st *state) *User {
 		Role:               RoleAdmin,
 		TokenVersion:       st.TokenVersion,
 		MustChangePassword: st.MustChangePassword,
+		PasswordUnset:      st.PasswordUnset,
 	}
 }
 
@@ -335,28 +404,26 @@ func (s *Store) migrateLocked(data []byte) (*state, error) {
 	return st, nil
 }
 
-// seedLocked gives root its first password and creates the state. The boot
-// partition's root.pass wins and is consumed once applied; it is a chosen
-// password, so no change is forced. Otherwise root gets the seed from the seed
-// file, or a generated one written there for the device screen, and the first
-// login must change it. A root.pass that the shadow update refuses is logged
-// and left, and the seed is used.
+// seedLocked gives root its first state. The boot partition's root.pass wins
+// and is consumed once applied; it is a chosen password, so no change is forced.
+// Otherwise root is locked in /etc/shadow (no ssh or web password login) and the
+// state records the password as UNSET: the first connection sets it through
+// SetupPassword. No password is generated or written anywhere. A root.pass that
+// the shadow update refuses is logged and left, and root is locked.
 func (s *Store) seedLocked() (*state, error) {
-	password, mustChange, fromBoot := "", true, false
+	unset, fromBoot := true, false
 	if boot, ok := readBootPassword(s.bootRootPath, "first-boot root password"); ok {
 		if err := utils.SetRootPassword(boot); err == nil {
-			password, mustChange, fromBoot = boot, false, true
+			unset, fromBoot = false, true
 		} else {
-			log.Errorf("root password from %s could not be applied (%v): using the generated seed", s.bootRootPath, err)
+			log.Errorf("root password from %s could not be applied (%v): root is locked until the first connection sets a password", s.bootRootPath, err)
 		}
 	}
-	if !fromBoot {
-		var err error
-		if password, err = s.seedPassword(); err != nil {
-			return nil, err
-		}
-		if err = utils.SetRootPassword(password); err != nil {
-			return nil, fmt.Errorf("set root to the seed password: %w", err)
+	if unset {
+		// fail closed: without the lock the state would claim an unset password
+		// while root still has the stock one
+		if err := utils.LockRootPassword(); err != nil {
+			return nil, fmt.Errorf("lock root: %w", err)
 		}
 	}
 
@@ -364,42 +431,19 @@ func (s *Store) seedLocked() (*state, error) {
 	if err != nil {
 		return nil, err
 	}
-	st := &state{Version: stateVersion, TokenVersion: tokenVersion, MustChangePassword: mustChange}
+	st := &state{Version: stateVersion, TokenVersion: tokenVersion, PasswordUnset: unset}
 	if err = s.saveLocked(st); err != nil {
 		return nil, err
 	}
 	if fromBoot {
 		log.Infof("root password set from %s", s.bootRootPath)
 		removeBootFile(s.bootRootPath, "first-boot root password")
-		// a seed left from an earlier reset is not root's password
-		if rmErr := os.Remove(s.seedPath); rmErr != nil && !errors.Is(rmErr, os.ErrNotExist) {
-			log.Errorf("failed to remove %s: %v", s.seedPath, rmErr)
-		}
+	} else {
+		log.Infof("root has no password: locked, the first connection sets it")
 	}
-	// root now has the seed or the chosen password: a rotated one is obsolete
-	if err = utils.ClearRootPassFile(); err != nil {
-		log.Errorf("failed to remove %s: %v", utils.RootPassFile, err)
-	}
+	// a seed or rotated password file of an earlier release is not root's password
+	s.removeSeedFiles()
 	return st, nil
-}
-
-// seedPassword is the password already in the seed file (written by the button
-// reset or an interrupted first boot) or a fresh random one, written 0600 so
-// the device screen can show it.
-func (s *Store) seedPassword() (string, error) {
-	if data, err := os.ReadFile(s.seedPath); err == nil {
-		if password := strings.TrimSpace(string(data)); ValidatePassword(password) == nil {
-			return password, nil
-		}
-	}
-	password, err := randomPassword(seedPasswordLength)
-	if err != nil {
-		return "", err
-	}
-	if err = writeFile0600(s.seedPath, []byte(password+"\n")); err != nil {
-		return "", err
-	}
-	return password, nil
 }
 
 func (s *Store) saveLocked(st *state) error {
@@ -486,31 +530,6 @@ func removeBootFile(path, what string) {
 	}
 	_ = dir.Close()
 	log.Infof("%s %s consumed and removed", what, path)
-}
-
-// writeFile0600 creates the file with 0600 from the start and fixes the mode of
-// one that already exists.
-func writeFile0600(path string, data []byte) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	if err := os.WriteFile(path, data, 0o600); err != nil {
-		return err
-	}
-	return os.Chmod(path, 0o600)
-}
-
-func randomPassword(length int) (string, error) {
-	limit := big.NewInt(int64(len(seedPasswordAlphabet)))
-	password := make([]byte, length)
-	for index := range password {
-		n, err := rand.Int(rand.Reader, limit)
-		if err != nil {
-			return "", err
-		}
-		password[index] = seedPasswordAlphabet[n.Int64()]
-	}
-	return string(password), nil
 }
 
 func newTokenVersion() (uint64, error) {

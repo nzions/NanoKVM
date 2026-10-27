@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"NanoKVM-Server/authn"
@@ -284,5 +285,139 @@ func TestLockoutBlocksEvenTheRightPassword(t *testing.T) {
 		if cookie.Name == middleware.CookieName {
 			t.Fatal("locked login set a session cookie")
 		}
+	}
+}
+
+// newUnsetStore is a first boot without /boot/root.pass: root has the stock
+// password, the state does not exist yet.
+func newUnsetStore(t *testing.T) *authn.Store {
+	t.Helper()
+	original, originalRoot := utils.ShadowFile, utils.RootPassFile
+	utils.ShadowFile, utils.RootPassFile = filepath.Join(t.TempDir(), "shadow"), filepath.Join(t.TempDir(), "root.pass")
+	t.Cleanup(func() { utils.ShadowFile, utils.RootPassFile = original, originalRoot })
+	if err := os.WriteFile(utils.ShadowFile, []byte("daemon:*:19000:0:99999:7:::\nroot:"+utils.MD5Crypt("root", "stocksal")+":19000:0:99999:7:::\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return authn.NewStore(filepath.Join(t.TempDir(), "pwd"))
+}
+
+func decodeResponse(t *testing.T, recorder *httptest.ResponseRecorder) proto.Response {
+	t.Helper()
+	var rsp proto.Response
+	if err := json.Unmarshal(recorder.Body.Bytes(), &rsp); err != nil {
+		t.Fatal(err)
+	}
+	return rsp
+}
+
+func hasSessionCookie(recorder *httptest.ResponseRecorder) bool {
+	for _, cookie := range recorder.Result().Cookies() {
+		if cookie.Name == middleware.CookieName && cookie.Value != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func TestFirstConnectionSetupThenLogin(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	store := newUnsetStore(t)
+	restore := useTestStore(store)
+	defer restore()
+
+	service := NewService()
+	router := gin.New()
+	router.POST("/login", service.Login)
+	router.GET("/state", service.GetState)
+	router.POST("/setup", service.Setup)
+	authenticated := router.Group("/").Use(middleware.CheckToken())
+	authenticated.GET("/account", service.GetAccount)
+
+	// the state says unset, with no session
+	recorder := requestJSONRecorder(router, http.MethodGet, "/state", nil, nil)
+	var state struct {
+		Data proto.AuthStateRsp `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &state); err != nil {
+		t.Fatal(err)
+	}
+	if state.Data.PasswordSet {
+		t.Fatalf("state = %+v, want password_set false", state.Data)
+	}
+
+	// login while unset: the distinct code, no cookie, not a counted failure
+	recorder = requestJSONRecorder(router, http.MethodPost, "/login",
+		map[string]any{"username": "root", "password": "root"}, nil)
+	if rsp := decodeResponse(t, recorder); rsp.Code != proto.ErrCodePasswordUnset || !strings.Contains(rsp.Msg, "/api/auth/setup") {
+		t.Fatalf("login while unset = %+v, want code %d naming the setup endpoint", rsp, proto.ErrCodePasswordUnset)
+	}
+	if hasSessionCookie(recorder) {
+		t.Fatal("login while unset set a session cookie")
+	}
+
+	// an invalid password is refused and leaves the state unset
+	recorder = requestJSONRecorder(router, http.MethodPost, "/setup", map[string]any{"password": "a:b"}, nil)
+	if rsp := decodeResponse(t, recorder); rsp.Code == 0 || hasSessionCookie(recorder) {
+		t.Fatalf("setup with an invalid password = %+v", rsp)
+	}
+
+	// setup logs in
+	recorder = requestJSONRecorder(router, http.MethodPost, "/setup", map[string]any{"password": "chosen-password"}, nil)
+	if rsp := decodeResponse(t, recorder); rsp.Code != 0 {
+		t.Fatalf("setup = %+v", rsp)
+	}
+	var cookie *http.Cookie
+	for _, c := range recorder.Result().Cookies() {
+		if c.Name == middleware.CookieName {
+			cookie = c
+		}
+	}
+	if cookie == nil || !cookie.HttpOnly || cookie.SameSite != http.SameSiteStrictMode || cookie.Path != "/" {
+		t.Fatalf("setup session cookie: %+v", cookie)
+	}
+	if code := requestJSON(router, http.MethodGet, "/account", nil, cookie); code != http.StatusOK {
+		t.Fatalf("account with the setup session = %d", code)
+	}
+
+	// a second setup is refused and sets no session
+	recorder = requestJSONRecorder(router, http.MethodPost, "/setup", map[string]any{"password": "attacker-password"}, nil)
+	if rsp := decodeResponse(t, recorder); rsp.Code != proto.ErrCodeSetupDone || hasSessionCookie(recorder) {
+		t.Fatalf("second setup = %+v, want code %d", rsp, proto.ErrCodeSetupDone)
+	}
+
+	// the state now says set, and login works with the chosen password only
+	recorder = requestJSONRecorder(router, http.MethodGet, "/state", nil, nil)
+	if err := json.Unmarshal(recorder.Body.Bytes(), &state); err != nil {
+		t.Fatal(err)
+	}
+	if !state.Data.PasswordSet {
+		t.Fatalf("state = %+v, want password_set true", state.Data)
+	}
+	loginCookie(t, router, "root", "chosen-password")
+	recorder = requestJSONRecorder(router, http.MethodPost, "/login",
+		map[string]any{"username": "root", "password": "attacker-password"}, nil)
+	if rsp := decodeResponse(t, recorder); rsp.Code == 0 {
+		t.Fatal("login with the refused second setup's password succeeded")
+	}
+}
+
+func TestRootPassStillWinsOverSetup(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	// a device with a password already set (what /boot/root.pass produces)
+	store := newTestStore(t)
+	restore := useTestStore(store)
+	defer restore()
+
+	service := NewService()
+	router := gin.New()
+	router.POST("/setup", service.Setup)
+	router.GET("/state", service.GetState)
+
+	recorder := requestJSONRecorder(router, http.MethodPost, "/setup", map[string]any{"password": "attacker-password"}, nil)
+	if rsp := decodeResponse(t, recorder); rsp.Code != proto.ErrCodeSetupDone || hasSessionCookie(recorder) {
+		t.Fatalf("setup on a set device = %+v", rsp)
+	}
+	if ok, err := utils.VerifyRootPassword(testSeedPassword); err != nil || !ok {
+		t.Fatalf("setup changed the password: ok=%v err=%v", ok, err)
 	}
 }

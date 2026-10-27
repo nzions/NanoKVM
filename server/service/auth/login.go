@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -40,6 +41,11 @@ func (s *Service) Login(c *gin.Context) {
 		return
 	}
 	user, ok, err := authn.DefaultStore.Authenticate(req.Username, password)
+	if errors.Is(err, authn.ErrPasswordUnset) {
+		// not a failed attempt: tell the client to call POST /api/auth/setup
+		rsp.ErrRsp(c, proto.ErrCodePasswordUnset, "password not set: call POST /api/auth/setup")
+		return
+	}
 	if err != nil {
 		log.Errorf("load account during login: %s", err)
 		time.Sleep(2 * time.Second)

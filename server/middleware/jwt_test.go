@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -54,20 +53,15 @@ func TestCheckTokenBlocksUntilPasswordChanged(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	useTestShadow(t)
 	path := filepath.Join(t.TempDir(), "pwd")
+	// a device upgraded from a release that forced a change of its seed password
+	if err := os.WriteFile(path, []byte(`{"version": 2, "tokenVersion": 5, "mustChangePassword": true}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := utils.SetRootPassword(testSeedPassword); err != nil {
+		t.Fatal(err)
+	}
 	store := authn.NewStore(path)
-	seed, err := os.ReadFile(filepath.Join(filepath.Dir(path), "initial.pass"))
-	if err == nil {
-		t.Fatalf("seed file exists before first use: %q", seed)
-	}
-	// first use seeds root and writes the seed password
-	if err = store.Init(); err != nil {
-		t.Fatal(err)
-	}
-	seed, err = os.ReadFile(filepath.Join(filepath.Dir(path), "initial.pass"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	owner, ok, err := store.Authenticate("root", strings.TrimSpace(string(seed)))
+	owner, ok, err := store.Authenticate("root", testSeedPassword)
 	if err != nil || !ok {
 		t.Fatalf("seed login: ok=%v err=%v", ok, err)
 	}

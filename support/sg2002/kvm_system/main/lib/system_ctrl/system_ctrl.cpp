@@ -9,7 +9,6 @@ extern kvm_oled_state_t kvm_oled_state;
 
 // no look-alike characters (0/O, 1/l/I); the AP one is lowercase for typing on a phone
 #define AP_PASS_ALPHABET	"abcdefghjkmnpqrstuvwxyz23456789"
-#define RESET_PASS_ALPHABET	"23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
 static uint64_t wifi_ap_start_ms = 0;
 static uint8_t seed_pass_shown = 0;
@@ -55,7 +54,8 @@ static uint8_t write_secret_file(const char *path, const char *text)
 	return written == (ssize_t)len;
 }
 
-// Show the first-boot / reset password on the OLED while its file exists.
+// Show a legacy generated password on the OLED while its file exists (releases
+// before 2.6.46 wrote one; nothing writes it now).
 void kvm_show_seed_password(void)
 {
 	if(access(SEED_PASS_FILE, F_OK) != 0 && access(ROOT_PASS_FILE, F_OK) != 0){
@@ -227,42 +227,77 @@ void kvm_wifi_config_process()
 	}
 }
 
-// Set a fresh random root password, make the web store reseed from it, and show
-// it on the OLED. Returns 0 on success.
+// Lock root's Linux password: replace the hash field of root's /etc/shadow line
+// with "!" (no password verifies, so no ssh password login). The file is
+// rewritten atomically with its mode and owner kept. Returns 1 on success.
+static uint8_t lock_root_shadow(void)
+{
+	const char *path = "/etc/shadow";
+	const char *tmp_path = "/etc/shadow.kvmlock";
+	struct stat st;
+	if(stat(path, &st) != 0) return 0;
+
+	FILE *in = fopen(path, "r");
+	if(in == NULL) return 0;
+	int tfd = open(tmp_path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+	if(tfd < 0){
+		fclose(in);
+		return 0;
+	}
+	FILE *out = fdopen(tfd, "w");
+	if(out == NULL){
+		close(tfd);
+		fclose(in);
+		unlink(tmp_path);
+		return 0;
+	}
+
+	char line[1024];
+	uint8_t found = 0, ok = 1;
+	while(fgets(line, sizeof(line), in) != NULL){
+		if(!found && strncmp(line, "root:", 5) == 0){
+			// root:<hash>:<rest>  ->  root:!:<rest>
+			char *rest = strchr(line + 5, ':');
+			if(rest == NULL){
+				ok = 0;
+				break;
+			}
+			fputs("root:!", out);
+			fputs(rest, out);
+			found = 1;
+		} else {
+			fputs(line, out);
+		}
+	}
+	if(ferror(in)) ok = 0;
+	fclose(in);
+	if(ok && (fflush(out) != 0 || fchmod(tfd, st.st_mode & 07777) != 0 ||
+	          fchown(tfd, st.st_uid, st.st_gid) != 0 || fsync(tfd) != 0)) ok = 0;
+	if(fclose(out) != 0) ok = 0;
+	if(!ok || !found || rename(tmp_path, path) != 0){
+		unlink(tmp_path);
+		return 0;
+	}
+	return 1;
+}
+
+// The button reset: root gets NO password. Root is locked in /etc/shadow and
+// the web state (/etc/kvm/pwd) is removed, so the web server's next use finds
+// the password UNSET and the first connection sets it (POST /api/auth/setup).
+// No password is generated or shown. Returns 0 on success.
 uint8_t kvm_reset_password(void)
 {
-	char pass[RESET_PASS_LEN + 1] = {0};
-	char line[RESET_PASS_LEN + 8];
-
-	if(!random_string(pass, RESET_PASS_LEN, RESET_PASS_ALPHABET)){
-		perror("urandom");
+	if(!lock_root_shadow()){
+		perror("lock root");
 		return 1;
 	}
-
-	FILE *fp = popen("chpasswd", "w");
-	if (fp == NULL) {
-		perror("popen");
-		return 1;
-	}
-	fprintf(fp, "root:%s\n", pass);
-	if (pclose(fp) != 0) {
-		perror("pclose");
-		return 1;
-	}
-
-	// the web store seeds the admin account from this file once /etc/kvm/pwd is gone
-	snprintf(line, sizeof(line), "%s\n", pass);
-	if(!write_secret_file(SEED_PASS_FILE, line)){
-		perror("write seed password");
-		return 1;
-	}
-	// root now has the seed password too: a rotated one is obsolete
+	// files of earlier releases that carried a generated password
+	unlink(SEED_PASS_FILE);
 	unlink(ROOT_PASS_FILE);
 	unlink("/etc/kvm/pwd");
 	sync();
 
-	seed_pass_shown = 1;
-	kvm_sys_state.page = 2;
+	kvm_sys_state.page = 0;
 	kvm_sys_state.sub_page = 0;
 	return 0;
 }

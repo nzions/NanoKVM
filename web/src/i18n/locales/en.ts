@@ -26,6 +26,10 @@ const en = {
       ok: 'Ok',
       cancel: 'Cancel',
       loginButtonText: 'Login',
+      setupTitle: 'Set root password',
+      setupDesc: 'This device has no password yet. The first connection sets it; choose one now.',
+      setupButtonText: 'Set password',
+      setupDone: 'A password is already set, please log in',
       tips: {
         reset1:
           'To reset the passwords, press and hold the BOOT button on the NanoKVM for 10 seconds.',

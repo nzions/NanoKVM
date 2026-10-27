@@ -51,13 +51,16 @@ This uses the raw `.img`, because macOS ships no `xz`.
 ## After flashing: set the hostname and the root password
 
 There is one account, `root`: the web login and the Linux login share its password. The
-card's small FAT partition (label `boot`) is readable and writable from the Mac, and the
-first boot takes root's password from it, so nothing has to be read off the OLED. The
-network is DHCP on first boot: the card carries no `eth.nodhcp`.
+card's small FAT partition (label `boot`) is readable and writable from the Mac. A
+`root.pass` on it is OPTIONAL: with one, the first boot takes root's password from it; with
+none, the box boots with NO password (root is locked, no ssh password login) and the first
+web connection sets it. The OLED is not used. **Warning: with no `root.pass`, anyone on the
+LAN who connects first claims the box.** The network is DHCP on first boot: the card carries
+no `eth.nodhcp`.
 
 1. Re-insert the card (the flash ejected it). It mounts as `/Volumes/boot` (macOS adds a
    number, e.g. `boot 1`, if another volume is already named `boot`; use the name you see).
-2. On m5sspro (where nik's sage key is), as one line: generate the password, store it in
+2. (Optional: skip it for the no-password first boot, but still write `hostname`.) On m5sspro (where nik's sage key is), as one line: generate the password, store it in
    sage FIRST, share it with the rook, only then write it to the card, and eject. `--show`
    is needed or sage prints a redaction instead of the value:
 
@@ -65,12 +68,13 @@ network is DHCP on first boot: the card carries no `eth.nodhcp`.
 
    The password here is 24 characters, but there is no policy: any non-empty password of at
    most 256 bytes without `:`, a newline or NUL works, even `a`. An empty `root.pass` is
-   ignored and the device falls back to a random password shown on the OLED.
+   ignored and the device boots with no password (first web connection sets it).
 3. Put the card back, cable the Cube as before, and power it on. First boot takes a minute
    or two. The server sets root's password from `root.pass`, deletes the file from the card
    as soon as it has used it, and does not force a change (you chose it). Without
-   `root.pass` it sets a random password, shows it on the OLED (also kept in
-   `/etc/kvm/initial.pass`, the OLED channel only) and the first web login forces a change.
+   `root.pass` root has no password: open the web UI at the device's address, the login
+   page shows "Set root password", and the first connection sets it (once; a second setup is
+   refused). The button reset (BOOT held 10 s) returns the device to this no-password state.
 4. **kvm1 in our estate: do NOT log in yourself.** Tell the rook. It logs in as `root` with
    the password from sage, sets a new password stored in sage for rookery, captures the
    device cert, adds kvm1 to rookery's and capsd's config, and runs the screenshot and

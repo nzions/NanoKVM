@@ -2,9 +2,13 @@ package authn
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"NanoKVM-Server/utils"
@@ -118,36 +122,47 @@ func TestAuthenticateUnverifiableHashIsAnError(t *testing.T) {
 	}
 }
 
-func TestFirstBootGeneratesSeedForRootAndForcesChange(t *testing.T) {
+func rootHashOf(t *testing.T) string {
+	t.Helper()
+	hash, err := utils.RootHash()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return hash
+}
+
+func TestFirstBootWithoutRootPassLocksRootAndLeavesPasswordUnset(t *testing.T) {
 	f := newFixture(t, utils.MD5Crypt("root", "stocksal"))
 	if err := f.store.Init(); err != nil {
 		t.Fatal(err)
 	}
-	seed, err := os.ReadFile(f.store.seedPath)
-	if err != nil {
-		t.Fatalf("seed file: %v", err)
+	if hash := rootHashOf(t); hash != "!" {
+		t.Fatalf("root's shadow hash = %q, want the lock %q", hash, "!")
 	}
-	password := strings.TrimSpace(string(seed))
-	if len(password) != seedPasswordLength {
-		t.Fatalf("seed %q is not %d characters", password, seedPasswordLength)
+	if f.exists("initial.pass") {
+		t.Fatal("a seed password file was written")
 	}
-	if info, _ := os.Stat(f.store.seedPath); info.Mode().Perm() != 0o600 {
-		t.Fatalf("seed file mode = %v", info.Mode().Perm())
+	if st := f.readState(t); !st.PasswordUnset || st.MustChangePassword {
+		t.Fatalf("state = %+v, want unset and no forced change", st)
 	}
-	if ok, err := utils.VerifyRootPassword(password); err != nil || !ok {
-		t.Fatalf("root's shadow password is not the seed: ok=%v err=%v", ok, err)
+	if set, err := f.store.PasswordSet(); err != nil || set {
+		t.Fatalf("PasswordSet = %v, %v; want false", set, err)
 	}
-	user, ok := mustAuth(t, f.store, "root", password)
-	if !ok || !user.MustChangePassword {
-		t.Fatalf("seed login = %+v, %v; want must-change", user, ok)
+	// neither the stock password nor anything else logs in
+	for _, password := range []string{"root", "x", "!"} {
+		if _, ok, err := f.store.Authenticate("root", password); ok || !errors.Is(err, ErrPasswordUnset) {
+			t.Fatalf("login %q while unset: ok=%v err=%v, want ErrPasswordUnset", password, ok, err)
+		}
 	}
-	if _, ok = mustAuth(t, f.store, "root", "root"); ok {
-		t.Fatal("the stock password still works")
+	// only root's line changed
+	data, _ := os.ReadFile(f.shadow)
+	if !strings.Contains(string(data), "nik:$6$x$y:19001:::::\n") || !strings.Contains(string(data), "daemon:*:19000:0:99999:7:::\n") {
+		t.Fatalf("other shadow lines changed:\n%s", data)
 	}
 
 	// a second Init changes nothing
 	before := f.readState(t)
-	if err = f.store.Init(); err != nil {
+	if err := f.store.Init(); err != nil {
 		t.Fatal(err)
 	}
 	if after := f.readState(t); after != before {
@@ -155,26 +170,100 @@ func TestFirstBootGeneratesSeedForRootAndForcesChange(t *testing.T) {
 	}
 }
 
-func TestFirstBootReusesSeedFile(t *testing.T) {
-	// the button reset writes initial.pass and removes the state
-	f := newFixture(t, utils.SHA512Crypt("old", "saltsalt", 0))
-	f.write(t, "initial.pass", "Reset12345Ab\n")
+func TestSetupThenLoginWorksAndSecondSetupIsRefused(t *testing.T) {
+	f := newFixture(t, utils.MD5Crypt("root", "stocksal"))
+	f.write(t, "initial.pass", "left-by-an-old-release\n")
 	f.write(t, "root.pass", "stale-rotated-root\n")
-	if err := f.store.Init(); err != nil {
+	if _, err := f.store.SetupPassword(""); err == nil {
+		t.Fatal("empty password accepted by setup")
+	}
+	if _, err := f.store.SetupPassword("a:b"); err == nil {
+		t.Fatal("password with a colon accepted by setup")
+	}
+	if set, _ := f.store.PasswordSet(); set {
+		t.Fatal("a refused setup cleared the unset state")
+	}
+
+	user, err := f.store.SetupPassword("first-connection-pw")
+	if err != nil {
 		t.Fatal(err)
 	}
-	if ok, _ := utils.VerifyRootPassword("Reset12345Ab"); !ok {
-		t.Fatal("root did not take the seed file's password")
+	if user.PasswordUnset || user.MustChangePassword {
+		t.Fatalf("after setup: %+v", user)
 	}
-	if f.exists("root.pass") {
-		t.Fatal("the rotated root.pass was not cleared")
+	if ok, err := utils.VerifyRootPassword("first-connection-pw"); err != nil || !ok {
+		t.Fatalf("shadow not updated: ok=%v err=%v", ok, err)
 	}
-	if !f.exists("initial.pass") {
-		t.Fatal("seed file removed before the owner chose a password")
+	if f.exists("initial.pass") || f.exists("root.pass") {
+		t.Fatal("seed or rotated password file survived the setup")
+	}
+	if set, err := f.store.PasswordSet(); err != nil || !set {
+		t.Fatalf("PasswordSet = %v, %v; want true", set, err)
+	}
+	logged, ok := mustAuth(t, f.store, "root", "first-connection-pw")
+	if !ok || logged.TokenVersion != user.TokenVersion {
+		t.Fatalf("login = %+v, %v; want the setup session's version %d", logged, ok, user.TokenVersion)
+	}
+	if _, ok = mustAuth(t, f.store, "root", "root"); ok {
+		t.Fatal("the stock password works")
+	}
+
+	// never a second setup, and it must not change the password
+	if _, err = f.store.SetupPassword("attacker-pw"); !errors.Is(err, ErrPasswordAlreadySet) {
+		t.Fatalf("second setup = %v, want ErrPasswordAlreadySet", err)
+	}
+	if ok, _ := utils.VerifyRootPassword("first-connection-pw"); !ok {
+		t.Fatal("a refused second setup changed the password")
 	}
 }
 
-func TestBootRootPassSeedsRootAndIsConsumed(t *testing.T) {
+func TestConcurrentSetupsHaveExactlyOneWinner(t *testing.T) {
+	f := newFixture(t, utils.MD5Crypt("root", "stocksal"))
+	const callers = 8
+	var wg sync.WaitGroup
+	var wins, refused atomic.Int32
+	for i := 0; i < callers; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			_, err := f.store.SetupPassword(fmt.Sprintf("password-%d", i))
+			switch {
+			case err == nil:
+				wins.Add(1)
+			case errors.Is(err, ErrPasswordAlreadySet):
+				refused.Add(1)
+			default:
+				t.Errorf("setup %d: %v", i, err)
+			}
+		}(i)
+	}
+	wg.Wait()
+	if wins.Load() != 1 || refused.Load() != callers-1 {
+		t.Fatalf("wins=%d refused=%d, want 1 and %d", wins.Load(), refused.Load(), callers-1)
+	}
+}
+
+func TestStateFromAnEarlierReleaseIsUnaffected(t *testing.T) {
+	// a device whose password is set (no passwordUnset field) stays set, and its
+	// old must-change-from-seed flag keeps working
+	f := newFixture(t, utils.SHA512Crypt("pw-one", "saltsalt", 0))
+	f.write(t, "pwd", `{"version": 2, "tokenVersion": 5, "mustChangePassword": true}`)
+	user, ok := mustAuth(t, f.store, "root", "pw-one")
+	if !ok || !user.MustChangePassword || user.PasswordUnset {
+		t.Fatalf("login = %+v, %v; want must-change and not unset", user, ok)
+	}
+	if set, err := f.store.PasswordSet(); err != nil || !set {
+		t.Fatalf("PasswordSet = %v, %v; want true", set, err)
+	}
+	if _, err := f.store.SetupPassword("attacker-pw"); !errors.Is(err, ErrPasswordAlreadySet) {
+		t.Fatalf("setup on a set device = %v, want ErrPasswordAlreadySet", err)
+	}
+	if ok, _ := utils.VerifyRootPassword("pw-one"); !ok {
+		t.Fatal("setup on a set device changed the password")
+	}
+}
+
+func TestBootRootPassWinsAndIsConsumed(t *testing.T) {
 	f := newFixture(t, utils.MD5Crypt("root", "stocksal"))
 	bootFile := f.write(t, "boot-root.pass", "from-the-card\r\n")
 	f.write(t, "initial.pass", "stale-seed-file\n")
@@ -190,13 +279,19 @@ func TestBootRootPassSeedsRootAndIsConsumed(t *testing.T) {
 	if f.exists("initial.pass") {
 		t.Fatal("stale seed file kept beside an operator-chosen password")
 	}
+	if st := f.readState(t); st.PasswordUnset {
+		t.Fatalf("state = %+v, root.pass must leave the password set", st)
+	}
 	user, ok := mustAuth(t, f.store, "root", "from-the-card")
 	if !ok || user.MustChangePassword {
 		t.Fatalf("login = %+v, %v; an operator-chosen password must not force a change", user, ok)
 	}
+	if _, err := f.store.SetupPassword("attacker-pw"); !errors.Is(err, ErrPasswordAlreadySet) {
+		t.Fatalf("setup after root.pass = %v, want ErrPasswordAlreadySet", err)
+	}
 }
 
-func TestBootRootPassRefusedByShadowFallsBackToSeed(t *testing.T) {
+func TestUnusableBootRootPassLeavesRootLockedAndUnset(t *testing.T) {
 	f := newFixture(t, utils.MD5Crypt("root", "stocksal"))
 	bootFile := f.write(t, "boot-root.pass", "has:colon\n")
 	if err := f.store.Init(); err != nil {
@@ -205,27 +300,36 @@ func TestBootRootPassRefusedByShadowFallsBackToSeed(t *testing.T) {
 	if _, err := os.Stat(bootFile); err != nil {
 		t.Fatalf("an unusable root.pass should be left alone: %v", err)
 	}
-	if ok, _ := utils.VerifyRootPassword("has:colon"); ok {
-		t.Fatal("unusable root.pass was applied")
+	if hash := rootHashOf(t); hash != "!" {
+		t.Fatalf("root's shadow hash = %q, want the lock", hash)
 	}
-	seed, err := os.ReadFile(f.store.seedPath)
-	if err != nil {
+	if set, _ := f.store.PasswordSet(); set {
+		t.Fatal("password reported set")
+	}
+}
+
+func TestButtonResetStateGoesBackToUnset(t *testing.T) {
+	// the button reset locks root and removes the state: the next use is unset
+	f := newFixture(t, utils.SHA512Crypt("old", "saltsalt", 0))
+	if _, err := f.store.SetPassword("old"); err != nil {
 		t.Fatal(err)
 	}
-	if ok, _ := utils.VerifyRootPassword(strings.TrimSpace(string(seed))); !ok {
-		t.Fatal("root did not fall back to the seed")
+	if err := os.Remove(f.store.path); err != nil {
+		t.Fatal(err)
+	}
+	if set, err := f.store.PasswordSet(); err != nil || set {
+		t.Fatalf("PasswordSet after reset = %v, %v; want false", set, err)
+	}
+	if _, ok, err := f.store.Authenticate("root", "old"); ok || !errors.Is(err, ErrPasswordUnset) {
+		t.Fatalf("login after reset: ok=%v err=%v", ok, err)
 	}
 }
 
 func TestSetPasswordChangesRootAndRevokes(t *testing.T) {
 	f := newFixture(t, utils.MD5Crypt("root", "stocksal"))
-	if err := f.store.Init(); err != nil {
+	first, err := f.store.SetupPassword("initial-pass")
+	if err != nil {
 		t.Fatal(err)
-	}
-	seed, _ := os.ReadFile(f.store.seedPath)
-	first, ok := mustAuth(t, f.store, "root", strings.TrimSpace(string(seed)))
-	if !ok {
-		t.Fatal("seed login failed")
 	}
 	f.write(t, "root.pass", "rotated\n")
 
@@ -245,14 +349,14 @@ func TestSetPasswordChangesRootAndRevokes(t *testing.T) {
 	if changed.MustChangePassword || changed.TokenVersion == first.TokenVersion {
 		t.Fatalf("after change: %+v (before %+v)", changed, first)
 	}
-	if ok, err = utils.VerifyRootPassword("brand-new-pass"); err != nil || !ok {
+	if ok, err := utils.VerifyRootPassword("brand-new-pass"); err != nil || !ok {
 		t.Fatalf("shadow not updated: ok=%v err=%v", ok, err)
 	}
-	if _, ok = mustAuth(t, f.store, "root", string(seed[:len(seed)-1])); ok {
-		t.Fatal("seed password still works")
+	if _, ok := mustAuth(t, f.store, "root", "initial-pass"); ok {
+		t.Fatal("old password still works")
 	}
-	if f.exists("initial.pass") || f.exists("root.pass") {
-		t.Fatal("seed or rotated password file survived the owner's change")
+	if f.exists("root.pass") {
+		t.Fatal("rotated password file survived the owner's change")
 	}
 	if _, err = f.store.ValidateToken("root", first.TokenVersion); err == nil {
 		t.Fatal("pre-change session still valid")

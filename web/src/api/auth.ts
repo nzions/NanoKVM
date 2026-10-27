@@ -29,3 +29,15 @@ export function changePassword(currentPassword: string, password: string) {
 export function isPasswordUpdated() {
   return http.get('/api/auth/password');
 }
+
+// Unauthenticated: { password_set: boolean }. False only on a device that has no
+// password yet (booted without /boot/root.pass, or button-reset).
+export function getAuthState() {
+  return http.get('/api/auth/state');
+}
+
+// First-connection setup: accepted once, only while the password is unset; on
+// success the response carries the session cookie, as a login does.
+export function setupPassword(password: string) {
+  return http.post('/api/auth/setup', { password });
+}

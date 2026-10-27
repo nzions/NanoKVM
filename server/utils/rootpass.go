@@ -145,3 +145,14 @@ func ClearRootPassFile() error {
 	}
 	return nil
 }
+
+// lockedRootHash is the shadow hash field of a locked account: no password
+// verifies against it, so there is no ssh password login for root.
+const lockedRootHash = "!"
+
+// LockRootPassword locks root's Linux password by writing "!" as its hash, with
+// the same atomic rewrite as SetRootPassword. The first connection to the web
+// UI sets the password again (authn.Store.SetupPassword).
+func LockRootPassword() error {
+	return rewriteShadowRoot(ShadowFile, lockedRootHash, time.Now().UTC().Unix()/86400)
+}
