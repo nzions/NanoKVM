@@ -9,6 +9,7 @@ add_library(kvm_mmf SHARED
     ${KVM_MMF_DIR}/src/kvm_mmf.cpp
     ${_c}/loadbmp.c
     ${_c}/md5sum.c
+    ${KVM_MMF_DIR}/pin/cvi_mipi.c
     ${KVM_MMF_DIR}/pin/sample_common_isp.c
     ${_c}/sample_common_peripheral.c
     ${_c}/sample_common_platform.c
