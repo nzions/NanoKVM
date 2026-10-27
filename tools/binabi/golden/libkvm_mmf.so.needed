@@ -1,10 +1,4 @@
 libcvi_bin.so
-libae.so
-libaf.so
-libawb.so
-libcvi_bin_isp.so
-libisp_algo.so
-libisp.so
 libsys.so
 libvdec.so
 libvenc.so

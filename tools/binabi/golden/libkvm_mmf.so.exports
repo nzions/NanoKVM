@@ -17,8 +17,6 @@ OSD_MAKECOLOR_U16
 OSD_MAKECOLOR_U16_A
 RoiAttr_testcase
 SAMPLE_COMM_All_ISP_Stop
-SAMPLE_COMM_BIN_ReadBlockParaFrombin
-SAMPLE_COMM_BIN_ReadParaFrombin
 SAMPLE_COMM_FRAME_CompareWithFile
 SAMPLE_COMM_FRAME_LoadFromFile
 SAMPLE_COMM_FRAME_SaveToFile
@@ -239,7 +237,6 @@ _Z24mmf_invert_format_to_mmfi
 _Z25mmf_get_vi_unused_channelv
 _Z29mmf_enc_jpg_push_with_qualityiPhiiii
 _Z8mmf_initv
-callback_FPS
 dev_cfg_hx8394_720x1280
 dsi_init_cmds_hx8394_720x1280
 find_bitshift
