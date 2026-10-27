@@ -358,15 +358,14 @@ SHA256="$(tr -d ' \n' < "$TARBALL.sha256")"
 printf '%s' "$SHA256" | grep -qE '^[0-9a-f]{64}$' || die "bad sha256 in $TARBALL.sha256: '$SHA256'"
 [ "$SHA256" = "$(sha256sum "$TARBALL" | cut -d' ' -f1)" ] || die "sha256 file does not match the tarball"
 
-# The 12 MMF libraries in the package must be the exact bytes build-mmf.sh staged: nothing
+# The 6 MMF libraries in the package must be the exact bytes build-mmf.sh staged: nothing
 # between the build and the archive may swap or rewrite one (fail closed).
 log "verifying the MMF libraries inside $(basename "$TARBALL")"
 VERIFY_DIR="$HOME/pkg-verify"
 rm -rf "$VERIFY_DIR"
 mkdir -p "$VERIFY_DIR"
 tar -xzf "$TARBALL" -C "$VERIFY_DIR"
-for lib in libsys.so libcvi_bin.so libvpu.so libvenc.so libvdec.so libini.so libisp.so \
-           libcvi_bin_isp.so libisp_algo.so libae.so libaf.so libawb.so; do
+for lib in libsys.so libcvi_bin.so libvpu.so libvenc.so libvdec.so libini.so; do
     src="$MMF_OUT/lib/$lib"
     [ "$lib" = libini.so ] && src="$MMF_OUT/lib/3rd/libini.so"
     shipped="$VERIFY_DIR/nanokvm_$VERSION/server/dl_lib/$lib"

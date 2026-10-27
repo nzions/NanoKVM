@@ -74,10 +74,8 @@ require_riscv64() {
 #   libkvm libkvm_mmf           MaixCDK build of support/sg2002
 #   libsys libcvi_bin libvpu libvenc libvdec libini
 #                               scripts/build-mmf.sh, from the pinned sophgo-middleware
-#   libisp libcvi_bin_isp libisp_algo libae libaf libawb
-#                               the closed blobs of the SAME pin, copied by build-mmf.sh
 # Every library the package ships is therefore in this list; nothing comes from git.
-BUILT_LIBS="libkvm.so libkvm_mmf.so libsys.so libcvi_bin.so libvpu.so libvenc.so libvdec.so libini.so libisp.so libcvi_bin_isp.so libisp_algo.so libae.so libaf.so libawb.so"
+BUILT_LIBS="libkvm.so libkvm_mmf.so libsys.so libcvi_bin.so libvpu.so libvenc.so libvdec.so libini.so"
 
 # Libraries nothing in the package NEEDs or dlopens (measured with readelf -d and
 # strings over the 2.6.17 package; see server/dl_lib/README.md). They are no longer

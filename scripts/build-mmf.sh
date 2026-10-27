@@ -6,13 +6,16 @@
 #
 #   built here   libsys libcvi_bin libvpu (VI/VO/VPSS/RGN/GDC are compiled into it)
 #                libvenc libvdec 3rd/libini
-#   pin blobs    libisp libcvi_bin_isp libisp_algo libae libaf libawb: closed, taken from
-#                v2/modules/isp/lib/musl_riscv64 of the SAME pin (no source anywhere)
+#   NOT linked   the six closed ISP blobs of the pin (libisp libcvi_bin_isp libisp_algo
+#                libae libaf libawb): the LT6911 delivers YUV and the VI pipe bypasses the
+#                ISP. libcvi_bin is built with CONFIG_DISABLE_PQBIN_JSON=y (no json/miniz)
+#                and the two groups of symbols the blobs defined for it and libvpu are
+#                stubbed from scripts/mmf-shim/{bin,vpu}.
 #
 # Usage: build-mmf.sh <mw-src> <outdir>
 #   <mw-src>   scripts/fetch-middleware.sh's <outdir> (the tree is <mw-src>/v2)
 #   <outdir>   absolute, under $HOME. Writes:
-#                <outdir>/lib/*.so, <outdir>/lib/3rd/libini.so   the 12-library link set
+#                <outdir>/lib/*.so, <outdir>/lib/3rd/libini.so   the 6-library link set
 #                <outdir>/MANIFEST                               sha256 + origin of each
 #                <outdir>/uapi                                   ";"-list for NANOKVM_MMF_UAPI
 #                <outdir>/cvi                                    NANOKVM_MMF_CVI include root
@@ -98,7 +101,10 @@ tar -xzf "$tgz" -C "$OUT/src/json-c" --strip-components=1
 bash "$HERE/gen-cvi-headers.sh" "$OUT/src/json-c" "$OUT/cvi"
 
 # --- build with the pin's own make files -----------------------------------------------
-: > "$OUT/cfg/.config"      # Makefile.param includes $(BUILD_PATH)/.config; no option is needed
+# Makefile.param includes $(BUILD_PATH)/.config. CONFIG_DISABLE_PQBIN_JSON=y compiles out
+# libcvi_bin's json/miniz parts (Makefile.param:167 adds -DDISABLE_PQBIN_JSON): the cvi_json_*
+# and cvi_compress* symbols were only ever defined by the closed libcvi_bin_isp.
+echo "CONFIG_DISABLE_PQBIN_JSON=y" > "$OUT/cfg/.config"
 JOBS="$(nproc)"
 LIBDIR="$MW/v2/lib"
 mkdir -p "$LIBDIR/3rd"
@@ -124,15 +130,18 @@ V1INC="$V1_UAPI_A|$V1_UAPI_B"
 # of the driver they ioctl; everything else is the v2 set (tools/abicheck).
 mk 3rdparty/inih "$LIBDIR/3rd/libini.so" "$V2INC" ""
 mk modules/sys "$LIBDIR/libsys.so" "$V2INC" ""
+# The stubs the closed blobs used to define (scripts/mmf-shim): the ISP block handlers of
+# libcvi_bin's table and libvpu's one CVI_ISP_GetVDTimeOut call. Copied into the (re-fetched,
+# git-less) pin tree; the modules' makefiles take every src/*.c.
+install -m 0644 "$SHIM/bin/isp_bin_stub.c" "$MW/v2/modules/bin/src/nanokvm_isp_bin_stub.c"
+install -m 0644 "$SHIM/vpu/isp_vd_stub.c" "$MW/v2/modules/vpu/src/nanokvm_isp_vd_stub.c"
 mk modules/bin "$LIBDIR/libcvi_bin.so" "$V2INC" "-idirafter $OUT/cvi/include/cvi_json-c -idirafter $OUT/cvi/include/cvi_miniz"
 mk modules/vpu "$LIBDIR/libvpu.so" "$V2INC" ""
 mk modules/venc "$LIBDIR/libvenc.so" "$V1INC" "-D__CV181X__"
 mk modules/vdec "$LIBDIR/libvdec.so" "$V1INC" "-D__CV181X__"
 
-# --- stage the 12-library link set ------------------------------------------------------
-BLOBS="$MW/v2/modules/isp/lib/musl_riscv64"
+# --- stage the 6-library link set -------------------------------------------------------
 OURS="libsys.so libcvi_bin.so libvpu.so libvenc.so libvdec.so"
-PINBLOBS="libisp.so libcvi_bin_isp.so libisp_algo.so libae.so libaf.so libawb.so"
 : > "$OUT/MANIFEST"
 for l in $OURS 3rd/libini.so; do
     [ -f "$LIBDIR/$l" ] || die "the build did not produce $l"
@@ -144,12 +153,7 @@ for l in $OURS 3rd/libini.so; do
     printf '%s  %s  built-from=sophgo-middleware@%s source-path-strings=%s\n' \
         "$(sha256sum "$OUT/lib/$l" | cut -d' ' -f1)" "$l" "$MW_COMMIT" "$n" >> "$OUT/MANIFEST"
 done
-for l in $PINBLOBS; do
-    [ -f "$BLOBS/$l" ] || die "the pin has no $BLOBS/$l"
-    install -m 0755 "$BLOBS/$l" "$OUT/lib/$l"
-    printf '%s  %s  closed-blob-from=sophgo-middleware@%s v2/modules/isp/lib/musl_riscv64\n' \
-        "$(sha256sum "$OUT/lib/$l" | cut -d' ' -f1)" "$l" "$MW_COMMIT" >> "$OUT/MANIFEST"
-done
+
 echo "[build-mmf] link set (sha256, name, origin):"; cat "$OUT/MANIFEST"
 
 # --- closure: NEEDED and undefined symbols of the set ---------------------------------
@@ -160,6 +164,6 @@ gcc_s="$($CC -print-file-name=libgcc_s.so.1)"
 atomic="$($CC -print-file-name=libatomic.so.1)"
 for f in "$libc" "$cpp" "$gcc_s" "$atomic"; do [ -f "$f" ] || die "toolchain has no $f"; done
 set_files=()
-for l in $OURS $PINBLOBS 3rd/libini.so; do set_files+=("$OUT/lib/$l"); done
+for l in $OURS 3rd/libini.so; do set_files+=("$OUT/lib/$l"); done
 bash "$HERE/check-mmf-closure.sh" --lib "${set_files[@]}" --system "$libc" "$cpp" "$gcc_s" "$atomic"
 log "done: $OUT/lib"

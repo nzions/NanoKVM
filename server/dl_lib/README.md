@@ -17,31 +17,27 @@ them from the build, refusing a package that lacks one. No library comes from Ma
 `libcvi_bin` also needs the declarations of `cvi_json-c` and `cvi_miniz` (Sophgo's renamed json-c and
 miniz, whose OSS tarballs are not in the pin). Only the declarations: `scripts/gen-cvi-headers.sh`
 generates them from the sha256-pinned upstream json-c 0.15-20200726 headers (`scripts/mmf-shim/rename/json-c.sed`)
-and a three-function miniz shim. The symbols themselves come at runtime from `libcvi_bin_isp.so`, which
-statically contains json-c and miniz under those names (checked: it exports `cvi_json_object_*`,
-`cvi_compress2`, `cvi_uncompress2`, `cvi_compressBound`). `libsys` includes `<linux/ion_cvitek.h>`
+and a three-function miniz shim. Since 2.6.46 `libcvi_bin` is built with `CONFIG_DISABLE_PQBIN_JSON=y`, so
+it needs no json-c or miniz symbol at run time (they used to come from the closed `libcvi_bin_isp.so`).
+`libsys` includes `<linux/ion_cvitek.h>`
 (5.10 ION) but uses nothing from it; `scripts/mmf-shim/linux/ion_cvitek.h` is an empty stand-in
 (the 7.3 kernel has no ION).
 
-## Closed vendor blobs (copied from the same pin)
+## Closed vendor blobs: none (2.6.46)
 
-`v2/modules/isp/lib/musl_riscv64/` of `scpcom/sophgo-middleware@4e231ef5967f`, copied unchanged by
-`scripts/build-mmf.sh` (sha256 in its `MANIFEST`, printed in the build log). No source exists at this pin.
+Until 2.6.45 six closed blobs of the pin (`libae libaf libawb libisp libisp_algo libcvi_bin_isp`, step
+01k5reln6l) were copied in. They are no longer linked or shipped: the LT6911 delivers YUV and the VI pipe
+bypasses the ISP (`pin/sample_common_isp.c`, `pin/sample_common_vi.c`, `pin/lt6911_cmos.c`), and the
+few symbols libcvi_bin/libvpu took from them are stubbed in `scripts/mmf-shim/{bin,vpu}`.
 
-| Library | What it is |
-|---|---|
-| `libae.so libaf.so libawb.so libisp.so libisp_algo.so libcvi_bin_isp.so` | Sophgo/CVITEK ISP and 3A (closed); step 01k5reln6l |
-
-Nothing else of the 12 libraries `libkvm_mmf.so` links comes from anywhere but the two sections above.
-(2.6.22; before it these 12 were MaixCDK's `v2/lib` prebuilts, tracked here.)
+`libkvm_mmf.so` links the 6 libraries above and nothing else. (2.6.22 to 2.6.45: 12 libraries.)
 
 Exactly the dynamic-link closure of `libkvm.so` (`readelf -d` NEEDED, transitively):
 `libkvm.so` -> `libkvm_mmf.so` -> the libraries below.
 
 | Library | What it is |
 |---|---|
-| `libae.so libaf.so libawb.so libisp.so libisp_algo.so libcvi_bin.so libcvi_bin_isp.so` | Sophgo/CVITEK ISP and 3A (closed); step 01k5reln6l |
-| `libsys.so libvdec.so libvenc.so libvpu.so libini.so` | Sophgo/CVITEK middleware (system, video codec, ini parser) |
+| `libsys.so libvdec.so libvenc.so libvpu.so libini.so libcvi_bin.so` | Sophgo/CVITEK middleware (system, video codec, ini parser) |
 
 ## Removed (2.6.18, step 01k5rem2v3)
 

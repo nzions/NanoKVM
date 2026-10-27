@@ -56,8 +56,8 @@ MAIXLITE_BUILD="${MAIXLITE_BUILD:-$HOME/maixlite-build}"
 bash "$NANOKVM_PATH/scripts/build-maixlite.sh" "$NANOKVM_PATH" "$MAIXLITE_BUILD" kvm_system
 echo "::endgroup::"
 
-# libkvm_mmf.so links the 12-library MMF set in NANOKVM_MMF_LIB (scripts/build-mmf.sh:
-# libraries built from the pinned sophgo-middleware plus that pin's closed ISP/3A blobs;
+# libkvm_mmf.so links the 6-library MMF set in NANOKVM_MMF_LIB (scripts/build-mmf.sh:
+# libraries built from the pinned sophgo-middleware, no closed ISP/3A blob;
 # support/sg2002/maixlite/libs/kvm_mmf/CMakeLists.txt). Fail closed: without it there is
 # nothing to link.
 : "${NANOKVM_MMF_LIB:?NANOKVM_MMF_LIB is unset: libkvm_mmf must link the pinned build (run via scripts/forge-build.sh)}"
@@ -71,7 +71,7 @@ echo "::endgroup::"
 
 echo "::group::mmf: ship the libraries built from the pinned middleware"
 mmf_dl="$NANOKVM_PATH/kvmapp/server/dl_lib"
-mmf_set="libsys.so libcvi_bin.so libvpu.so libvenc.so libvdec.so libini.so libisp.so libcvi_bin_isp.so libisp_algo.so libae.so libaf.so libawb.so"
+mmf_set="libsys.so libcvi_bin.so libvpu.so libvenc.so libvdec.so libini.so"
 mmf_files=()
 for lib in $mmf_set; do
     src="$NANOKVM_MMF_LIB/$lib"

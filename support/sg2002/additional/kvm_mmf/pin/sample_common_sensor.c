@@ -967,6 +967,9 @@ CVI_S32 SAMPLE_COMM_SNS_GetYuvBypassSts(SAMPLE_SNS_TYPE_E enSnsType)
 	CVI_S32 s32Ret = 0;
 	//Set YUV sensor need bypass isp
 	switch (enSnsType) {
+	/* NanoKVM change: the LT6911 HDMI bridge delivers YUV, so the VI pipe bypasses the ISP
+	 * (bYuvBypassPath = TRUE) and no closed ISP library is needed. */
+	case LONTIUM_LT6911_2M_60FPS_8BIT:
 	case GCORE_GC0312_MIPI_480P_20FPS_8BIT:
 	case GCORE_GC0329_MIPI_480P_10FPS_8BIT:
 	case GCORE_GC2145_MIPI_2M_12FPS_8BIT:
