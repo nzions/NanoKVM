@@ -1,14 +1,72 @@
 #include "oled_ctrl.h"
 #include "internal/kvm_board.h"
+#include <errno.h>
+#include <exception>
+#include <memory>
 
 using namespace maix;
 using namespace maix::sys;
 using namespace maix::peripheral;
-i2c::I2C oled_alpha(1, i2c::Mode::MASTER);
-i2c::I2C oled_beta(5, i2c::Mode::MASTER);
+#define OLED_BUS_ALPHA	1
+#define OLED_BUS_BETA	5
 
 uint8_t OLED_state = 0;
 uint8_t kvm_hw_ver = 0;
+
+// The I2C buses are opened on first use, never as globals: the constructor
+// throws when /dev/i2c-N is missing (the Cube has no OLED), and a throw from a
+// global's constructor kills the process before main. A failure is logged once
+// and the bus stays unavailable (nullptr), which turns every OLED call into a
+// no-op. Only the OLED thread and main (before it starts) call this.
+static i2c::I2C *oled_bus(int id)
+{
+	static std::unique_ptr<i2c::I2C> buses[2];
+	static bool tried[2] = {false, false};
+	int slot = (id == OLED_BUS_ALPHA) ? 0 : 1;
+
+	if(tried[slot]){
+		return buses[slot].get();
+	}
+	tried[slot] = true;
+
+	char path[32];
+	snprintf(path, sizeof(path), "/dev/i2c-%d", id);
+	int fd = open(path, O_RDWR);
+	if(fd < 0){
+		int err = errno;
+		fprintf(stderr, "[kvm_system] OLED disabled: cannot open %s: %s (errno %d)\n", path, strerror(err), err);
+		return nullptr;
+	}
+	close(fd);
+
+	try {
+		buses[slot].reset(new i2c::I2C(id, i2c::Mode::MASTER));
+	} catch (const std::exception &e) {
+		fprintf(stderr, "[kvm_system] OLED disabled: i2c bus %d: %s\n", id, e.what());
+	} catch (...) {
+		fprintf(stderr, "[kvm_system] OLED disabled: i2c bus %d: unknown exception\n", id);
+	}
+	return buses[slot].get();
+}
+
+// One write to the OLED on the board's bus. Returns 0 on success, -1 when the
+// bus is unavailable or the write failed.
+static int oled_bus_write(int bus_id, uint8_t addr, const uint8_t *buf, int len)
+{
+	i2c::I2C *bus = oled_bus(bus_id);
+	if(bus == nullptr){
+		return -1;
+	}
+	try {
+		if(bus->writeto(addr, buf, len) == (int)-err::Err::ERR_IO){
+			return -1;
+		}
+	} catch (const std::exception &e) {
+		fprintf(stderr, "[kvm_system] OLED write to bus %d failed: %s\n", bus_id, e.what());
+		return -1;
+	}
+	return 0;
+}
 
 /* mode = OLED_CMD
  * 		= OLED_DATA         */
@@ -20,17 +78,11 @@ void oled_write_register(uint8_t mode, uint8_t data)
 		buf[0] = mode;
 		buf[1] = data;
 		if(kvm_hw_ver == 0){
-			if(oled_alpha.writeto(OLED_ADDR, buf, 2) == (int)-err::Err::ERR_IO){
-				return;
-			}
+			oled_bus_write(OLED_BUS_ALPHA, OLED_ADDR, buf, 2);
 		} else if(kvm_hw_ver == 1){
-			if(oled_beta.writeto(OLED_ADDR, buf, 2) == (int)-err::Err::ERR_IO){
-				return;
-			}
+			oled_bus_write(OLED_BUS_BETA, OLED_ADDR, buf, 2);
 		} else if(kvm_hw_ver == 2){
-			if(oled_beta.writeto(OLED_PCIe_ADDR, buf, 2) == (int)-err::Err::ERR_IO){
-				return;
-			}
+			oled_bus_write(OLED_BUS_BETA, OLED_PCIe_ADDR, buf, 2);
 		}
 		return;
 	}
@@ -58,17 +110,17 @@ int oled_exist(void)
 	buf[0] = OLED_CMD;
 	buf[1] = 0xAE;
 	if(kvm_hw_ver == 0){
-		if(oled_alpha.writeto(OLED_ADDR, buf, 2) == (int)-err::Err::ERR_IO){
+		if(oled_bus_write(OLED_BUS_ALPHA, OLED_ADDR, buf, 2) != 0){
 			return 0;
 		}
 	} else if(kvm_hw_ver == 1){
 		printf("beta\r\n");
-		if(oled_beta.writeto(OLED_ADDR, buf, 2) == (int)-err::Err::ERR_IO){
+		if(oled_bus_write(OLED_BUS_BETA, OLED_ADDR, buf, 2) != 0){
 			return 0;
 		}
 	} else if(kvm_hw_ver == 2){
 		printf("PCIe\r\n");
-		if(oled_beta.writeto(OLED_PCIe_ADDR, buf, 2) == (int)-err::Err::ERR_IO){
+		if(oled_bus_write(OLED_BUS_BETA, OLED_PCIe_ADDR, buf, 2) != 0){
 			return 0;
 		}
 	}

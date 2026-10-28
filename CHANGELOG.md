@@ -1,3 +1,10 @@
+## 2.6.53 (2026-10-28)
+
+### Fixes
+
+* `kvm_system` segfaulted at start on a Cube (no OLED) and the supervisor restart-looped it. The OLED I2C buses were globals whose constructor throws when `/dev/i2c-N` is missing; the throw built a `maix::err::Exception`, whose `to_str` read the `err_str` vector before its static initialiser had run. `err_str` is now a constexpr array (and `get_error`'s string a function-local static), the OLED buses open lazily and a failure is logged (`OLED disabled: cannot open /dev/i2c-1: ...`) and turns the OLED into a no-op, and `main` logs every uncaught exception and `std::terminate` (with the exception's `what()`) to stderr, and each start-up step (new-image/new-app init, production patch, OLED probe, HDMI client) logs and is skipped on failure.
+* Not run on hardware
+
 ## 2.6.52 (2026-10-28)
 
 ### Changes

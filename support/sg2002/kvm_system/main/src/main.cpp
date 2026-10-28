@@ -179,7 +179,44 @@ void* thread_sys_handle(void * arg)
 	KVM_FLAG_STORE(kvm_sys_state.sys_thread_running, 0);
 }
 
-int main(int argc, char* argv[])
+// Runs one start-up step. A step that throws is logged (what failed and why)
+// and skipped, so one failing subsystem does not take the whole app down.
+template <typename Fn>
+static bool kvm_step(const char *what, Fn fn)
+{
+	try {
+		fn();
+		return true;
+	} catch (const std::exception &e) {
+		fprintf(stderr, "[kvm_system] %s failed: %s\n", what, e.what());
+	} catch (...) {
+		fprintf(stderr, "[kvm_system] %s failed: unknown exception\n", what);
+	}
+	return false;
+}
+
+// Reached by an exception nothing caught (a thread body, a noexcept path) or
+// an explicit abort: say what it was before dying. The supervisor restarts us.
+static void kvm_terminate_handler(void)
+{
+	fprintf(stderr, "[kvm_system] terminate called\n");
+	std::exception_ptr ep = std::current_exception();
+	if(ep){
+		try {
+			std::rethrow_exception(ep);
+		} catch (const std::exception &e) {
+			fprintf(stderr, "[kvm_system] uncaught exception: %s\n", e.what());
+		} catch (...) {
+			fprintf(stderr, "[kvm_system] uncaught exception: unknown type\n");
+		}
+	} else {
+		fprintf(stderr, "[kvm_system] no active exception\n");
+	}
+	fflush(stderr);
+	_exit(1);
+}
+
+static int kvm_system_run(int argc, char* argv[])
 {
     // Catch SIGINT signal(e.g. Ctrl + C), and set exit flag to true.
     signal(SIGINT, [](int sig){ 
@@ -196,23 +233,25 @@ int main(int argc, char* argv[])
 
 	// Execute only when it's a new image
 	if(access("/kvmapp/kvm_new_img", F_OK) == 0){
-		new_img_init();
+		kvm_step("new image init", new_img_init);
 	}
 
 	// Execute only when it's a new app
 	if(access("/kvmapp/kvm_new_app", F_OK) == 0){
-		new_app_init();
+		kvm_step("new app init", new_app_init);
 	}
 
 	// only for production testing
 	if (access("/tmp/S49kvmtest", F_OK) == 0){
 		printf("Production testing patch\n");
-		Production_testing_patch();
+		kvm_step("production testing patch", Production_testing_patch);
 	}
 
 	system("sync");
 
-	OLED_state = oled_exist();
+	// oled_exist logs why itself when the bus cannot be opened; a Cube has none.
+	OLED_state = 0;
+	kvm_step("OLED probe", [&]{ OLED_state = oled_exist(); });
 	if(OLED_state){
 		printf("oled exist\r\n");
 		system("touch /etc/kvm/oled_exist");
@@ -229,7 +268,7 @@ int main(int argc, char* argv[])
 		}
 	}
 	if(kvm_sys_state.sys_thread_running == 1){
-		kvm_start_hdmi_client();
+		kvm_step("HDMI client start", kvm_start_hdmi_client);
 	}
 	if(OLED_state == 1 && kvm_sys_state.oled_thread_running == 0){
 		kvm_sys_state.oled_thread_running = 1;
@@ -278,5 +317,19 @@ int main(int argc, char* argv[])
 		}
 		time::sleep_ms(100);
 	}
+	return 0;
+}
+
+int main(int argc, char* argv[])
+{
+	std::set_terminate(kvm_terminate_handler);
+	try {
+		return kvm_system_run(argc, argv);
+	} catch (const std::exception &e) {
+		fprintf(stderr, "[kvm_system] fatal: %s\n", e.what());
+	} catch (...) {
+		fprintf(stderr, "[kvm_system] fatal: unknown exception\n");
+	}
+	return 1;
 }
 
