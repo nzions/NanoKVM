@@ -107,10 +107,11 @@ EOF
     fi
 
     # The hostname is set only now that networking has been launched, in the
-    # background and under a timeout: it can never block the boot or touch DHCP.
+    # background: it can never block the boot or touch DHCP. hostname.sh has no
+    # wait or loop, and the image has no `timeout` applet, so none is used.
     # avahi (S50) reads the kernel hostname when it starts; that this finishes
     # before it is best-effort.
-    ( timeout 15 sh /kvmapp/system/init.d/hostname.sh || echo "S30eth: hostname step failed or timed out ($?)" >&2 ) &
+    ( sh /kvmapp/system/init.d/hostname.sh || echo "S30eth: hostname step failed ($?)" >&2 ) &
 }
 
 stop() {

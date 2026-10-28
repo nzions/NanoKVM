@@ -1,3 +1,9 @@
+## 2.6.51 (2026-10-28)
+
+### Fixes
+
+* The hostname step never ran: `S30eth` called `timeout 15 sh hostname.sh`, but the image has no `timeout` (busybox lacks the applet, "timeout: not found"), so the `nanokvm-<id>` name was never set. `hostname.sh` is now run plainly in the background; it has no wait or loop. DHCP is unchanged.
+
 ## 2.6.50 (2026-10-27)
 
 ### Fixes

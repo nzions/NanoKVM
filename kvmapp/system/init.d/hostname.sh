@@ -1,7 +1,8 @@
 #!/bin/sh
 # Sets the hostname (nanokvm-<id>, or /boot/hostname). NOT an S??* script: rcS
-# does not run it. S30eth runs it in a background subshell under `timeout`
-# AFTER networking was launched, so it can never block or alter DHCP.
+# does not run it. S30eth runs it in a background subshell (no `timeout`: the
+# image has none; this script has no wait or loop) AFTER networking was
+# launched, so it can never block or alter DHCP.
 # --- hostname ---------------------------------------------------------------
 # /boot/hostname (non-empty) wins and is applied unchanged; the web UI writes it
 # too, so a name set there persists and beats the automatic one. With none, the
