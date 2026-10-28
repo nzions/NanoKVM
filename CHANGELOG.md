@@ -1,3 +1,9 @@
+## 2.6.52 (2026-10-28)
+
+### Changes
+
+* The SD image is built with kernel-nanokvm-sg2002-full 1.4 (kernel 1.2 before): the kernel gains `CONFIG_MMC_SDHCI_PCI`, `CONFIG_GPIO_SIM` and `CONFIG_IRQ_SIM`. The userspace is unchanged from 2.6.51.
+
 ## 2.6.51 (2026-10-28)
 
 ### Fixes
