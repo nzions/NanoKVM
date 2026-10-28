@@ -179,6 +179,24 @@ void* thread_sys_handle(void * arg)
 	KVM_FLAG_STORE(kvm_sys_state.sys_thread_running, 0);
 }
 
+
+// Thread bodies run behind a guard: an exception that escapes one is logged
+// with its cause and the thread ends, instead of std::terminate killing the app.
+template <void *(*Body)(void *)>
+static void *kvm_guarded_thread(void *arg, const char *name)
+{
+	try {
+		return Body(arg);
+	} catch (const std::exception &e) {
+		fprintf(stderr, "[kvm_system] %s thread died: %s\n", name, e.what());
+	} catch (...) {
+		fprintf(stderr, "[kvm_system] %s thread died: unknown exception\n", name);
+	}
+	return NULL;
+}
+static void *kvm_guarded_sys(void *arg)  { return kvm_guarded_thread<thread_sys_handle>(arg, "sys"); }
+static void *kvm_guarded_oled(void *arg) { return kvm_guarded_thread<thread_oled_handle>(arg, "oled"); }
+static void *kvm_guarded_key(void *arg)  { return kvm_guarded_thread<thread_key_handle>(arg, "key"); }
 // Runs one start-up step. A step that throws is logged (what failed and why)
 // and skipped, so one failing subsystem does not take the whole app down.
 template <typename Fn>
@@ -262,7 +280,7 @@ static int kvm_system_run(int argc, char* argv[])
 
 	if(kvm_sys_state.sys_thread_running == 0){
 		kvm_sys_state.sys_thread_running = 1;
-		if (0 != pthread_create(&sys_state_thread, NULL, thread_sys_handle, NULL)) {
+		if (0 != pthread_create(&sys_state_thread, NULL, kvm_guarded_sys, NULL)) {
 			kvm_sys_state.sys_thread_running = 0;
 			printf("[kvms]create thread failed!\r\n");
 		}
@@ -272,14 +290,14 @@ static int kvm_system_run(int argc, char* argv[])
 	}
 	if(OLED_state == 1 && kvm_sys_state.oled_thread_running == 0){
 		kvm_sys_state.oled_thread_running = 1;
-		if (0 != pthread_create(&display_thread, NULL, thread_oled_handle, NULL)) {
+		if (0 != pthread_create(&display_thread, NULL, kvm_guarded_oled, NULL)) {
 			kvm_sys_state.oled_thread_running = 0;
 			printf("[kvms]create thread failed!\r\n");
 		}
 	}
 	if(kvm_sys_state.key_thread_running == 0){
 		kvm_sys_state.key_thread_running = 1;
-		if (0 != pthread_create(&key_thread, NULL, thread_key_handle, NULL)) {
+		if (0 != pthread_create(&key_thread, NULL, kvm_guarded_key, NULL)) {
 			kvm_sys_state.key_thread_running = 0;
 			printf("[kvms]create thread failed!\r\n");
 		}

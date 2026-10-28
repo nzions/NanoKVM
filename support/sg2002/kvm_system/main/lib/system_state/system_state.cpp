@@ -1,6 +1,7 @@
 #include "config.h"
 #include "system_state.h"
 #include "vi_state_shared.hpp"
+#include <exception>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <net/if.h>
@@ -411,7 +412,7 @@ static bool parse_hdmi_snapshot(const char *line, hdmi_snapshot_t *out)
 	return true;
 }
 
-static void* thread_hdmi_snapshots(void *arg)
+static void* hdmi_snapshots_body(void *arg)
 {
 	while (KVM_FLAG_LOAD(kvm_sys_state.sys_thread_running)) {
 		int fd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -448,6 +449,18 @@ static void* thread_hdmi_snapshots(void *arg)
 			kvm_sys_state.hdmi_height = snapshot.height;
 		}
 		fclose(fp);		// the server closed the socket: connect again
+	}
+	return NULL;
+}
+
+static void* thread_hdmi_snapshots(void *arg)
+{
+	try {
+		return hdmi_snapshots_body(arg);
+	} catch (const std::exception &e) {
+		fprintf(stderr, "[kvm_system] hdmi snapshot thread died: %s\n", e.what());
+	} catch (...) {
+		fprintf(stderr, "[kvm_system] hdmi snapshot thread died: unknown exception\n");
 	}
 	return NULL;
 }

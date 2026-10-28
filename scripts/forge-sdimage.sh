@@ -33,15 +33,15 @@ SRC="$(cd "$(dirname "$0")/.." && pwd)"
 ARTIFACTS="${ARTIFACTS_DIR:-/artifacts}"
 
 # ------------------------------------------------------------------- the pins
-USERSPACE=2.6.52
-USERSPACE_SHA256=7e317de912845fdf0c4cbff41cb942a31dfd9bf14e070794d3e171dff66bbd19
+USERSPACE=2.6.53
+USERSPACE_SHA256=TODO-pin-after-the-2.6.53-release-build
 
-KERNEL_TAG=k1.4
+KERNEL_TAG=k1.6
 INPUTS=https://hc.nikspace.net/nanokvm/sdimg/inputs
-KERNEL_IMAGE_URL=$INPUTS/kernel-nanokvm-sg2002-full-1.4.Image
-KERNEL_IMAGE_SHA256=efbe387dae14c5677912dd7d3333700f5ffdf1b35f17cc5be83d81aa5f807d14
-KERNEL_DTB_URL=$INPUTS/kernel-nanokvm-sg2002-full-1.4.sg2002-nanokvm-cube.dtb
-KERNEL_DTB_SHA256=625368bf0da44cf2dda82193ffd66378a3ed876515f173189577e8b2d105440a
+KERNEL_IMAGE_URL=$INPUTS/kernel-nanokvm-sg2002-full-1.6.Image
+KERNEL_IMAGE_SHA256=6146fb8b1e55ada93079b77b07e5fc265a763c27e24113dcea5f83037fa45f35
+KERNEL_DTB_URL=$INPUTS/kernel-nanokvm-sg2002-full-1.6.sg2002-nanokvm-cube.dtb
+KERNEL_DTB_SHA256=a4cb731543d3e30063e83a459dd834f0a3c6763865e404de03601e686fa24b76
 
 BASE_XZ_URL=https://hc.nikspace.net/nanokvm/sdimg/nanokvm-cube-2.5.16-sd.img.xz
 BASE_XZ_SHA256=0d85839b3a92b51f4c28fbaab4c0b148da23eac896b1f641184ff5477c11ba0c

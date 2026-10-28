@@ -2,7 +2,10 @@
 
 ### Fixes
 
-* `kvm_system` segfaulted at start on a Cube (no OLED) and the supervisor restart-looped it. The OLED I2C buses were globals whose constructor throws when `/dev/i2c-N` is missing; the throw built a `maix::err::Exception`, whose `to_str` read the `err_str` vector before its static initialiser had run. `err_str` is now a constexpr array (and `get_error`'s string a function-local static), the OLED buses open lazily and a failure is logged (`OLED disabled: cannot open /dev/i2c-1: ...`) and turns the OLED into a no-op, and `main` logs every uncaught exception and `std::terminate` (with the exception's `what()`) to stderr, and each start-up step (new-image/new-app init, production patch, OLED probe, HDMI client) logs and is skipped on failure.
+* `kvm_system` segfaulted at start on a Cube (no OLED) and the supervisor restart-looped it (`unhandled signal 11 ... in libstdc++.so.6.0.28`). The OLED I2C buses were globals whose constructor throws when `/dev/i2c-N` is missing; the throw built a `maix::err::Exception`, whose `to_str` read the vendored `err_str` vector before its static initialiser had run. `kvm_system` no longer constructs any maix object at static-init time: the OLED buses open lazily, a failure is logged (`OLED disabled: cannot open /dev/i2c-1: ...`) and turns the OLED into a no-op, and `main` logs every uncaught exception and `std::terminate` (with `what()`) to stderr; each start-up step (new-image/new-app init, production patch, OLED probe, HDMI client) and each thread body (sys, oled, key, hdmi snapshots) logs its failure and is skipped or ends instead of taking the app down.
+* The maix_err fix moved out of the vendored file: `components/basic/src/maix_err.cpp` is back to the upstream bytes (`UPSTREAM.sha256` verifies again); nothing in our code calls `maix::err::to_str` before `main`, so the vendored table is never read early.
+* `S15kvmhwd` loads or removes `i2c-gpio.ko` / `i2c-algo-bit.ko` only when the file exists and logs one line when it is absent or the kernel refuses (a kernel without module support printed "kernel does not support requested operation").
+* `scripts/forge-sdimage.sh` takes master's kernel pins (`kernel-nanokvm-sg2002-full` 1.6, tag `k1.6`, XTheadVector enabled) and builds on release 2.6.53.
 * Not run on hardware
 
 ## 2.6.52 (2026-10-28)

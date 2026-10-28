@@ -12,6 +12,21 @@
 KVMGPIO=/kvmapp/system/tool/kvmgpio
 GPIO_MODE=none
 
+# Load/remove a .ko only if the file is there. A kernel that has the feature
+# built in ships no module (fleet kernel 1.7), and an unsupported insmod only
+# prints "kernel does not support requested operation": skip it, log one line.
+kmod_load(){
+  if [ -f "$1" ]; then
+    insmod "$1" || echo "kvmhwd: insmod $1 failed (kernel built without module support?), continuing"
+  else
+    echo "kvmhwd: $1 absent, skipping insmod"
+  fi
+}
+kmod_unload(){
+  [ -f "$1" ] || return 0
+  rmmod "$1" 2>/dev/null || true
+}
+
 Alpha_OLED_RST_Pin=371
 Beta_OLED_RST_Pin=502
 Beta_OLED_SCL=595
@@ -49,8 +64,8 @@ init_alpha_hw(){
   hw_key pwr-key ${Alpha_PWR_KEY_Pin}  # pwr key
   hw_key rst-key ${Alpha_RST_KEY_Pin}  # rst key
 
-  rmmod /mnt/system/ko/i2c-gpio.ko
-  rmmod /mnt/system/ko/i2c-algo-bit.ko
+  kmod_unload /mnt/system/ko/i2c-gpio.ko
+  kmod_unload /mnt/system/ko/i2c-algo-bit.ko
 
   # rm /etc/init.d/S25wifimod
   # rm /etc/init.d/S30wifi
@@ -83,10 +98,10 @@ init_beta_pcie_hw(){
   hw_key rst-key ${Beta_RST_KEY_Pin}  # rst key
   hw_out hdmi-rst ${PCIe_HDMI_RST_Pin} 1  # LT6911 reset released
 
-  rmmod /mnt/system/ko/i2c-gpio.ko
-  rmmod /mnt/system/ko/i2c-algo-bit.ko
-  insmod /mnt/system/ko/i2c-algo-bit.ko
-  insmod /mnt/system/ko/i2c-gpio.ko
+  kmod_unload /mnt/system/ko/i2c-gpio.ko
+  kmod_unload /mnt/system/ko/i2c-algo-bit.ko
+  kmod_load /mnt/system/ko/i2c-algo-bit.ko
+  kmod_load /mnt/system/ko/i2c-gpio.ko
 }
 
 # gpio_mode_probe: decide the GPIO path from what the kernel shows. Every
@@ -218,10 +233,10 @@ kvm_hw_detect(){
       [ "$GPIO_MODE" = sysfs ] && echo ${Alpha_OLED_RST_Pin} > /sys/class/gpio/unexport  # OLED_RST
       hw_out oled-rst ${Beta_OLED_RST_Pin} 1  # Beta_OLED_RST_Pin
 
-      rmmod /mnt/system/ko/i2c-gpio.ko
-      rmmod /mnt/system/ko/i2c-algo-bit.ko
-      insmod /mnt/system/ko/i2c-algo-bit.ko
-      insmod /mnt/system/ko/i2c-gpio.ko
+      kmod_unload /mnt/system/ko/i2c-gpio.ko
+      kmod_unload /mnt/system/ko/i2c-algo-bit.ko
+      kmod_load /mnt/system/ko/i2c-algo-bit.ko
+      kmod_load /mnt/system/ko/i2c-gpio.ko
 
       kvm_hdmi_version_detect
 

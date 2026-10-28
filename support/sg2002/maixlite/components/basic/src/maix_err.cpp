@@ -12,13 +12,9 @@
 
 namespace maix::err
 {
-    // Both tables are used while other translation units are still running
-    // their static initialisers (an Exception thrown from a global's
-    // constructor calls to_str), so neither may be a namespace-scope object
-    // with a dynamic initialiser: that read an unconstructed std::vector and
-    // crashed the process at start. A constexpr array of literals needs no
-    // initialiser, and the string is constructed on first use.
-    static constexpr const char *err_str[] = {
+    static std::string error_str = "No error";
+
+    const std::vector<std::string> err_str = {
         "No error",
         "Invalid arguments",
         "No memory",
@@ -42,31 +38,25 @@ namespace maix::err
         "Overflow",
     };
 
-    static std::string &error_str_ref()
-    {
-        static std::string error_str = "No error";
-        return error_str;
-    }
-
     std::string& get_error()
     {
-        return error_str_ref();
+        return error_str;
     }
 
     void set_error(const std::string &str)
     {
-        error_str_ref() = str;
+        error_str = str;
     }
 
     void set_error(const char *str)
     {
-        error_str_ref() = str;
+        error_str = str;
     }
 
     std::string to_str(Err e)
     {
         // size of err_str must equal to ERR_MAX
-        static_assert(sizeof(err_str) / sizeof(err_str[0]) == ERR_MAX, "err_str must have one entry per Err");
+        assert(err_str.size() == ERR_MAX);
 
         if(e < ERR_NONE || e >= ERR_MAX)
         {
