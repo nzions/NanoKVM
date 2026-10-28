@@ -247,6 +247,8 @@ initrd and no modules. The old 4-byte patch of Ubuntu's `linux-riscv` `vmlinuz`
 
 ## sd-image.sh: a flashable microSD image for real hardware
 
+End-to-end recipe (kernel, app, re-pinning, traps): [docs/building-the-sd-image.md](../docs/building-the-sd-image.md).
+
 `sd-image.sh` is the real-device counterpart of `emu-image.sh`. It takes
 Sipeed's stock image and one of our signed releases and writes an image that
 boots what an OTA of that release leaves on a stock device. The kernel, boot
