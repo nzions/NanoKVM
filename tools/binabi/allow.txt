@@ -12,6 +12,25 @@ kvm_system imports rename # 2.6.47 lock_root_shadow replaces /etc/shadow atomica
 kvm_system imports stat # 2.6.47 lock_root_shadow keeps the shadow file's mode
 kvm_system imports strchr # 2.6.47 lock_root_shadow finds the hash field of root's line
 kvm_system sections .text 166632 # 2.6.47 golden .text (reset code replaced)
-kvm_system sections .text 166838 # 2.6.47 build .text with lock_root_shadow
+
 kvm_system sections .rodata 55464 # 2.6.47 golden .rodata (reset code replaced)
-kvm_system sections .rodata 55384 # 2.6.47 build .rodata with lock_root_shadow
+kvm_system sections .text 168322 # 2.6.53 build .text: lock_root_shadow + thread/step guards + terminate handler
+kvm_system sections .rodata 56232 # 2.6.53 build .rodata: the guards' log strings
+
+# 2.6.53: kvm_system survives a missing OLED (the Cube has none): lazy I2C buses, guarded threads and start-up steps
+kvm_system exports _Z17thread_key_handlePv # 2.6.53 called only through kvm_guarded_thread<>, inlined into its static wrapper
+kvm_system exports _Z17thread_sys_handlePv # 2.6.53 called only through kvm_guarded_thread<>, inlined into its static wrapper
+kvm_system exports _Z18thread_oled_handlePv # 2.6.53 called only through kvm_guarded_thread<>, inlined into its static wrapper
+kvm_system exports _ZN4maix10peripheral3i2c3I2CD1Ev # 2.6.53 no global I2C objects; oled_bus() holds them in unique_ptr
+kvm_system exports oled_alpha # 2.6.53 global I2C bus 1 replaced by lazy oled_bus()
+kvm_system exports oled_beta # 2.6.53 global I2C bus 5 replaced by lazy oled_bus()
+kvm_system exports _Z12new_app_initv # 2.6.53 passed by address to kvm_step(), so emitted out of line
+kvm_system exports _Z12new_img_initv # 2.6.53 passed by address to kvm_step(), so emitted out of line
+kvm_system exports _Z21kvm_start_hdmi_clientv # 2.6.53 passed by address to kvm_step(), so emitted out of line
+kvm_system exports _Z24Production_testing_patchv # 2.6.53 passed by address to kvm_step(), so emitted out of line
+kvm_system imports _ZNSt15__exception_ptr13exception_ptrC1ERKS0_ # 2.6.53 kvm_terminate_handler reports the uncaught exception
+kvm_system imports _ZNSt15__exception_ptr13exception_ptrD1Ev # 2.6.53 kvm_terminate_handler reports the uncaught exception
+kvm_system imports _ZSt13set_terminatePFvvE # 2.6.53 installs kvm_terminate_handler
+kvm_system imports _ZSt17current_exceptionv # 2.6.53 kvm_terminate_handler reports the uncaught exception
+kvm_system imports _ZSt17rethrow_exceptionNSt15__exception_ptr13exception_ptrE # 2.6.53 kvm_terminate_handler reports the uncaught exception
+kvm_system imports _exit # 2.6.53 kvm_terminate_handler exits without running static destructors
