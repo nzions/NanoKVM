@@ -34,14 +34,14 @@ ARTIFACTS="${ARTIFACTS_DIR:-/artifacts}"
 
 # ------------------------------------------------------------------- the pins
 USERSPACE=2.6.53
-USERSPACE_SHA256=TODO-pin-after-the-2.6.53-release-build
+USERSPACE_SHA256=8cdb395a02b14e861711ae654668a259b3a692750e3f005ae75a6756935d7d71
 
-KERNEL_TAG=k1.6
+KERNEL_TAG=k1.7
 INPUTS=https://hc.nikspace.net/nanokvm/sdimg/inputs
-KERNEL_IMAGE_URL=$INPUTS/kernel-nanokvm-sg2002-full-1.6.Image
-KERNEL_IMAGE_SHA256=6146fb8b1e55ada93079b77b07e5fc265a763c27e24113dcea5f83037fa45f35
-KERNEL_DTB_URL=$INPUTS/kernel-nanokvm-sg2002-full-1.6.sg2002-nanokvm-cube.dtb
-KERNEL_DTB_SHA256=a4cb731543d3e30063e83a459dd834f0a3c6763865e404de03601e686fa24b76
+KERNEL_IMAGE_URL=$INPUTS/kernel-nanokvm-sg2002-full-1.7.Image
+KERNEL_IMAGE_SHA256=593a18552a2f4139f5b55deba295b20d6275f1b7786b59dbc3d4dd905f9f6394
+KERNEL_DTB_URL=$INPUTS/kernel-nanokvm-sg2002-full-1.7.sg2002-nanokvm-cube.dtb
+KERNEL_DTB_SHA256=75550479d2a4f517cac9a11430d6949b31006e02fe30598b188f930ac1777039
 
 BASE_XZ_URL=https://hc.nikspace.net/nanokvm/sdimg/nanokvm-cube-2.5.16-sd.img.xz
 BASE_XZ_SHA256=0d85839b3a92b51f4c28fbaab4c0b148da23eac896b1f641184ff5477c11ba0c
